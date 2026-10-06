@@ -10,6 +10,7 @@
 - session_id: `claude_code_cloud:swingbot-<YYYY-MM-DD>`, topics: `claude_code`, `cloud`, `swingbot`.
 - 원문 전체를 넣지 않는다(긴 원문은 안전 필터에 걸린다). 저장 형식은 작업 요약 `{날짜, 완료 항목[], 미완료 항목[], 미반영 요청 research_id[]}` 500자 안팎. 원문이 필요하면 세션 jsonl 파일을 직접 읽는다.
 - 저장 후 `search_conversations`로 검색해 나오는지 확인하기 전엔 완료라고 하지 않는다.
+- 주의: `save_conversation`은 같은 session_id라도 덮어쓰지 않고 행을 추가한다(2026-10-06 확인). 한 세션에 한 번만, 마지막에 저장하는 것을 원칙으로 하고, 다시 저장해야 하면 날짜 뒤에 `-v2`처럼 붙인다. `get_conversation`은 같은 session_id 행을 전부 이어붙여 돌려준다.
 
 ## 지키는 것
 - 사이트는 주문을 내지 않는다. 승인과 조회만.
