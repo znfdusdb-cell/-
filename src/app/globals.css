@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0b0d12;
+  --bg-2: #12151c;
+  --bg-3: #1a1e27;
+  --line: #262b36;
+  --fg: #e8eaf0;
+  --fg-2: #9aa3b5;
+  --fg-3: #626b7d;
+  --up: #f04452;   /* 상승 빨강 (한국 증권앱 관례) */
+  --down: #3182f6; /* 하락 파랑 */
+  --go: #22c55e;
+  --warn: #f59e0b;
+  --stop: #ef4444;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-2: var(--bg-2);
+  --color-bg-3: var(--bg-3);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --color-go: var(--go);
+  --color-warn: var(--warn);
+  --color-stop: var(--stop);
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.num { font-variant-numeric: tabular-nums; }
+.scroll-x { overflow-x: auto; scrollbar-width: none; }
+.scroll-x::-webkit-scrollbar { display: none; }
