@@ -29,7 +29,7 @@ npm run dev        # 환경변수 없으면 내장 시드 데이터로 뜬다 (�
 ## Supabase 연결 (비움 승인 후)
 
 1. `docs/SCHEMA.md` 읽고 승인.
-2. Supabase SQL Editor에서 `supabase/migrations/20261006_swingbot_init.sql` 실행.
+2. Supabase SQL Editor에서 `supabase/migrations/20261006_swingbot_init.sql` → `20261006_02_accounts_rules_calendar.sql` 순서로 실행.
 3. 같은 곳에서 `supabase/seed.sql` 실행 (또는 `.env.local` 채우고 `npx tsx scripts/seed.ts`).
 4. `.env.example`을 `.env.local`로 복사해 값 채움. 배지가 'DB'로 바뀐다.
 
@@ -45,7 +45,7 @@ vercel env add SITE_PASSCODE          # 사이트 잠금 비밀번호 (폰에서
 vercel --prod
 ```
 
-`SITE_PASSCODE`가 없으면 잠금이 없다. 포지션이 보이는 사이트이니 배포 시엔 꼭 넣는다. (비움 전용 로그인으로 바꾸는 안은 docs/SCHEMA.md 하단 참고)
+`SITE_PASSCODE`가 없으면 잠금이 없다. 매직링크 로그인(비움 이메일 1개만 허용)으로 바꾸려면 `NEXT_PUBLIC_SUPABASE_ANON_KEY`·`AUTH_ALLOWED_EMAIL`을 추가하고 Supabase Redirect URL을 등록한다. 절차는 docs/SCHEMA.md 8장.
 
 ## 봇·브레인이 쓰는 테이블
 

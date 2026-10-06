@@ -39,7 +39,27 @@ export const POSITION_STATE_LABEL: Record<PositionState, string> = {
   squat_wait: "스쿼트 대기",
   reset_watch: "재설정 감시",
   closed: "종료",
+  manual: "수동 보유",
 };
+
+export const ACCOUNT_LABEL: Record<"kis_bot" | "kb_manual", string> = {
+  kis_bot: "한투 봇 계좌",
+  kb_manual: "KB 수동 보유",
+};
+
+/** sb_settings 키와 설명. 값 null = 비움 미확정. */
+export const SETTING_KEYS: { key: string; label: string; unit?: string }[] = [
+  { key: "bot_started_at", label: "봇 가동일" },
+  { key: "bot_account_balance", label: "봇 계좌 잔고", unit: "원" },
+  { key: "max_weight_per_stock_pct", label: "SZ-1 종목당 비중 상한", unit: "%" },
+  { key: "max_weight_per_sector_pct", label: "SZ-1 업종당 비중 상한", unit: "%" },
+  { key: "uv4_drawdown_pct", label: "UV-4 고점 대비 조정 상한", unit: "%" },
+  { key: "uv4_market_multiple", label: "UV-4 시장 대비 조정 배수 상한", unit: "배" },
+  { key: "regime_vkospi_reduce", label: "시장 필터: VKOSPI 축소 기준" },
+  { key: "regime_vkospi_wait", label: "시장 필터: VKOSPI 관망 기준" },
+  { key: "regime_lev_etf_share_reduce", label: "시장 필터: 레버리지 ETF 비중 축소 기준", unit: "%" },
+  { key: "regime_ma200_slope_min_pct", label: "시장 필터: 200일선 기울기 최소", unit: "%" },
+];
 
 export const REGIME_LABEL: Record<RegimeSignal, string> = {
   trade: "거래",
@@ -102,6 +122,7 @@ export const RULES: Rule[] = [
   { rule_id: "UV-1", category: "유니버스", title: "유니버스 밖 종목 매수 금지", description: "봇은 '유니버스' 단계 종목만 매수할 수 있다. 사람이 승인한다." },
   { rule_id: "UV-2", category: "유니버스", title: "가설 + 무효화 조건 필수", description: "무효화 조건이 비어 있으면 유니버스 승인 불가." },
   { rule_id: "UV-3", category: "유니버스", title: "무효화 위반 시 검토 강등", description: "무효화 조건 위반 확인 → 검토 단계로 강등 → 비움 승인 후 퇴출(봇 매도)." },
+  { rule_id: "UV-4", category: "유니버스", title: "제외 조건", description: "고점 대비 60% 이상 조정, 또는 같은 기간 비교 지수 대비 2배 이상 조정한 종목은 유니버스 승인 불가. 대형 지수 비중주는 코스피 대신 반도체지수·코스닥 등으로 비교." },
   { rule_id: "EN-1", category: "진입", title: "피봇 장중 돌파 + 거래량", description: "피봇(C 박스/베이스 고점) 장중 돌파 + 개장 2시간 내 누적 거래량 ≥ 50일 평균 일거래량의 50%." },
   { rule_id: "EN-2", category: "진입", title: "추격 금지", description: "피봇 대비 +2~3%를 넘으면 주문 취소. 추격 매수 금지." },
   { rule_id: "EN-3", category: "진입", title: "정찰병 3거래일", description: "소액 정찰병으로 진입 후 3거래일 관찰. 관찰 중 손절선 도달 시 즉시 종료." },
@@ -109,7 +130,9 @@ export const RULES: Rule[] = [
   { rule_id: "EN-5", category: "진입", title: "2차는 피봇 돌파 확인 후", description: "2차 추가는 피봇 돌파 확인 후." },
   { rule_id: "EN-6", category: "진입", title: "3차는 트렌드 템플레이트 대부분 충족", description: "3차 추가는 트렌드 템플레이트 8요건 대부분 충족 시." },
   { rule_id: "EN-7", category: "진입", title: "물타기 금지", description: "손실 중 추가매수 금지. 피라미딩은 위로만." },
-  { rule_id: "EN-8", category: "진입", title: "주 수로 계산해 로그", description: "주문은 금액이 아니라 주 수로 계산해 주문 전 로그에 기록 (9/18 10주 오주문 재발 방지)." },
+  { rule_id: "EN-8", category: "진입", title: "주 수로 계산해 로그", description: "주문은 금액이 아니라 주 수로 계산해 주문 전 로그에 기록 (8/18 10주 오주문 재발 방지)." },
+  { rule_id: "RR-1", category: "진입", title: "손익비 2:1 이상 사전 고정", description: "매수 전 손절가·목표가를 숫자로 기록하고 손익비 (목표-진입)/(진입-손절) 가 2:1~3:1 이상이어야 한다. 미기록 시 주문 거부." },
+  { rule_id: "SZ-1", category: "진입", title: "종목당·업종당 비중 상한", description: "봇 계좌 잔고 기준 종목당·업종당 최대 비중(sb_settings)을 넘는 주문은 거부." },
   { rule_id: "EX-1", category: "손절·매도", title: "손절 -6% 장중 발동", description: "진입가 -6%. 장중에 손절가 닿으면 발동." },
   { rule_id: "EX-2", category: "손절·매도", title: "손절선 갱신: 종가×0.94, 1일 1회, 위로만", description: "갱신은 종가 기준 하루 한 번, 위로만 움직인다." },
   { rule_id: "EX-3", category: "손절·매도", title: "수익 구간 최소 본전", description: "수익 구간에서는 손절선을 최소 본전 이상으로." },

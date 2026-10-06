@@ -2,12 +2,12 @@
  * 시드 데이터. Supabase 연결이 없을 때 사이트가 그대로 쓰고,
  * scripts/seed.ts 가 같은 데이터를 Supabase에 넣는다. (단일 출처)
  *
- * 삼성전자 숫자는 9/22 10:41 마지막 확인값(13주, 평단 257,575, 손절 본전 고정).
- * 이후 포지션 변화 미확인 → 비움이 실제 숫자를 주면 교체한다. 일봉은 가짜다.
+ * 삼성전자는 KB 수동 보유(봇 대상 아님). 체결 이력은 재구성 불가라 화면으로 확인된 잔고 스냅샷만 넣는다
+ * (swingbot_erratum_2_2026-10-06). 9/22 이후 미확인 → 비움이 실제 숫자를 주면 교체. 일봉은 가짜다.
  * 나머지 4종목은 완전히 가짜(이름 앞에 [가짜]).
  */
 import type {
-  Stock, Thesis, Setup, Position, OrderLog, MarketEvent, Prediction, MarketRegime, Candle, StageLog, CheckItem, Settings,
+  Stock, Thesis, Setup, Position, OrderLog, MarketEvent, Prediction, MarketRegime, Candle, StageLog, CheckItem, Settings, BalanceSnapshot,
 } from "./types";
 import { TREND_TEMPLATE_ITEMS, CHECKLIST_ITEMS } from "./constants";
 
@@ -56,7 +56,7 @@ function makeCandles(code: string, seed: number, anchors: [number, number][], n:
     const lo = round(Math.min(open, close) * (1 - rnd() * 0.012));
     const move = Math.abs(close - open) / open;
     const volume = Math.round(baseVol * (0.5 + rnd() + move * 40));
-    out.push({ code, date: days[i], open, high: hi, low: lo, close, volume });
+    out.push({ code, date: days[i], open, high: hi, low: lo, close, volume, source: "seed" });
     prevClose = close;
   }
   return out;
@@ -72,18 +72,15 @@ const score = (items: CheckItem[]) => items.filter((i) => i.pass).length;
 
 // ---------- 종목 ----------
 export const SEED_STOCKS: Stock[] = [
-  { code: "005930", name: "삼성전자", market: "KOSPI", sector: "반도체", stage: "holding", stage_changed_at: "2026-09-18T01:05:00+09:00", stage_reason: "정찰병 체결 (봇)", is_seed: false },
+  { code: "005930", name: "삼성전자", market: "KOSPI", sector: "반도체", stage: "review", stage_changed_at: "2026-10-06T09:00:00+09:00", stage_reason: "KB 계좌 수동 보유 중. 봇 계좌 파이프라인은 검토부터 시작 (가설 작성 완료, 유니버스 승인 대기)", is_seed: false },
   { code: "999901", name: "[가짜] 알파로보틱스", market: "KOSDAQ", sector: "로봇", stage: "radar", stage_changed_at: "2026-10-05T07:10:00+09:00", stage_reason: "브레인 후보 수집: 상대강도 상위", is_seed: true },
   { code: "999902", name: "[가짜] 베타바이오", market: "KOSDAQ", sector: "바이오", stage: "review", stage_changed_at: "2026-10-02T09:30:00+09:00", stage_reason: "가설 작성 중", is_seed: true },
   { code: "999903", name: "[가짜] 감마조선", market: "KOSPI", sector: "조선", stage: "universe", stage_changed_at: "2026-09-29T20:00:00+09:00", stage_reason: "비움 승인", is_seed: true },
-  { code: "999904", name: "[가짜] 델타에너지", market: "KOSPI", sector: "에너지", stage: "exited", stage_changed_at: "2026-09-25T15:40:00+09:00", stage_reason: "무효화 조건 위반 확인 후 퇴출 승인", is_seed: true },
+  { code: "999904", name: "[가짜] 델타에너지", market: "KOSPI", sector: "에너지", stage: "exited", stage_changed_at: "2026-09-29T15:40:00+09:00", stage_reason: "무효화 조건 위반 확인 후 퇴출 승인", is_seed: true },
 ];
 
 export const SEED_STAGE_LOG: StageLog[] = [
-  { id: 1, code: "005930", from_stage: null, to_stage: "radar", reason: "시드", actor: "brain", created_at: "2026-09-01T09:00:00+09:00" },
-  { id: 2, code: "005930", from_stage: "radar", to_stage: "review", reason: "3C 대입 시작", actor: "bium", created_at: "2026-09-05T21:00:00+09:00" },
-  { id: 3, code: "005930", from_stage: "review", to_stage: "universe", reason: "가설·무효화 조건 작성 완료", actor: "bium", created_at: "2026-09-15T22:30:00+09:00" },
-  { id: 4, code: "005930", from_stage: "universe", to_stage: "holding", reason: "정찰병 체결", actor: "bot", created_at: "2026-09-18T01:05:00+09:00" },
+  { id: 1, code: "005930", from_stage: null, to_stage: "review", reason: "시드: KB 수동 보유 중, 가설·무효화 조건 작성 완료. 봇 계좌 기준으론 아직 유니버스 아님", actor: "bium", created_at: "2026-10-06T09:00:00+09:00" },
   { id: 5, code: "999901", from_stage: null, to_stage: "radar", reason: "상대강도 상위 + 거래량 축소 감지", actor: "brain", created_at: "2026-10-05T07:10:00+09:00" },
   { id: 6, code: "999902", from_stage: null, to_stage: "radar", reason: "실적 서프라이즈 2분기 연속", actor: "brain", created_at: "2026-09-28T07:10:00+09:00" },
   { id: 7, code: "999902", from_stage: "radar", to_stage: "review", reason: "가설 작성 시작", actor: "bium", created_at: "2026-10-02T09:30:00+09:00" },
@@ -93,7 +90,7 @@ export const SEED_STAGE_LOG: StageLog[] = [
   { id: 11, code: "999904", from_stage: null, to_stage: "radar", reason: "유가 급등 수혜 가설", actor: "brain", created_at: "2026-09-10T07:10:00+09:00" },
   { id: 12, code: "999904", from_stage: "radar", to_stage: "universe", reason: "시드", actor: "bium", created_at: "2026-09-12T20:00:00+09:00" },
   { id: 13, code: "999904", from_stage: "universe", to_stage: "review", reason: "무효화 조건 위반 의심: 유가 70달러 하회", actor: "brain", created_at: "2026-09-24T07:10:00+09:00" },
-  { id: 14, code: "999904", from_stage: "review", to_stage: "exited", reason: "무효화 조건 위반 확인 후 퇴출 승인", actor: "bium", created_at: "2026-09-25T15:40:00+09:00" },
+  { id: 14, code: "999904", from_stage: "review", to_stage: "exited", reason: "무효화 조건 위반 확인 후 퇴출 승인", actor: "bium", created_at: "2026-09-29T15:40:00+09:00" },
 ];
 
 // ---------- 가설 ----------
@@ -146,7 +143,7 @@ export const SEED_SETUPS: Setup[] = [
     trend_template_score: 0,
     checklist: cl([true, true, false, true, true, false, false]),
     checklist_score: 0,
-    drawdown_pct: -13.0, market_drawdown_pct: -6.5, drawdown_vs_market: 2.0,
+    drawdown_pct: -13.0, market_drawdown_pct: -6.5, drawdown_vs_market: 2.0, benchmark: "SOX",
     notes: "C 박스가 아직 넓음(-13%). 거래량 7월 1억 주 → 9월 1,600만~2,800만 주로 축소. 피봇 288,000 돌파 + 거래량 전까지 2차 금지.",
   },
   {
@@ -158,7 +155,7 @@ export const SEED_SETUPS: Setup[] = [
     trend_template_score: 0,
     checklist: cl([true, true, true, true, true, false, false]),
     checklist_score: 0,
-    drawdown_pct: -6.0, market_drawdown_pct: -6.5, drawdown_vs_market: 0.9,
+    drawdown_pct: -6.0, market_drawdown_pct: -6.5, drawdown_vs_market: 0.9, benchmark: "KOSDAQ",
     notes: "[가짜] 펀더멘털 미확인. 가설 없음.",
   },
   {
@@ -170,7 +167,7 @@ export const SEED_SETUPS: Setup[] = [
     trend_template_score: 0,
     checklist: cl([true, false, false, false, true, false, false]),
     checklist_score: 0,
-    drawdown_pct: -20.0, market_drawdown_pct: -6.5, drawdown_vs_market: 3.1,
+    drawdown_pct: -20.0, market_drawdown_pct: -6.5, drawdown_vs_market: 3.1, benchmark: "KOSDAQ",
     notes: "[가짜] 조정이 안 줄어듦. 시장 대비 3배 조정 → 제외 기준 근접.",
   },
   {
@@ -182,7 +179,7 @@ export const SEED_SETUPS: Setup[] = [
     trend_template_score: 0,
     checklist: cl([true, true, true, true, true, false, false]),
     checklist_score: 0,
-    drawdown_pct: -8.0, market_drawdown_pct: -6.5, drawdown_vs_market: 1.2,
+    drawdown_pct: -8.0, market_drawdown_pct: -6.5, drawdown_vs_market: 1.2, benchmark: "KOSPI",
     notes: "[가짜] 플랫 베이스 6주차. 피봇 131,500. 거래량 마른 7일째.",
   },
   {
@@ -194,27 +191,45 @@ export const SEED_SETUPS: Setup[] = [
     trend_template_score: 0,
     checklist: cl([false, true, false, false, true, false, false]),
     checklist_score: 0,
-    drawdown_pct: -22.0, market_drawdown_pct: -6.5, drawdown_vs_market: 3.4,
+    drawdown_pct: -22.0, market_drawdown_pct: -6.5, drawdown_vs_market: 3.4, benchmark: "KOSPI",
     notes: "[가짜] 50일선 이탈. 퇴출.",
   },
-].map((s) => ({ ...s, trend_template_score: score(s.trend_template), checklist_score: score(s.checklist) })) as Setup[];
+].map((s) => ({ ...s, data_source: "seed" as const, trend_template_score: score(s.trend_template), checklist_score: score(s.checklist) })) as Setup[];
 
 // ---------- 포지션 ----------
 export const SEED_POSITIONS: Position[] = [
-  { id: 1, code: "005930", qty: 13, avg_price: 257575, stop_price: 257575, state: "scout", entry_rule_id: "EN-3", is_unverified: true, note: "9/22 10:41 확인값(13주, 평단 257,575, 손절 본전). 이후 변동 미확인 — 비움이 현재 수량·평단을 주면 교체", opened_at: "2026-09-18T01:05:00+09:00", closed_at: null, updated_at: "2026-09-22T10:41:00+09:00" },
-  { id: 2, code: "999904", qty: 0, avg_price: 41200, stop_price: 36000, state: "closed", entry_rule_id: "EN-3", is_unverified: false, note: "[가짜]", opened_at: "2026-09-15T09:40:00+09:00", closed_at: "2026-09-26T09:02:00+09:00", updated_at: "2026-09-26T09:02:00+09:00" },
+  { id: 1, code: "005930", account: "kb_manual", qty: 13, avg_price: 257575, stop_price: null, state: "manual", entry_rule_id: null, is_unverified: true, note: "KB 계좌 수동 보유. 봇 상태 머신·손절 자동화 대상 아님. 9/22 10:41 확인값(13주, 평단 257,575). 이후 변동 미확인 — 비움이 현재 수량·평단을 주면 교체", opened_at: "2026-08-13T09:00:00+09:00", closed_at: null, updated_at: "2026-09-22T10:41:00+09:00" },
+  { id: 2, code: "999904", account: "kis_bot", qty: 0, avg_price: 41200, stop_price: 36000, state: "closed", entry_rule_id: "EN-3", is_unverified: false, note: "[가짜]", opened_at: "2026-09-15T09:40:00+09:00", closed_at: "2026-09-29T09:02:00+09:00", updated_at: "2026-09-29T09:02:00+09:00" },
+];
+
+/** 확인된 시점의 잔고 스냅샷 (체결가·체결일은 지어내지 않는다) */
+export const SEED_SNAPSHOTS: BalanceSnapshot[] = [
+  { id: 1, account: "kb_manual", code: "005930", as_of: "2026-08-18T09:00:00+09:00", qty: 1, avg_price: null, market_price: null, cash: null, note: "8/18 오전 잔고: 정찰병 1주, +6.19% (8/13 전후 매수)" },
+  { id: 2, account: "kb_manual", code: "005930", as_of: "2026-08-18T15:14:00+09:00", qty: 10, avg_price: 268400, market_price: 267500, cash: null, note: "10주 오주문 (계획 1주). 매입금액 약 2,684,190원 → EN-8 신설 계기" },
+  { id: 3, account: "kb_manual", code: "005930", as_of: "2026-08-26T09:43:00+09:00", qty: 10, avg_price: 259609, market_price: null, cash: null, note: "8/18 이후 일부 매도·재매수 추정, 미확인" },
+  { id: 4, account: "kb_manual", code: "005930", as_of: "2026-09-04T10:11:00+09:00", qty: 13, avg_price: 257575, market_price: null, cash: 2900000, note: "3주 추가: 국장 총액 증가(예수금 168만→290만)에 따른 수동 비중 조정. 정찰병 규칙 매수 아님" },
+  { id: 5, account: "kb_manual", code: "005930", as_of: "2026-09-22T10:41:00+09:00", qty: 13, avg_price: 257575, market_price: 279250, cash: null, note: "마지막 확인. 이후 미확인" },
 ];
 
 // ---------- 주문 로그 ----------
 export const SEED_ORDERS: OrderLog[] = [
-  { id: 1, ts: "2026-09-15T09:40:00+09:00", code: "999904", side: "buy", qty: 10, planned_qty: 10, price: 41200, source: "bot", rule_id: "EN-3", rule_text: "정찰병 소액 진입", is_violation: false, note: "[가짜]" },
-  { id: 2, ts: "2026-09-18T01:05:00+09:00", code: "005930", side: "buy", qty: 10, planned_qty: 1, price: 257575, source: "manual", rule_id: null, rule_text: null, is_violation: true, note: "봇 이전 수동 매매. 정찰병 1주 계획이 10주로 들어감 (9/18 오주문) → EN-8 신설 계기. 카운터 제외" },
-  { id: 3, ts: "2026-09-19T09:31:00+09:00", code: "005930", side: "buy", qty: 3, planned_qty: 3, price: 257575, source: "manual", rule_id: "EN-3", rule_text: "정찰병 소액 진입 (주 수 계산 로그: 3주)", is_violation: false, note: "봇 이전 수동 매매. 카운터 제외" },
-  { id: 4, ts: "2026-09-26T09:02:00+09:00", code: "999904", side: "sell", qty: 10, planned_qty: 10, price: 38600, source: "bot", rule_id: "UV-3", rule_text: "무효화 조건 위반 → 퇴출 승인 → 봇 매도", is_violation: false, note: "[가짜]" },
+  { id: 1, ts: "2026-09-15T09:40:00+09:00", code: "999904", side: "buy", qty: 10, planned_qty: 10, price: 41200, source: "bot", stop_price: 38700, target_price: 47000, account_balance_at: 6200000, rule_id: "EN-3", rule_text: "정찰병 소액 진입", is_violation: false, note: "[가짜]" },
+  { id: 2, ts: "2026-09-29T09:02:00+09:00", code: "999904", side: "sell", qty: 10, planned_qty: 10, price: 38600, source: "bot", stop_price: null, target_price: null, account_balance_at: 6180000, rule_id: "UV-3", rule_text: "무효화 조건 위반 → 퇴출 승인 → 봇 매도", is_violation: false, note: "[가짜] 추석 연휴 뒤 첫 거래일" },
 ];
 
-/** 봇 가동일. 시드값(가짜). 모의투자 시작일로 바꾼다. null 이면 카운터는 '봇 미가동'. */
-export const SEED_SETTINGS: Settings = { bot_started_at: "2026-09-15" };
+/** sb_settings. null = 비움 미확정. 봇 가동일은 모의투자 시작일에 넣는다. */
+export const SEED_SETTINGS: Settings = {
+  bot_started_at: null,
+  bot_account_balance: null,
+  max_weight_per_stock_pct: null,
+  max_weight_per_sector_pct: null,
+  uv4_drawdown_pct: "60",
+  uv4_market_multiple: "2",
+  regime_vkospi_reduce: null,
+  regime_vkospi_wait: null,
+  regime_lev_etf_share_reduce: null,
+  regime_ma200_slope_min_pct: null,
+};
 
 // ---------- 이벤트 ----------
 export const SEED_EVENTS: MarketEvent[] = [
@@ -237,14 +252,16 @@ export const SEED_REGIME: MarketRegime[] = [
     kospi_close: 3420.5, kospi_ma200: 3215.2, kospi_ma200_slope_pct: 1.8,
     kosdaq_close: 812.3, kosdaq_ma200: 790.1, kosdaq_ma200_slope_pct: 0.4,
     vkospi: 24.8, lev_etf_turnover_share_pct: 9.2,
-    reasons: ["코스피·코스닥 200일선 위, 기울기 상승 → 거래 조건 충족", "VKOSPI 24.8 (20 초과) → 축소", "단일종목 레버리지 ETF 거래대금 비중 9.2% (코스닥 풍선효과) → 축소"],
+    reasons: ["코스피·코스닥 200일선 위, 기울기 상승", "VKOSPI 24.8 → 축소 (임계값 미확정)", "단일종목 레버리지 ETF 거래대금 비중 9.2% → 축소 (임계값 미확정)"],
+    is_seed: true,
   },
   {
     as_of: "2026-10-02", signal: "reduce",
     kospi_close: 3388.1, kospi_ma200: 3209.0, kospi_ma200_slope_pct: 1.7,
     kosdaq_close: 805.0, kosdaq_ma200: 789.4, kosdaq_ma200_slope_pct: 0.4,
     vkospi: 25.9, lev_etf_turnover_share_pct: 10.1,
-    reasons: ["VKOSPI 25.9 → 축소"],
+    reasons: ["VKOSPI 25.9 → 축소 (임계값 미확정)"],
+    is_seed: true,
   },
 ];
 

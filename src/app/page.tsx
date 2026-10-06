@@ -7,11 +7,11 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const repo = getRepo();
-  const [regime, items, events] = await Promise.all([repo.latestRegime(), repo.summaries(), repo.upcomingEvents(14)]);
+  const [regime, items, events, settings] = await Promise.all([repo.latestRegime(), repo.summaries(), repo.upcomingEvents(14), repo.settings()]);
   const names = Object.fromEntries(items.map((i) => [i.stock.code, i.stock.name]));
   return (
     <div className="space-y-4">
-      <MarketLight regime={regime} />
+      <MarketLight regime={regime} settings={settings} />
       <UpcomingEvents events={events} names={names} />
       <PipelineBoard items={items} />
       <p className="text-[11px] leading-relaxed text-fg-3">

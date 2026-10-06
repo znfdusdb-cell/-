@@ -8,7 +8,7 @@ import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { RULES } from "../src/lib/constants";
 import {
-  SEED_STOCKS, SEED_STAGE_LOG, SEED_THESES, SEED_SETUPS, SEED_POSITIONS, SEED_ORDERS, SEED_EVENTS, SEED_PREDICTIONS, SEED_REGIME, SEED_CANDLES, SEED_SETTINGS,
+  SEED_STOCKS, SEED_STAGE_LOG, SEED_THESES, SEED_SETUPS, SEED_POSITIONS, SEED_ORDERS, SEED_EVENTS, SEED_PREDICTIONS, SEED_REGIME, SEED_CANDLES, SEED_SETTINGS, SEED_SNAPSHOTS,
 } from "../src/lib/seed-data";
 
 type Row = Record<string, unknown>;
@@ -21,12 +21,13 @@ const TABLES: { table: string; rows: Row[]; conflict: string }[] = [
   { table: "sb_theses", rows: strip(SEED_THESES as unknown as Row[], ["id"]), conflict: "" },
   { table: "sb_setups", rows: strip(SEED_SETUPS as unknown as Row[], ["id"]), conflict: "code,as_of" },
   { table: "sb_positions", rows: strip(SEED_POSITIONS as unknown as Row[], ["id"]), conflict: "" },
+  { table: "sb_balance_snapshots", rows: strip(SEED_SNAPSHOTS as unknown as Row[], ["id"]), conflict: "" },
   { table: "sb_orders_log", rows: strip(SEED_ORDERS as unknown as Row[], ["id"]), conflict: "" },
   { table: "sb_events", rows: strip(SEED_EVENTS as unknown as Row[], ["id"]), conflict: "" },
   { table: "sb_predictions", rows: strip(SEED_PREDICTIONS as unknown as Row[], ["id"]), conflict: "" },
   { table: "sb_market_regime", rows: SEED_REGIME as unknown as Row[], conflict: "as_of" },
   { table: "sb_candles", rows: SEED_CANDLES as unknown as Row[], conflict: "code,date" },
-  { table: "sb_settings", rows: [{ key: "bot_started_at", value: SEED_SETTINGS.bot_started_at }], conflict: "key" },
+  { table: "sb_settings", rows: Object.entries(SEED_SETTINGS).map(([key, value]) => ({ key, value })), conflict: "key" },
 ];
 
 function lit(v: unknown): string {

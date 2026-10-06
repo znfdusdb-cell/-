@@ -72,3 +72,32 @@ Supabase 본체에는 아직 실행하지 않았다.
 | C. Cloudflare Access (무료 50명) | 0원 | 앱 코드 손 안 댐, 도메인 단위 차단 | 서비스 하나 추가, 커스텀 도메인 필요 |
 
 추천은 **A**(허용 이메일 = znfdusdb@naver.com, 그 외 이메일은 로그인 자체 거부). 비밀번호를 외울 것도 유출될 것도 없고 bium-brain Supabase 안에서 끝난다. 승인하면 `@supabase/ssr`로 붙이고 지금 비밀번호 잠금은 폴백으로 남긴다.
+
+## 7. 2차 마이그레이션 (2026-10-06, 비움 수정 요청 7개 반영) — `supabase/migrations/20261006_02_accounts_rules_calendar.sql`
+
+전부 추가만. 1차 실행 뒤 SQL Editor에서 실행하고, `supabase/seed.sql`을 다시 실행한다(시드 종목을 지우고 다시 넣는다).
+
+- 계좌 구분 `sb_positions.account` (kis_bot / kb_manual). KB 삼성전자는 `kb_manual` + 상태 `manual`, 손절선 null(봇 관리 아님). 상태 머신·EX-1 검증 대상에서 제외. 봇 계좌 잔고가 SZ-1 기준.
+- `sb_balance_snapshots`: 확인된 시점의 잔고 스냅샷. 삼성전자 체결 이력은 재구성하지 않고 8/18·8/26·9/4·9/22 스냅샷만 (정정본 2).
+- `sb_orders_log`에 `stop_price`·`target_price`(RR-1), `account_balance_at`(SZ-1) 추가.
+- `sb_setups`에 `benchmark`(UV-4 비교 지수)·`data_source`('seed'면 가짜 일봉 기준 표시). `sb_candles.source`, `sb_market_regime.is_seed`.
+- `sb_settings` 키 추가: SZ-1 상한 2개, 봇 계좌 잔고, UV-4 임계 2개(60%, 2배), 시장 필터 임계 4개(전부 null = 미확정, 4단계 검증 때 확정).
+- 규칙 3개 추가: RR-1, SZ-1, UV-4. UV-4는 유니버스 승인 트리거에도 들어갔다(로컬 Postgres에서 거부·통과 둘 다 확인).
+- 검증 함수 추가 판정: RR-1(손절가·목표가 미기록, 손익비 2:1 미만), SZ-1(잔고 미기록, 종목·업종 상한 초과. 상한 null이면 판정 보류), EV-2 휴장일 주문.
+- KRX 거래일 달력 `src/lib/krx-calendar.ts` (2025~2026, 주말·공휴일·대체공휴일·선거일·연말휴장). 매년 12월 갱신. 규칙 로그 화면에 다가오는 휴장과 장기 휴장(3일 이상) 표시.
+- 규칙 위반 카운터: `bot_started_at` null이면 "가동 전". 봇 주문만 센다.
+
+## 8. 인증 A (매직링크) 설정 — 비움이 할 것
+
+코드는 들어가 있다. 환경변수 두 개와 Supabase 설정 하나만 더 넣으면 비밀번호 대신 이메일 링크 로그인으로 바뀐다.
+
+1. Supabase → Project Settings → API Keys → `anon` 키 복사.
+2. Vercel → 프로젝트 → Settings → Environment Variables에 추가:
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = anon 키
+   - `AUTH_ALLOWED_EMAIL` = `znfdusdb@naver.com`
+3. Supabase → Authentication → URL Configuration:
+   - Site URL = `https://<사이트주소>.vercel.app`
+   - Redirect URLs에 `https://<사이트주소>.vercel.app/auth/callback` 추가.
+4. Vercel에서 Redeploy. 로그인 화면이 이메일 입력으로 바뀐다. 다른 이메일은 발송 자체를 거부한다. `SITE_PASSCODE`는 남겨둬도 된다(매직링크 설정이 비면 폴백).
+
+Supabase 기본 메일러는 시간당 3통 제한이라 혼자 쓰기엔 충분하다. 링크는 한 번만 쓸 수 있고 세션은 브라우저에 남는다.

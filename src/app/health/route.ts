@@ -1,4 +1,5 @@
 import { hasSupabase, supabaseAdmin, supabaseUrl } from "@/lib/supabase";
+import { authMode } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,7 @@ export async function GET() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   const info: Record<string, unknown> = {
     mode: hasSupabase() ? "supabase" : "seed",
+    auth: authMode(),
     url_host: url ? (() => { try { return new URL(url).host; } catch { return "URL 형식 아님: " + url.slice(0, 12); } })() : "(없음)",
     url_raw_path: url ? (() => { try { return new URL(url).pathname; } catch { return "?"; } })() : "",
     url_used: supabaseUrl(),

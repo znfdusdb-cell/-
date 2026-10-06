@@ -66,7 +66,9 @@ export function CandleChart({ candles, setup, position }: { candles: Candle[]; s
         cs.createPriceLine({ price: setup.pivot, color: "#f59e0b", lineWidth: 2, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: "피봇" });
       }
       if (position) {
-        cs.createPriceLine({ price: position.stop_price, color: "#3182f6", lineWidth: 2, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "손절" });
+        if (position.stop_price !== null) {
+          cs.createPriceLine({ price: position.stop_price, color: "#3182f6", lineWidth: 2, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "손절" });
+        }
         cs.createPriceLine({ price: position.avg_price, color: "#9aa3b5", lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: "평단" });
       }
 
@@ -83,8 +85,10 @@ export function CandleChart({ candles, setup, position }: { candles: Candle[]; s
   if (!candles.length) {
     return <div className="flex h-72 items-center justify-center rounded-xl border border-dashed border-line text-xs text-fg-3">일봉 없음. 봇이 sb_candles 에 적재하면 표시된다.</div>;
   }
+  const fake = candles.some((c) => c.source === "seed");
   return (
-    <div>
+    <div className="relative">
+      {fake && <span className="absolute left-0 top-0 z-10 rounded-full border border-warn/60 bg-warn/15 px-2 py-0.5 text-[11px] text-warn">가짜 일봉 (실제 적재 전)</span>}
       <div ref={ref} className="h-80 w-full" />
       <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-fg-3">
         <Legend c="#f59e0b" t="피봇 (C 박스/베이스 고점)" />

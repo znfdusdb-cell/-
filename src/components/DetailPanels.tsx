@@ -1,5 +1,6 @@
-import type { Setup, Thesis, Position, StageLog, OrderLog, MarketEvent, CheckItem, Violation } from "@/lib/types";
-import { SETUP_TYPE_LABEL, THESIS_STATUS_LABEL, POSITION_STATE_LABEL, STAGE_LABEL, RULE_MAP, EVENT_TYPE_LABEL } from "@/lib/constants";
+import type { Setup, Thesis, Position, StageLog, OrderLog, MarketEvent, CheckItem, Violation, BalanceSnapshot, Settings } from "@/lib/types";
+import { SETUP_TYPE_LABEL, THESIS_STATUS_LABEL, POSITION_STATE_LABEL, STAGE_LABEL, RULE_MAP, EVENT_TYPE_LABEL, ACCOUNT_LABEL, SETTING_KEYS } from "@/lib/constants";
+import { upcomingClosures, KRX_CALENDAR_UPDATED, KRX_CALENDAR_COVERS_UNTIL } from "@/lib/krx-calendar";
 import { fmtNum, fmtPct, footprint, fmtDate, fmtDateTime, pctChange, udClass, daysBetween, todayKST } from "@/lib/format";
 import { Badge } from "./StockCard";
 
@@ -19,7 +20,7 @@ export function FootprintPanel({ setup, lastClose }: { setup: Setup | null; last
   if (!setup) return <Section title="발자국·셋업"><p className="text-xs text-fg-3">봇 계산값 없음</p></Section>;
   const toPivot = setup.pivot ? pctChange(lastClose, setup.pivot) : null;
   return (
-    <Section title="발자국·셋업" right={<span className="text-[11px] text-fg-3">{fmtDate(setup.as_of)} 계산</span>}>
+    <Section title="발자국·셋업" right={<span className="flex items-center gap-1 text-[11px] text-fg-3">{setup.data_source === "seed" && <Badge tone="warn">가짜 일봉 기준</Badge>}{fmtDate(setup.as_of)} 계산</span>}>
       <div className="flex items-baseline gap-3">
         <span className="num text-2xl font-bold">{footprint(setup.footprint_weeks, setup.max_contraction_pct, setup.min_contraction_pct, setup.t_count)}</span>
         <span className="text-sm text-fg-2">{SETUP_TYPE_LABEL[setup.setup_type]}</span>
@@ -31,7 +32,7 @@ export function FootprintPanel({ setup, lastClose }: { setup: Setup | null; last
         <KV k="C 박스" v={setup.cbox_high ? `${fmtNum(setup.cbox_low)} ~ ${fmtNum(setup.cbox_high)}` : "—"} />
         <KV k="거래량 마른 일수" v={setup.volume_dry_days != null ? `${setup.volume_dry_days}일` : "—"} />
         <KV k="고점 대비 조정" v={fmtPct(setup.drawdown_pct, 1)} />
-        <KV k="시장 대비 조정 배수" v={setup.drawdown_vs_market != null ? `${fmtNum(setup.drawdown_vs_market, 1)}배 (시장 ${fmtPct(setup.market_drawdown_pct, 1)})` : "—"} cls={setup.drawdown_vs_market != null && setup.drawdown_vs_market >= 2 ? "text-stop" : undefined} />
+        <KV k={`${setup.benchmark ?? "시장"} 대비 조정 배수`} v={setup.drawdown_vs_market != null ? `${fmtNum(setup.drawdown_vs_market, 1)}배 (${setup.benchmark ?? "시장"} ${fmtPct(setup.market_drawdown_pct, 1)})` : "—"} cls={setup.drawdown_vs_market != null && setup.drawdown_vs_market >= 2 ? "text-stop" : undefined} />
       </dl>
       {setup.notes && <p className="mt-3 border-t border-line pt-2 text-xs text-fg-2">{setup.notes}</p>}
     </Section>
@@ -111,21 +112,25 @@ export function ThesisPanel({ thesis }: { thesis: Thesis | null }) {
   );
 }
 
-export function PositionPanel({ position, lastClose }: { position: Position | null; lastClose: number | null }) {
+export function PositionPanel({ position, lastClose, fakePrice }: { position: Position | null; lastClose: number | null; fakePrice?: boolean }) {
   if (!position) return null;
+  const manual = position.account === "kb_manual";
   const pnl = pctChange(lastClose, position.avg_price);
-  const toStop = pctChange(lastClose, position.stop_price);
+  const toStop = position.stop_price === null ? null : pctChange(lastClose, position.stop_price);
   const rule = position.entry_rule_id ? RULE_MAP[position.entry_rule_id] : null;
   return (
-    <Section title="포지션" right={<span className="flex gap-1">{position.is_unverified && <Badge tone="warn">숫자 미확인</Badge>}<Badge tone="fg">{POSITION_STATE_LABEL[position.state]}</Badge></span>}>
+    <Section
+      title={manual ? "KB 수동 보유 (봇 대상 아님)" : "포지션 (한투 봇 계좌)"}
+      right={<span className="flex gap-1">{position.is_unverified && <Badge tone="warn">숫자 미확인</Badge>}<Badge tone={manual ? "muted" : "fg"}>{manual ? ACCOUNT_LABEL.kb_manual : POSITION_STATE_LABEL[position.state]}</Badge></span>}
+    >
       {position.note && <p className={`mb-2 text-xs ${position.is_unverified ? "text-warn" : "text-fg-3"}`}>{position.note}</p>}
       <dl className="num grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs sm:grid-cols-4">
         <KV k="수량" v={`${fmtNum(position.qty)}주`} />
         <KV k="평단" v={fmtNum(position.avg_price)} />
-        <KV k="손절선" v={fmtNum(position.stop_price)} />
+        <KV k="손절선" v={position.stop_price === null ? (manual ? "봇 관리 아님" : "—") : fmtNum(position.stop_price)} />
         <KV k="손절까지" v={fmtPct(toStop, 2)} cls={toStop != null && toStop < 2 ? "text-stop" : undefined} />
-        <KV k="평가손익" v={fmtPct(pnl, 2)} cls={udClass(pnl)} />
-        <KV k="평가금액" v={lastClose ? fmtNum(lastClose * position.qty) : "—"} />
+        <KV k={fakePrice ? "평가손익 (가짜 일봉)" : "평가손익"} v={fakePrice ? "—" : fmtPct(pnl, 2)} cls={udClass(pnl)} />
+        <KV k={fakePrice ? "평가금액 (가짜 일봉)" : "평가금액"} v={fakePrice || !lastClose ? "—" : fmtNum(lastClose * position.qty)} />
         <KV k="진입 규칙" v={rule ? `${rule.rule_id} ${rule.title}` : position.entry_rule_id ?? "—"} />
         <KV k="진입일" v={fmtDate(position.opened_at)} />
       </dl>
@@ -218,5 +223,69 @@ export function OrdersTable({ orders, names, violations }: { orders: OrderLog[];
         </tbody>
       </table>
     </div>
+  );
+}
+
+export function SnapshotsPanel({ snapshots }: { snapshots: BalanceSnapshot[] }) {
+  if (!snapshots.length) return null;
+  return (
+    <Section title="확인된 잔고 스냅샷" right={<span className="text-[11px] text-fg-3">체결가·체결일은 재구성 안 함</span>}>
+      <ul className="space-y-2 text-xs">
+        {snapshots.map((x) => (
+          <li key={x.id} className="border-b border-line/60 pb-2 last:border-0 last:pb-0">
+            <div className="num flex flex-wrap gap-x-3 gap-y-0.5">
+              <span className="text-fg-3">{fmtDateTime(x.as_of)}</span>
+              {x.qty !== null && <span className="font-semibold text-fg">{x.qty}주</span>}
+              {x.avg_price !== null && <span className="text-fg">평단 {fmtNum(x.avg_price)}</span>}
+              {x.market_price !== null && <span className="text-fg-2">현재가 {fmtNum(x.market_price)}</span>}
+              {x.cash !== null && <span className="text-fg-2">예수금 {fmtNum(x.cash)}</span>}
+            </div>
+            {x.note && <div className="mt-0.5 text-fg-2">{x.note}</div>}
+          </li>
+        ))}
+      </ul>
+    </Section>
+  );
+}
+
+export function ClosuresPanel({ from, days = 45 }: { from: string; days?: number }) {
+  const list = upcomingClosures(from, days);
+  const expired = KRX_CALENDAR_COVERS_UNTIL < from;
+  return (
+    <Section title="휴장 달력 (EV-2)" right={<span className="text-[11px] text-fg-3">KRX 달력 {KRX_CALENDAR_UPDATED} 갱신</span>}>
+      {expired && <p className="mb-2 text-xs text-stop">달력이 {KRX_CALENDAR_COVERS_UNTIL}까지만 있다. krx-calendar.ts 갱신 필요.</p>}
+      {list.length === 0 ? (
+        <p className="text-xs text-fg-3">{days}일 안에 공휴일 휴장 없음</p>
+      ) : (
+        <ul className="space-y-1 text-xs">
+          {list.map((c) => (
+            <li key={c.start} className="flex gap-2">
+              <span className={`num w-10 shrink-0 font-semibold ${c.long ? "text-warn" : "text-fg"}`}>D-{daysBetween(from, c.start)}</span>
+              <span className="text-fg">{c.start.slice(5)}~{c.end.slice(5)} ({c.days}일 휴장{c.long ? " · 장기: 손절선 작동 불가" : ""})</span>
+              <span className="text-fg-3">{c.names.join(", ")}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
+  );
+}
+
+export function SettingsPanel({ settings }: { settings: Settings }) {
+  return (
+    <Section title="설정값 (sb_settings)" right={<span className="text-[11px] text-fg-3">null = 비움 미확정</span>}>
+      <dl className="num grid grid-cols-1 gap-x-4 gap-y-1 text-xs sm:grid-cols-2">
+        {SETTING_KEYS.map((k) => {
+          const v = settings[k.key];
+          const empty = v === null || v === undefined || v === "";
+          return (
+            <div key={k.key} className="flex justify-between gap-2 border-b border-line/60 py-1">
+              <dt className="text-fg-3">{k.label}</dt>
+              <dd className={empty ? "text-warn" : "text-fg"}>{empty ? "미확정" : `${k.key === "bot_account_balance" ? fmtNum(Number(v)) : v}${k.unit ?? ""}`}</dd>
+            </div>
+          );
+        })}
+      </dl>
+    </Section>
   );
 }

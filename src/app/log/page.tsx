@@ -1,7 +1,8 @@
 import { getRepo } from "@/lib/repo";
 import { RULES } from "@/lib/constants";
 import { fmtDate } from "@/lib/format";
-import { Section, OrdersTable } from "@/components/DetailPanels";
+import { Section, OrdersTable, ClosuresPanel, SettingsPanel } from "@/components/DetailPanels";
+import { todayKST } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -18,17 +19,17 @@ export default async function LogPage() {
       <section className="rounded-xl border border-line bg-bg-2 p-4 text-center">
         <div className="text-xs text-fg-3">규칙 위반 0일</div>
         {audit.days === null ? (
-          <div className="text-2xl font-bold text-fg-2">봇 미가동</div>
+          <div className="text-2xl font-bold text-fg-2">가동 전</div>
         ) : (
           <div className={`num text-5xl font-bold ${audit.days >= 30 ? "text-go" : "text-fg"}`}>{audit.days}<span className="ml-1 text-lg font-semibold text-fg-2">일째</span></div>
         )}
         <p className="mt-1 text-xs text-fg-3">
           {audit.days === null
-            ? "sb_settings.bot_started_at 에 봇 가동일(모의투자 시작일)을 넣으면 센다"
+            ? "봇 가동일(모의투자 시작일)이 정해지면 그날부터 센다 · sb_settings.bot_started_at"
             : `${audit.violations.length > 0 && audit.since !== audit.settings.bot_started_at ? `마지막 위반 ${fmtDate(audit.since)}` : `봇 가동일 ${fmtDate(audit.settings.bot_started_at)}`} 기준 · 봇 주문 ${audit.botOrders}건 · 위반 ${audit.violations.length}건`}
         </p>
         <p className="mt-1 text-[11px] text-fg-3">
-          위반 = 주문 기록을 규칙과 대조한 검증 함수 판정(UV-1·EN-2·EN-7·EN-8·EX-1·근거 없음) + 봇 자진 신고. 수동 매매와 봇 가동일 이전 주문은 기록만 하고 제외. 소액 실전 통과 기준: 3개월 0건.
+          위반 = 주문 기록을 규칙과 대조한 검증 함수 판정(UV-1·EN-2·EN-7·EN-8·RR-1·SZ-1·EX-1·EV-2 휴장일·근거 없음) + 봇 자진 신고. 수동 매매와 봇 가동일 이전 주문은 기록만 하고 제외. 소액 실전 통과 기준: 3개월 0건.
         </p>
       </section>
 
@@ -52,6 +53,9 @@ export default async function LogPage() {
       <Section title="주문별 근거 규칙">
         <OrdersTable orders={audit.orders} names={names} violations={vByOrder} />
       </Section>
+
+      <ClosuresPanel from={todayKST()} />
+      <SettingsPanel settings={audit.settings} />
 
       <Section title="규칙 카탈로그">
         <div className="space-y-3">

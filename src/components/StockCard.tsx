@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { StockSummary } from "@/lib/types";
-import { POSITION_STATE_LABEL, SETUP_TYPE_LABEL } from "@/lib/constants";
+import { POSITION_STATE_LABEL, SETUP_TYPE_LABEL, ACCOUNT_LABEL } from "@/lib/constants";
 import { fmtNum, fmtPct, pctChange, udClass, footprint, fmtDate } from "@/lib/format";
 import { universeGuard } from "@/lib/guards";
 
@@ -25,16 +25,24 @@ export function StockCard({ s }: { s: StockSummary }) {
           </div>
         </div>
         <div className="num text-right">
-          <div className="font-semibold">{fmtNum(s.last_close)}</div>
-          <div className={`text-xs ${udClass(chg)}`}>{fmtPct(chg, 2)}</div>
+          {setup?.data_source === "seed" ? (
+            <div className="text-[11px] text-warn">현재가 없음</div>
+          ) : (
+            <>
+              <div className="font-semibold">{fmtNum(s.last_close)}</div>
+              <div className={`text-xs ${udClass(chg)}`}>{fmtPct(chg, 2)}</div>
+            </>
+          )}
         </div>
       </div>
 
       <div className="mt-2 flex flex-wrap gap-1 text-[11px]">
         {violated && <Badge tone="stop">무효화 조건 위반</Badge>}
         {guard && <Badge tone="warn">{guard.replace("UV-2: ", "")}</Badge>}
-        {position && <Badge tone="fg">{POSITION_STATE_LABEL[position.state]} · {position.qty}주</Badge>}
+        {position && position.account === "kb_manual" && <Badge tone="muted">{ACCOUNT_LABEL.kb_manual} · {position.qty}주</Badge>}
+        {position && position.account === "kis_bot" && <Badge tone="fg">{POSITION_STATE_LABEL[position.state]} · {position.qty}주</Badge>}
         {position?.is_unverified && <Badge tone="warn">숫자 미확인</Badge>}
+        {setup?.data_source === "seed" && <Badge tone="warn">가짜 일봉 기준</Badge>}
         {setup && setup.setup_type !== "none" && <Badge tone="muted">{SETUP_TYPE_LABEL[setup.setup_type]}</Badge>}
       </div>
 
@@ -42,7 +50,7 @@ export function StockCard({ s }: { s: StockSummary }) {
         <Cell k="발자국" v={setup ? footprint(setup.footprint_weeks, setup.max_contraction_pct, setup.min_contraction_pct, setup.t_count) : "—"} />
         {position ? (
           <>
-            <Cell k="평단/손절" v={`${fmtNum(position.avg_price)} / ${fmtNum(position.stop_price)}`} />
+            <Cell k="평단/손절" v={`${fmtNum(position.avg_price)} / ${position.stop_price === null ? "없음" : fmtNum(position.stop_price)}`} />
             <Cell k="손익" v={fmtPct(pnl, 2)} cls={udClass(pnl)} />
           </>
         ) : (

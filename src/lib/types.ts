@@ -10,7 +10,9 @@ export type PositionState =
   | "tranche3"
   | "squat_wait"
   | "reset_watch"
-  | "closed";
+  | "closed"
+  | "manual";
+export type Account = "kis_bot" | "kb_manual";
 export type Side = "buy" | "sell";
 export type OrderSource = "bot" | "manual";
 export type RegimeSignal = "trade" | "reduce" | "wait";
@@ -82,15 +84,18 @@ export interface Setup {
   drawdown_pct: number | null;
   market_drawdown_pct: number | null;
   drawdown_vs_market: number | null;
+  benchmark: string | null;
+  data_source: "bot" | "seed";
   notes: string | null;
 }
 
 export interface Position {
   id: number;
   code: string;
+  account: Account;
   qty: number;
   avg_price: number;
-  stop_price: number;
+  stop_price: number | null;
   state: PositionState;
   entry_rule_id: string | null;
   is_unverified: boolean;
@@ -109,6 +114,9 @@ export interface OrderLog {
   planned_qty: number | null;
   price: number;
   source: OrderSource;
+  stop_price: number | null;
+  target_price: number | null;
+  account_balance_at: number | null;
   rule_id: string | null;
   rule_text: string | null;
   is_violation: boolean;
@@ -147,6 +155,7 @@ export interface MarketRegime {
   vkospi: number | null;
   lev_etf_turnover_share_pct: number | null;
   reasons: string[];
+  is_seed: boolean;
 }
 
 export interface Candle {
@@ -157,6 +166,7 @@ export interface Candle {
   low: number;
   close: number;
   volume: number;
+  source: "kis" | "seed";
 }
 
 export interface Rule {
@@ -176,14 +186,26 @@ export interface StockSummary {
 }
 
 export interface StockDetail extends StockSummary {
+  snapshots: BalanceSnapshot[];
   candles: Candle[];
   events: MarketEvent[];
   stage_log: StageLog[];
   orders: OrderLog[];
 }
 
-export interface Settings {
-  bot_started_at: string | null;
+/** sb_settings key/value. 값 null = 비움 미확정 */
+export type Settings = Record<string, string | null>;
+
+export interface BalanceSnapshot {
+  id: number;
+  account: Account;
+  code: string | null;
+  as_of: string;
+  qty: number | null;
+  avg_price: number | null;
+  market_price: number | null;
+  cash: number | null;
+  note: string | null;
 }
 
 export interface Violation {
