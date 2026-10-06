@@ -1,4 +1,4 @@
-import { hasSupabase, supabaseAdmin } from "@/lib/supabase";
+import { hasSupabase, supabaseAdmin, supabaseUrl } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +9,8 @@ export async function GET() {
   const info: Record<string, unknown> = {
     mode: hasSupabase() ? "supabase" : "seed",
     url_host: url ? (() => { try { return new URL(url).host; } catch { return "URL 형식 아님: " + url.slice(0, 12); } })() : "(없음)",
+    url_raw_path: url ? (() => { try { return new URL(url).pathname; } catch { return "?"; } })() : "",
+    url_used: supabaseUrl(),
     url_has_whitespace: /\s/.test(url),
     key_length: key.length,
     key_has_whitespace: /\s/.test(key),
