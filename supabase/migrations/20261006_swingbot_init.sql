@@ -38,6 +38,10 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 do $$ begin
+  create type sb_order_source as enum ('bot','manual');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
   create type sb_regime as enum ('trade','reduce','wait');
 exception when duplicate_object then null; end $$;
 
@@ -132,6 +136,8 @@ create table if not exists sb_positions (
   stop_price    numeric(14,2) not null,
   state         sb_position_state not null default 'scout',
   entry_rule_id text references sb_rules(rule_id),
+  is_unverified boolean not null default false,   -- 비움 화면으로 재확인 전인 숫자
+  note          text,
   opened_at     timestamptz not null default now(),
   closed_at     timestamptz,
   updated_at    timestamptz not null default now()
@@ -145,7 +151,9 @@ create table if not exists sb_orders_log (
   code         text not null references sb_stocks(code) on delete cascade,
   side         sb_side not null,
   qty          integer not null check (qty > 0),
+  planned_qty  integer,                          -- EN-8: 주문 전 로그에 계산한 주 수
   price        numeric(14,2) not null,
+  source       sb_order_source not null default 'bot',  -- manual = 봇 이전/밖의 수동 매매 (카운터 제외)
   rule_id      text references sb_rules(rule_id),
   rule_text    text,
   is_violation boolean not null default false,   -- 규칙 밖 주문 (rule_id 없음 또는 위반 판정)
@@ -194,7 +202,16 @@ create table if not exists sb_market_regime (
   created_at                 timestamptz not null default now()
 );
 
--- ---------- 일봉 (차트용, 봇이 적재) ----------
+-- ---------- 설정 (key/value) ----------
+-- bot_started_at: 봇 가동일(모의투자 시작일). 규칙 위반 카운터는 이 날부터 센다.
+create table if not exists sb_settings (
+  key        text primary key,
+  value      text,
+  updated_at timestamptz not null default now()
+);
+insert into sb_settings (key, value) values ('bot_started_at', null) on conflict (key) do nothing;
+
+-- ---------- 일봉 (차트용, 봇이 적재. 분봉·실시간은 DB에 넣지 않는다) ----------
 create table if not exists sb_candles (
   code   text not null references sb_stocks(code) on delete cascade,
   date   date not null,
@@ -236,6 +253,54 @@ create trigger sb_stocks_guard_universe
   for each row execute function sb_guard_universe();
 
 -- =============================================================================
+-- 가드: 무효화 조건 위반 → 자동 '검토' 강등 (UV-3)
+-- 브레인이 조건을 violated=true 로 표시하면 note(근거) 가 필수이고,
+-- 가설 상태는 suspect, 종목이 유니버스/보유면 검토로 강등 + 이력 기록.
+-- 신규·추가 매수는 유니버스 단계만 허용(UV-1)이므로 강등 즉시 차단된다.
+-- 보유분 손절은 봇 규칙 그대로. 매도는 비움이 퇴출 승인한 뒤에만.
+-- =============================================================================
+create or replace function sb_on_thesis_violation() returns trigger
+language plpgsql as $$
+declare
+  c jsonb;
+  violated_texts text := '';
+  cur_stage sb_stage;
+begin
+  for c in select * from jsonb_array_elements(new.invalidation_conditions) loop
+    if coalesce((c->>'violated')::boolean, false) then
+      if coalesce(trim(c->>'note'), '') = '' then
+        raise exception 'UV-3: 무효화 조건 "%" 를 위반으로 표시하려면 근거(note)가 필요하다', c->>'text';
+      end if;
+      violated_texts := violated_texts || '· ' || (c->>'text') || ' (' || (c->>'note') || ') ';
+    end if;
+  end loop;
+  new.updated_at := now();
+  if violated_texts <> '' then
+    if new.status = 'valid' then new.status := 'suspect'; end if;
+    select stage into cur_stage from sb_stocks where code = new.code;
+    if cur_stage in ('universe','holding') then
+      update sb_stocks
+         set stage = 'review', stage_reason = 'UV-3 자동 강등: ' || violated_texts
+       where code = new.code;
+      insert into sb_stage_log (code, from_stage, to_stage, reason, actor)
+      values (new.code, cur_stage, 'review', 'UV-3 자동 강등: ' || violated_texts, 'brain');
+    end if;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists sb_theses_on_violation on sb_theses;
+create trigger sb_theses_on_violation
+  before insert or update of invalidation_conditions, status on sb_theses
+  for each row execute function sb_on_thesis_violation();
+
+-- 봇이 주문 직전에 호출: 유니버스 단계(= 매수 가능)인지. (UV-1)
+create or replace function sb_can_buy(p_code text) returns boolean
+language sql stable as $$
+  select exists (select 1 from sb_stocks where code = p_code and stage = 'universe');
+$$;
+
+-- =============================================================================
 -- RLS: 사이트는 서버에서 service_role 로만 접근한다. anon 은 전부 차단.
 -- =============================================================================
 alter table sb_rules         enable row level security;
@@ -249,3 +314,4 @@ alter table sb_events        enable row level security;
 alter table sb_predictions   enable row level security;
 alter table sb_market_regime enable row level security;
 alter table sb_candles       enable row level security;
+alter table sb_settings      enable row level security;

@@ -85,15 +85,15 @@ export const TREND_TEMPLATE_ITEMS: { key: string; label: string }[] = [
   { key: "tt8", label: "상대강도 상위" },
 ];
 
-/** 체크리스트 7항목 — 확정본에서 항목 수(7)만 명시돼 있어 규칙에서 추린 초안. 비움 확인 필요. */
+/** 체크리스트 7항목 (비움 확정 2026-10-06) */
 export const CHECKLIST_ITEMS: { key: string; label: string }[] = [
-  { key: "c1", label: "2단계 상승 추세 (트렌드 템플레이트 충족)" },
-  { key: "c2", label: "펀더멘털: 최근 2~3분기 컨센서스 상회, 영업이익 +20~25%↑" },
-  { key: "c3", label: "VCP 축소: 조정 2~4번, 매번 직전의 약 절반" },
-  { key: "c4", label: "거래량 마름: 피봇 직전 50일 평균 이하" },
-  { key: "c5", label: "베이스 기간 3~65주 (시간 압축 아님)" },
-  { key: "c6", label: "고점 대비 조정 ≤ 50%, 시장 대비 조정 2배 미만" },
-  { key: "c7", label: "가설 + 무효화 조건 작성 완료" },
+  { key: "c1", label: "큰 흐름이 2단계(상승 추세)다" },
+  { key: "c2", label: "상승 중 베이스(조정·횡보 구간)가 있다" },
+  { key: "c3", label: "흔들림이 갈수록 작아졌고 마지막 조정이 10% 이내다" },
+  { key: "c4", label: "베이스 동안 거래량이 줄었다" },
+  { key: "c5", label: "고점 대비 조정이 60% 미만이다" },
+  { key: "c6", label: "피봇을 거래량 급증과 함께 돌파했다" },
+  { key: "c7", label: "피봇 대비 +2~3% 이내에서 진입했다" },
 ];
 
 export const RULES: Rule[] = [
@@ -106,7 +106,7 @@ export const RULES: Rule[] = [
   { rule_id: "EN-2", category: "진입", title: "추격 금지", description: "피봇 대비 +2~3%를 넘으면 주문 취소. 추격 매수 금지." },
   { rule_id: "EN-3", category: "진입", title: "정찰병 3거래일", description: "소액 정찰병으로 진입 후 3거래일 관찰. 관찰 중 손절선 도달 시 즉시 종료." },
   { rule_id: "EN-4", category: "진입", title: "1차 45~50%", description: "정찰병 통과 후 계획 비중의 45~50% 진입." },
-  { rule_id: "EN-5", category: "진입", title: "2차는 피봇 돌파 확인 후", description: "2차 추가는 피봇 돌파 확인 후. (60일선 돌파 조건은 폐기)" },
+  { rule_id: "EN-5", category: "진입", title: "2차는 피봇 돌파 확인 후", description: "2차 추가는 피봇 돌파 확인 후." },
   { rule_id: "EN-6", category: "진입", title: "3차는 트렌드 템플레이트 대부분 충족", description: "3차 추가는 트렌드 템플레이트 8요건 대부분 충족 시." },
   { rule_id: "EN-7", category: "진입", title: "물타기 금지", description: "손실 중 추가매수 금지. 피라미딩은 위로만." },
   { rule_id: "EN-8", category: "진입", title: "주 수로 계산해 로그", description: "주문은 금액이 아니라 주 수로 계산해 주문 전 로그에 기록 (9/18 10주 오주문 재발 방지)." },

@@ -1,4 +1,4 @@
-import type { Setup, Thesis, Position, StageLog, OrderLog, MarketEvent, CheckItem } from "@/lib/types";
+import type { Setup, Thesis, Position, StageLog, OrderLog, MarketEvent, CheckItem, Violation } from "@/lib/types";
 import { SETUP_TYPE_LABEL, THESIS_STATUS_LABEL, POSITION_STATE_LABEL, STAGE_LABEL, RULE_MAP, EVENT_TYPE_LABEL } from "@/lib/constants";
 import { fmtNum, fmtPct, footprint, fmtDate, fmtDateTime, pctChange, udClass, daysBetween, todayKST } from "@/lib/format";
 import { Badge } from "./StockCard";
@@ -117,7 +117,8 @@ export function PositionPanel({ position, lastClose }: { position: Position | nu
   const toStop = pctChange(lastClose, position.stop_price);
   const rule = position.entry_rule_id ? RULE_MAP[position.entry_rule_id] : null;
   return (
-    <Section title="포지션" right={<Badge tone="fg">{POSITION_STATE_LABEL[position.state]}</Badge>}>
+    <Section title="포지션" right={<span className="flex gap-1">{position.is_unverified && <Badge tone="warn">숫자 미확인</Badge>}<Badge tone="fg">{POSITION_STATE_LABEL[position.state]}</Badge></span>}>
+      {position.note && <p className={`mb-2 text-xs ${position.is_unverified ? "text-warn" : "text-fg-3"}`}>{position.note}</p>}
       <dl className="num grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs sm:grid-cols-4">
         <KV k="수량" v={`${fmtNum(position.qty)}주`} />
         <KV k="평단" v={fmtNum(position.avg_price)} />
@@ -173,7 +174,7 @@ export function StageLogPanel({ log }: { log: StageLog[] }) {
   );
 }
 
-export function OrdersTable({ orders, names }: { orders: OrderLog[]; names?: Record<string, string> }) {
+export function OrdersTable({ orders, names, violations }: { orders: OrderLog[]; names?: Record<string, string>; violations?: Map<number, Violation[]> }) {
   if (!orders.length) return <p className="text-xs text-fg-3">주문 없음</p>;
   return (
     <div className="-mx-4 overflow-x-auto px-4">
@@ -191,20 +192,24 @@ export function OrdersTable({ orders, names }: { orders: OrderLog[]; names?: Rec
         <tbody>
           {orders.map((o) => {
             const rule = o.rule_id ? RULE_MAP[o.rule_id] : null;
-            const bad = o.is_violation || !o.rule_id;
+            const vs = violations?.get(o.id) ?? [];
+            const manual = o.source === "manual";
+            const bad = !manual && (vs.length > 0 || o.is_violation || !o.rule_id);
             return (
               <tr key={o.id} className={`border-b border-line/60 align-top ${bad ? "bg-stop/5" : ""}`}>
                 <td className="py-2 pr-2 whitespace-nowrap text-fg-2">{fmtDateTime(o.ts)}</td>
                 {names && <td className="py-2 pr-2 whitespace-nowrap">{names[o.code] ?? o.code}</td>}
                 <td className={`py-2 pr-2 font-semibold ${o.side === "buy" ? "text-up" : "text-down"}`}>{o.side === "buy" ? "매수" : "매도"}</td>
-                <td className="py-2 pr-2 text-right">{fmtNum(o.qty)}주</td>
+                <td className="py-2 pr-2 text-right">{fmtNum(o.qty)}주{o.planned_qty !== null && o.planned_qty !== o.qty ? <span className="text-stop"> (계산 {o.planned_qty})</span> : null}</td>
                 <td className="py-2 pr-2 text-right">{fmtNum(o.price)}</td>
                 <td className="py-2 pr-2">
+                  {manual && <span className="mr-1 rounded border border-line px-1 text-[10px] text-fg-3">수동</span>}
                   {bad ? (
-                    <span className="font-semibold text-stop">규칙 위반{o.rule_id ? ` (${o.rule_id})` : " · 근거 없음"}</span>
+                    <span className="font-semibold text-stop">규칙 위반 {vs.length ? vs.map((v) => v.rule_id).join(", ") : o.rule_id ? `(${o.rule_id})` : "· 근거 없음"}</span>
                   ) : (
-                    <span><span className="text-fg">{o.rule_id}</span> <span className="text-fg-2">{rule?.title ?? o.rule_text}</span></span>
+                    <span><span className="text-fg">{o.rule_id ?? "—"}</span> <span className="text-fg-2">{rule?.title ?? o.rule_text}</span></span>
                   )}
+                  {vs.map((v, i) => <div key={i} className="text-stop/90">{v.reason}</div>)}
                   {(o.rule_text && rule) || o.note ? <div className="text-fg-3">{[o.rule_text && rule ? o.rule_text : null, o.note].filter(Boolean).join(" · ")}</div> : null}
                 </td>
               </tr>

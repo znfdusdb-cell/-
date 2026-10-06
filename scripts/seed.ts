@@ -8,7 +8,7 @@ import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { RULES } from "../src/lib/constants";
 import {
-  SEED_STOCKS, SEED_STAGE_LOG, SEED_THESES, SEED_SETUPS, SEED_POSITIONS, SEED_ORDERS, SEED_EVENTS, SEED_PREDICTIONS, SEED_REGIME, SEED_CANDLES,
+  SEED_STOCKS, SEED_STAGE_LOG, SEED_THESES, SEED_SETUPS, SEED_POSITIONS, SEED_ORDERS, SEED_EVENTS, SEED_PREDICTIONS, SEED_REGIME, SEED_CANDLES, SEED_SETTINGS,
 } from "../src/lib/seed-data";
 
 type Row = Record<string, unknown>;
@@ -26,6 +26,7 @@ const TABLES: { table: string; rows: Row[]; conflict: string }[] = [
   { table: "sb_predictions", rows: strip(SEED_PREDICTIONS as unknown as Row[], ["id"]), conflict: "" },
   { table: "sb_market_regime", rows: SEED_REGIME as unknown as Row[], conflict: "as_of" },
   { table: "sb_candles", rows: SEED_CANDLES as unknown as Row[], conflict: "code,date" },
+  { table: "sb_settings", rows: [{ key: "bot_started_at", value: SEED_SETTINGS.bot_started_at }], conflict: "key" },
 ];
 
 function lit(v: unknown): string {

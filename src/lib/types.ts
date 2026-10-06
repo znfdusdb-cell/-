@@ -12,6 +12,7 @@ export type PositionState =
   | "reset_watch"
   | "closed";
 export type Side = "buy" | "sell";
+export type OrderSource = "bot" | "manual";
 export type RegimeSignal = "trade" | "reduce" | "wait";
 export type EventType = "earnings" | "holiday" | "macro" | "other";
 
@@ -92,6 +93,8 @@ export interface Position {
   stop_price: number;
   state: PositionState;
   entry_rule_id: string | null;
+  is_unverified: boolean;
+  note: string | null;
   opened_at: string;
   closed_at: string | null;
   updated_at: string;
@@ -103,7 +106,9 @@ export interface OrderLog {
   code: string;
   side: Side;
   qty: number;
+  planned_qty: number | null;
   price: number;
+  source: OrderSource;
   rule_id: string | null;
   rule_text: string | null;
   is_violation: boolean;
@@ -175,4 +180,14 @@ export interface StockDetail extends StockSummary {
   events: MarketEvent[];
   stage_log: StageLog[];
   orders: OrderLog[];
+}
+
+export interface Settings {
+  bot_started_at: string | null;
+}
+
+export interface Violation {
+  order_id: number;
+  rule_id: string;
+  reason: string;
 }

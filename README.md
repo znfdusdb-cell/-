@@ -45,7 +45,7 @@ vercel env add SITE_PASSCODE          # 사이트 잠금 비밀번호 (폰에서
 vercel --prod
 ```
 
-`SITE_PASSCODE`가 없으면 잠금이 없다. 포지션이 보이는 사이트이니 배포 시엔 꼭 넣는다.
+`SITE_PASSCODE`가 없으면 잠금이 없다. 포지션이 보이는 사이트이니 배포 시엔 꼭 넣는다. (비움 전용 로그인으로 바꾸는 안은 docs/SCHEMA.md 하단 참고)
 
 ## 봇·브레인이 쓰는 테이블
 

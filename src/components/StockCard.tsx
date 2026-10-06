@@ -34,6 +34,7 @@ export function StockCard({ s }: { s: StockSummary }) {
         {violated && <Badge tone="stop">무효화 조건 위반</Badge>}
         {guard && <Badge tone="warn">{guard.replace("UV-2: ", "")}</Badge>}
         {position && <Badge tone="fg">{POSITION_STATE_LABEL[position.state]} · {position.qty}주</Badge>}
+        {position?.is_unverified && <Badge tone="warn">숫자 미확인</Badge>}
         {setup && setup.setup_type !== "none" && <Badge tone="muted">{SETUP_TYPE_LABEL[setup.setup_type]}</Badge>}
       </div>
 

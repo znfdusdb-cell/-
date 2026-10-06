@@ -7,7 +7,7 @@
  * 나머지 4종목은 완전히 가짜(이름 앞에 [가짜]).
  */
 import type {
-  Stock, Thesis, Setup, Position, OrderLog, MarketEvent, Prediction, MarketRegime, Candle, StageLog, CheckItem,
+  Stock, Thesis, Setup, Position, OrderLog, MarketEvent, Prediction, MarketRegime, Candle, StageLog, CheckItem, Settings,
 } from "./types";
 import { TREND_TEMPLATE_ITEMS, CHECKLIST_ITEMS } from "./constants";
 
@@ -144,7 +144,7 @@ export const SEED_SETUPS: Setup[] = [
     volume_dry_days: 9,
     trend_template: tt([true, true, false, true, true, true, true, false], ["257,000 > 231,000·214,000", null, "200일선 상승 3주", null, null, "저가 189,200 대비 +36%", "고가 288,000 대비 -11%", "SOX 대비 하위"]),
     trend_template_score: 0,
-    checklist: cl([false, true, true, true, true, true, true]),
+    checklist: cl([true, true, false, true, true, false, false]),
     checklist_score: 0,
     drawdown_pct: -13.0, market_drawdown_pct: -6.5, drawdown_vs_market: 2.0,
     notes: "C 박스가 아직 넓음(-13%). 거래량 7월 1억 주 → 9월 1,600만~2,800만 주로 축소. 피봇 288,000 돌파 + 거래량 전까지 2차 금지.",
@@ -156,7 +156,7 @@ export const SEED_SETUPS: Setup[] = [
     volume_dry_days: 4,
     trend_template: tt([true, true, true, true, true, true, true, true]),
     trend_template_score: 0,
-    checklist: cl([true, false, true, true, true, true, false]),
+    checklist: cl([true, true, true, true, true, false, false]),
     checklist_score: 0,
     drawdown_pct: -6.0, market_drawdown_pct: -6.5, drawdown_vs_market: 0.9,
     notes: "[가짜] 펀더멘털 미확인. 가설 없음.",
@@ -168,7 +168,7 @@ export const SEED_SETUPS: Setup[] = [
     volume_dry_days: 0,
     trend_template: tt([true, true, true, false, true, true, false, true]),
     trend_template_score: 0,
-    checklist: cl([false, true, false, false, true, true, false]),
+    checklist: cl([true, false, false, false, true, false, false]),
     checklist_score: 0,
     drawdown_pct: -20.0, market_drawdown_pct: -6.5, drawdown_vs_market: 3.1,
     notes: "[가짜] 조정이 안 줄어듦. 시장 대비 3배 조정 → 제외 기준 근접.",
@@ -180,7 +180,7 @@ export const SEED_SETUPS: Setup[] = [
     volume_dry_days: 7,
     trend_template: tt([true, true, true, true, true, true, true, true]),
     trend_template_score: 0,
-    checklist: cl([true, true, true, true, true, true, true]),
+    checklist: cl([true, true, true, true, true, false, false]),
     checklist_score: 0,
     drawdown_pct: -8.0, market_drawdown_pct: -6.5, drawdown_vs_market: 1.2,
     notes: "[가짜] 플랫 베이스 6주차. 피봇 131,500. 거래량 마른 7일째.",
@@ -192,7 +192,7 @@ export const SEED_SETUPS: Setup[] = [
     volume_dry_days: 0,
     trend_template: tt([false, true, true, false, false, true, false, false]),
     trend_template_score: 0,
-    checklist: cl([false, false, false, false, true, true, true]),
+    checklist: cl([false, true, false, false, true, false, false]),
     checklist_score: 0,
     drawdown_pct: -22.0, market_drawdown_pct: -6.5, drawdown_vs_market: 3.4,
     notes: "[가짜] 50일선 이탈. 퇴출.",
@@ -201,17 +201,20 @@ export const SEED_SETUPS: Setup[] = [
 
 // ---------- 포지션 ----------
 export const SEED_POSITIONS: Position[] = [
-  { id: 1, code: "005930", qty: 13, avg_price: 257575, stop_price: 257575, state: "scout", entry_rule_id: "EN-3", opened_at: "2026-09-18T01:05:00+09:00", closed_at: null, updated_at: "2026-09-22T10:41:00+09:00" },
-  { id: 2, code: "999904", qty: 0, avg_price: 41200, stop_price: 38700, state: "closed", entry_rule_id: "EN-3", opened_at: "2026-09-15T09:40:00+09:00", closed_at: "2026-09-26T09:02:00+09:00", updated_at: "2026-09-26T09:02:00+09:00" },
+  { id: 1, code: "005930", qty: 13, avg_price: 257575, stop_price: 257575, state: "scout", entry_rule_id: "EN-3", is_unverified: true, note: "9/22 10:41 확인값(13주, 평단 257,575, 손절 본전). 이후 변동 미확인 — 비움이 현재 수량·평단을 주면 교체", opened_at: "2026-09-18T01:05:00+09:00", closed_at: null, updated_at: "2026-09-22T10:41:00+09:00" },
+  { id: 2, code: "999904", qty: 0, avg_price: 41200, stop_price: 36000, state: "closed", entry_rule_id: "EN-3", is_unverified: false, note: "[가짜]", opened_at: "2026-09-15T09:40:00+09:00", closed_at: "2026-09-26T09:02:00+09:00", updated_at: "2026-09-26T09:02:00+09:00" },
 ];
 
 // ---------- 주문 로그 ----------
 export const SEED_ORDERS: OrderLog[] = [
-  { id: 1, ts: "2026-09-15T09:40:00+09:00", code: "999904", side: "buy", qty: 10, price: 41200, rule_id: "EN-3", rule_text: "정찰병 소액 진입", is_violation: false, note: "[가짜]" },
-  { id: 2, ts: "2026-09-18T01:05:00+09:00", code: "005930", side: "buy", qty: 10, price: 257575, rule_id: null, rule_text: null, is_violation: true, note: "정찰병 1주 계획이 10주로 들어감 (9/18 오주문). 이후 EN-8 신설." },
-  { id: 3, ts: "2026-09-19T09:31:00+09:00", code: "005930", side: "buy", qty: 3, price: 257575, rule_id: "EN-3", rule_text: "정찰병 소액 진입 (주 수 계산 로그: 3주)", is_violation: false, note: null },
-  { id: 4, ts: "2026-09-26T09:02:00+09:00", code: "999904", side: "sell", qty: 10, price: 38600, rule_id: "UV-3", rule_text: "무효화 조건 위반 → 퇴출 승인 → 봇 매도", is_violation: false, note: "[가짜]" },
+  { id: 1, ts: "2026-09-15T09:40:00+09:00", code: "999904", side: "buy", qty: 10, planned_qty: 10, price: 41200, source: "bot", rule_id: "EN-3", rule_text: "정찰병 소액 진입", is_violation: false, note: "[가짜]" },
+  { id: 2, ts: "2026-09-18T01:05:00+09:00", code: "005930", side: "buy", qty: 10, planned_qty: 1, price: 257575, source: "manual", rule_id: null, rule_text: null, is_violation: true, note: "봇 이전 수동 매매. 정찰병 1주 계획이 10주로 들어감 (9/18 오주문) → EN-8 신설 계기. 카운터 제외" },
+  { id: 3, ts: "2026-09-19T09:31:00+09:00", code: "005930", side: "buy", qty: 3, planned_qty: 3, price: 257575, source: "manual", rule_id: "EN-3", rule_text: "정찰병 소액 진입 (주 수 계산 로그: 3주)", is_violation: false, note: "봇 이전 수동 매매. 카운터 제외" },
+  { id: 4, ts: "2026-09-26T09:02:00+09:00", code: "999904", side: "sell", qty: 10, planned_qty: 10, price: 38600, source: "bot", rule_id: "UV-3", rule_text: "무효화 조건 위반 → 퇴출 승인 → 봇 매도", is_violation: false, note: "[가짜]" },
 ];
+
+/** 봇 가동일. 시드값(가짜). 모의투자 시작일로 바꾼다. null 이면 카운터는 '봇 미가동'. */
+export const SEED_SETTINGS: Settings = { bot_started_at: "2026-09-15" };
 
 // ---------- 이벤트 ----------
 export const SEED_EVENTS: MarketEvent[] = [
