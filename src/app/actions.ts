@@ -49,3 +49,21 @@ export async function sendMagicLinkAction(formData: FormData) {
   if (error) redirect(`/login?err=send&msg=${encodeURIComponent(error.message)}&next=${encodeURIComponent(next)}`);
   redirect(`/login?sent=1`);
 }
+
+export async function approveThesisAction(input: { thesisId: number; code: string; note: string }) {
+  const res = await getRepo().approveThesis(input.thesisId, "bium", input.note.trim() || "사이트 버튼 승인");
+  if (res.ok) {
+    revalidatePath("/");
+    revalidatePath(`/stocks/${input.code}`);
+  }
+  return res;
+}
+
+/** 쉬운/자세히 보기 전환 (쿠키, 1년) */
+export async function setViewAction(formData: FormData) {
+  const mode = String(formData.get("mode")) === "detail" ? "detail" : "easy";
+  const back = String(formData.get("back") ?? "/");
+  const jar = await cookies();
+  jar.set("sb_view", mode, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
+  redirect(back.startsWith("/") ? back : "/");
+}

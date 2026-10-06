@@ -20,6 +20,8 @@ export interface Repo {
   /** 주문 전수 + 규칙 대조 위반 + 카운터. 수동 매매와 봇 가동일 이전은 카운터에서 제외. */
   ruleAudit(): Promise<RuleAudit>;
   settings(): Promise<Settings>;
+  /** 가설 승인(draft → valid). 비움 버튼으로만. */
+  approveThesis(thesisId: number, actor: Author, note: string): Promise<{ ok: true } | { ok: false; error: string }>;
   moveStage(code: string, to: Stage, reason: string, actor: Author): Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
@@ -102,6 +104,15 @@ class SeedRepo implements Repo {
   async settings() {
     return { ...SEED_SETTINGS };
   }
+  async approveThesis(thesisId: number) {
+    const t = SEED_THESES.find((x) => x.id === thesisId);
+    if (!t) return { ok: false as const, error: "가설 없음" };
+    if (t.status !== "draft") return { ok: false as const, error: "미승인 상태가 아님" };
+    if (t.invalidation_conditions.length === 0) return { ok: false as const, error: "무효화 조건이 비어 있어 승인 불가" };
+    t.status = "valid";
+    t.updated_at = new Date().toISOString();
+    return { ok: true as const };
+  }
   async ruleAudit() {
     const computed = verifyOrders({
       orders: SEED_ORDERS, stageLog: this.stageLog, stocks: this.stocks,
@@ -143,6 +154,7 @@ function rowToSetup(r: Row): Setup {
     id: Number(r.id), code: r.code as string, as_of: r.as_of as string, setup_type: r.setup_type as Setup["setup_type"],
     footprint_weeks: num(r.footprint_weeks), max_contraction_pct: num(r.max_contraction_pct), min_contraction_pct: num(r.min_contraction_pct), t_count: num(r.t_count),
     pivot: num(r.pivot), cbox_high: num(r.cbox_high), cbox_low: num(r.cbox_low), cbox_start: (r.cbox_start as string) ?? null,
+    high_52w: num(r.high_52w), high_52w_date: (r.high_52w_date as string) ?? null, low_52w: num(r.low_52w), low_52w_date: (r.low_52w_date as string) ?? null, base_start: (r.base_start as string) ?? null,
     volume_dry_days: num(r.volume_dry_days),
     trend_template: (r.trend_template as Setup["trend_template"]) ?? [], trend_template_score: Number(r.trend_template_score ?? 0),
     checklist: (r.checklist as Setup["checklist"]) ?? [], checklist_score: Number(r.checklist_score ?? 0),
@@ -158,7 +170,7 @@ function rowToOrder(r: Row): OrderLog {
   return { id: Number(r.id), ts: r.ts as string, code: r.code as string, side: r.side as OrderLog["side"], qty: Number(r.qty), planned_qty: num(r.planned_qty), price: Number(r.price), source: (r.source as OrderLog["source"]) ?? "bot", stop_price: num(r.stop_price), target_price: num(r.target_price), account_balance_at: num(r.account_balance_at), rule_id: (r.rule_id as string) ?? null, rule_text: (r.rule_text as string) ?? null, is_violation: Boolean(r.is_violation), note: (r.note as string) ?? null };
 }
 function rowToEvent(r: Row): MarketEvent {
-  return { id: Number(r.id), code: (r.code as string) ?? null, event_type: r.event_type as MarketEvent["event_type"], title: r.title as string, event_date: r.event_date as string, note: (r.note as string) ?? null };
+  return { id: Number(r.id), code: (r.code as string) ?? null, event_type: r.event_type as MarketEvent["event_type"], title: r.title as string, event_date: r.event_date as string, note: (r.note as string) ?? null, source: (r.source as string) ?? "brain" };
 }
 function rowToRegime(r: Row): MarketRegime {
   return { as_of: r.as_of as string, signal: r.signal as MarketRegime["signal"], kospi_close: num(r.kospi_close), kospi_ma200: num(r.kospi_ma200), kospi_ma200_slope_pct: num(r.kospi_ma200_slope_pct), kosdaq_close: num(r.kosdaq_close), kosdaq_ma200: num(r.kosdaq_ma200), kosdaq_ma200_slope_pct: num(r.kosdaq_ma200_slope_pct), vkospi: num(r.vkospi), lev_etf_turnover_share_pct: num(r.lev_etf_turnover_share_pct), reasons: (r.reasons as string[]) ?? [], is_seed: Boolean(r.is_seed) };
@@ -276,6 +288,18 @@ class SupabaseRepo implements Repo {
     end.setUTCDate(end.getUTCDate() + days);
     const { data } = await this.db.from("sb_events").select("*").gte("event_date", t).lte("event_date", end.toISOString().slice(0, 10)).order("event_date", { ascending: true });
     return ((data ?? []) as Row[]).map(rowToEvent);
+  }
+
+  async approveThesis(thesisId: number, actor: Author, note: string) {
+    const { data: t } = await this.db.from("sb_theses").select("*").eq("id", thesisId).maybeSingle();
+    if (!t) return { ok: false as const, error: "가설 없음" };
+    const th = rowToThesis(t as Row);
+    if (th.status !== "draft") return { ok: false as const, error: "미승인 상태가 아님" };
+    if (th.invalidation_conditions.length === 0) return { ok: false as const, error: "무효화 조건이 비어 있어 승인 불가" };
+    const { error } = await this.db.from("sb_theses").update({ status: "valid" }).eq("id", thesisId);
+    if (error) return { ok: false as const, error: error.message };
+    await this.db.from("sb_thesis_log").insert({ thesis_id: thesisId, from_status: "draft", to_status: "valid", actor, note });
+    return { ok: true as const };
   }
 
   async ruleAudit() {

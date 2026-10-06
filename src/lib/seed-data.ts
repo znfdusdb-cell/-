@@ -10,6 +10,7 @@ import type {
   Stock, Thesis, Setup, Position, OrderLog, MarketEvent, Prediction, MarketRegime, Candle, StageLog, CheckItem, Settings, BalanceSnapshot,
 } from "./types";
 import { TREND_TEMPLATE_ITEMS, CHECKLIST_ITEMS } from "./constants";
+import { candleStats } from "./setup-calc";
 
 export const SEED_AS_OF = "2026-10-06";
 
@@ -34,10 +35,13 @@ function tradingDays(endISO: string, n: number): string[] {
   return out;
 }
 
-/** 앵커(날짜 인덱스→가격)를 선형 보간한 뒤 노이즈를 얹어 일봉을 만든다. */
-function makeCandles(code: string, seed: number, anchors: [number, number][], n: number, tick: number, baseVol: number): Candle[] {
+/** 앵커(날짜→가격)를 선형 보간한 뒤 노이즈를 얹어 일봉을 만든다. 고점·저점 앵커는 그날 고가·저가가 앵커값이 되게 맞춘다. */
+function makeCandles(code: string, seed: number, dateAnchors: [string, number][], n: number, tick: number, baseVol: number, clamp?: [number, number]): Candle[] {
   const rnd = mulberry32(seed);
   const days = tradingDays(SEED_AS_OF, n);
+  const idx = (d: string) => { let i = days.findIndex((x) => x >= d); return i < 0 ? n - 1 : i; };
+  const anchors: [number, number][] = dateAnchors.map(([d, p]) => [idx(d), p]);
+  const pinned = new Map(anchors.map(([i, p]) => [i, p]));
   const round = (v: number) => Math.max(tick, Math.round(v / tick) * tick);
   const out: Candle[] = [];
   let prevClose: number | null = null;
@@ -56,8 +60,22 @@ function makeCandles(code: string, seed: number, anchors: [number, number][], n:
     const lo = round(Math.min(open, close) * (1 - rnd() * 0.012));
     const move = Math.abs(close - open) / open;
     const volume = Math.round(baseVol * (0.5 + rnd() + move * 40));
-    out.push({ code, date: days[i], open, high: hi, low: lo, close, volume, source: "seed" });
-    prevClose = close;
+    const pin = pinned.get(i);
+    const c: Candle = { code, date: days[i], open, high: hi, low: lo, close, volume, source: "seed" };
+    if (pin !== undefined) {
+      // 앵커 날엔 앵커값이 그날의 극값(고점이면 고가, 저점이면 저가)이 되도록
+      if (pin >= trend) { c.high = Math.max(c.high, pin); c.close = round(Math.min(c.close, pin)); }
+      else { c.low = Math.min(c.low, pin); c.close = round(Math.max(c.close, pin)); }
+    }
+    if (clamp) {
+      // 앵커 날만 극값에 닿고, 나머지 날은 한 틱 안쪽으로
+      const hiCap = pin === clamp[1] ? clamp[1] : clamp[1] - tick;
+      const loCap = pin === clamp[0] ? clamp[0] : clamp[0] + tick;
+      c.high = Math.min(c.high, hiCap); c.low = Math.max(c.low, loCap);
+      c.open = Math.min(Math.max(c.open, c.low), c.high); c.close = Math.min(Math.max(c.close, c.low), c.high);
+    }
+    out.push(c);
+    prevClose = c.close;
   }
   return out;
 }
@@ -80,7 +98,7 @@ export const SEED_STOCKS: Stock[] = [
 ];
 
 export const SEED_STAGE_LOG: StageLog[] = [
-  { id: 1, code: "005930", from_stage: null, to_stage: "review", reason: "시드: KB 수동 보유 중, 가설·무효화 조건 작성 완료. 봇 계좌 기준으론 아직 유니버스 아님", actor: "bium", created_at: "2026-10-06T09:00:00+09:00" },
+  { id: 1, code: "005930", from_stage: null, to_stage: "review", reason: "시드: KB 수동 보유 중, 가설 초안(claude_code) 비움 미승인. 봇 계좌 기준으론 아직 유니버스 아님", actor: "claude_code", created_at: "2026-10-06T09:00:00+09:00" },
   { id: 5, code: "999901", from_stage: null, to_stage: "radar", reason: "상대강도 상위 + 거래량 축소 감지", actor: "brain", created_at: "2026-10-05T07:10:00+09:00" },
   { id: 6, code: "999902", from_stage: null, to_stage: "radar", reason: "실적 서프라이즈 2분기 연속", actor: "brain", created_at: "2026-09-28T07:10:00+09:00" },
   { id: 7, code: "999902", from_stage: "radar", to_stage: "review", reason: "가설 작성 시작", actor: "bium", created_at: "2026-10-02T09:30:00+09:00" },
@@ -96,7 +114,7 @@ export const SEED_STAGE_LOG: StageLog[] = [
 // ---------- 가설 ----------
 export const SEED_THESES: Thesis[] = [
   {
-    id: 1, code: "005930", author: "bium", status: "valid",
+    id: 1, code: "005930", author: "claude_code", status: "draft",
     hypothesis: "HBM 구조적 수요 + 범용 D램 가격 반등으로 2026 하반기 실적 컨센서스 상향. 3C 베이스(A 380,000→189,200, B 288,000 회복) 완성 후 C 박스 고점 돌파 시 2단계 재개.",
     invalidation_conditions: [
       { text: "288,000 돌파 실패 후 C 박스 하단(250,000) 종가 이탈", violated: false, note: null },
@@ -104,17 +122,17 @@ export const SEED_THESES: Thesis[] = [
       { text: "분기 영업이익 컨센서스 10% 이상 하회", violated: false, note: null },
       { text: "필라델피아 반도체지수 대비 상대강도 3개월 연속 하위", violated: false, note: null },
     ],
-    created_at: "2026-09-15T22:30:00+09:00", updated_at: "2026-09-15T22:30:00+09:00",
+    created_at: "2026-10-06T09:00:00+09:00", updated_at: "2026-10-06T09:00:00+09:00",
   },
   {
-    id: 2, code: "999902", author: "brain", status: "valid",
+    id: 2, code: "999902", author: "claude_code", status: "draft",
     hypothesis: "[가짜] 신약 3상 결과 발표 전 기관 매집. 2분기 연속 컨센서스 상회.",
     invalidation_conditions: [],   // 비어 있음 → 유니버스 승인 불가 상태를 보여주는 카드
     created_at: "2026-10-02T09:30:00+09:00", updated_at: "2026-10-02T09:30:00+09:00",
   },
   {
-    id: 3, code: "999903", author: "bium", status: "valid",
-    hypothesis: "[가짜] LNG선 수주 잔고 3년치 + 신조선가 상승. 4~7주 플랫 베이스 고점 돌파 대기.",
+    id: 3, code: "999903", author: "claude_code", status: "valid",
+    hypothesis: "[가짜] LNG선 수주 잔고 3년치 + 신조선가 상승. 4~7주 플랫 베이스 고점 돌파 대기. (가짜 카드라 '유효' 상태로 둠)",
     invalidation_conditions: [
       { text: "신조선가 지수 2개월 연속 하락", violated: false, note: null },
       { text: "베이스 하단(-12%) 종가 이탈", violated: false, note: null },
@@ -122,7 +140,7 @@ export const SEED_THESES: Thesis[] = [
     created_at: "2026-09-29T20:00:00+09:00", updated_at: "2026-09-29T20:00:00+09:00",
   },
   {
-    id: 4, code: "999904", author: "bium", status: "suspect",
+    id: 4, code: "999904", author: "claude_code", status: "suspect",
     hypothesis: "[가짜] 중동 리스크로 유가 90달러 이상 유지 시 정제 마진 확대.",
     invalidation_conditions: [
       { text: "WTI 70달러 하회", violated: true, note: "9/24 종가 68.4달러" },
@@ -136,15 +154,15 @@ export const SEED_THESES: Thesis[] = [
 export const SEED_SETUPS: Setup[] = [
   {
     id: 1, code: "005930", as_of: SEED_AS_OF, setup_type: "cup3c",
-    footprint_weeks: 40, max_contraction_pct: 50.2, min_contraction_pct: 13, t_count: 3,
+    footprint_weeks: 0, max_contraction_pct: 50.2, min_contraction_pct: 13, t_count: 3,
     pivot: 288000, cbox_high: 288000, cbox_low: 250000, cbox_start: "2026-08-04",
     volume_dry_days: 9,
-    trend_template: tt([true, true, false, true, true, true, true, false], ["257,000 > 231,000·214,000", null, "200일선 상승 3주", null, null, "저가 189,200 대비 +36%", "고가 288,000 대비 -11%", "SOX 대비 하위"]),
+    trend_template: tt([true, true, false, true, true, true, true, false], ["257,000 > 231,000·214,000", null, "200일선 상승 3주", null, null, null, null, "SOX 대비 하위"]),
     trend_template_score: 0,
     checklist: cl([true, true, false, true, true, false, false]),
     checklist_score: 0,
-    drawdown_pct: -13.0, market_drawdown_pct: -6.5, drawdown_vs_market: 2.0, benchmark: "SOX",
-    notes: "C 박스가 아직 넓음(-13%). 거래량 7월 1억 주 → 9월 1,600만~2,800만 주로 축소. 피봇 288,000 돌파 + 거래량 전까지 2차 금지.",
+    drawdown_pct: 0, market_drawdown_pct: -6.5, drawdown_vs_market: 0, benchmark: "SOX",
+    notes: "C 후보: 288,000 이후 약 25만까지 -13% 흔들려 아직 넓음(10% 안으로 좁아져야 진짜 C). 거래량 7월 1억 주 → 9월 1,600만~2,800만 주로 축소. 위에 325,000·380,000에 본전 기다리는 사람들 있음.",
   },
   {
     id: 2, code: "999901", as_of: SEED_AS_OF, setup_type: "vcp",
@@ -194,7 +212,7 @@ export const SEED_SETUPS: Setup[] = [
     drawdown_pct: -22.0, market_drawdown_pct: -6.5, drawdown_vs_market: 3.4, benchmark: "KOSPI",
     notes: "[가짜] 50일선 이탈. 퇴출.",
   },
-].map((s) => ({ ...s, data_source: "seed" as const, trend_template_score: score(s.trend_template), checklist_score: score(s.checklist) })) as Setup[];
+].map((s) => ({ ...s, high_52w: null, high_52w_date: null, low_52w: null, low_52w_date: null, base_start: null, data_source: "seed" as const, trend_template_score: 0, checklist_score: 0 })) as Setup[];
 
 // ---------- 포지션 ----------
 export const SEED_POSITIONS: Position[] = [
@@ -233,10 +251,10 @@ export const SEED_SETTINGS: Settings = {
 
 // ---------- 이벤트 ----------
 export const SEED_EVENTS: MarketEvent[] = [
-  { id: 1, code: "005930", event_type: "earnings", title: "삼성전자 3분기 잠정실적", event_date: "2026-10-08", note: "EV-1: 발표 전 축소 여부 비움 승인" },
-  { id: 2, code: null, event_type: "macro", title: "미국 CPI 발표", event_date: "2026-10-14", note: null },
-  { id: 3, code: null, event_type: "holiday", title: "한글날 휴장", event_date: "2026-10-09", note: "하루 휴장. 손절선 하루 미작동" },
-  { id: 4, code: "999903", event_type: "earnings", title: "[가짜] 감마조선 3분기 실적", event_date: "2026-10-28", note: null },
+  { id: 1, code: "005930", event_type: "earnings", title: "3분기 잠정실적", event_date: "2026-10-08", note: "EV-1: 발표 전 축소 여부 비움 승인", source: "seed" },
+  { id: 2, code: null, event_type: "macro", title: "미국 CPI 발표", event_date: "2026-10-14", note: null, source: "seed" },
+  { id: 3, code: null, event_type: "holiday", title: "한글날 휴장", event_date: "2026-10-09", note: "하루 휴장. 손절선 하루 미작동", source: "krx_calendar" },
+  { id: 4, code: "999903", event_type: "earnings", title: "[가짜] 3분기 실적", event_date: "2026-10-28", note: null, source: "seed" },
 ];
 
 // ---------- 가설 장부 ----------
@@ -268,9 +286,28 @@ export const SEED_REGIME: MarketRegime[] = [
 // ---------- 일봉 (전부 가짜) ----------
 // 삼성전자: 1월 380,000 → 4월 저점 189,200 → 7월 288,000 → 8~10월 250,000~288,000 박스
 export const SEED_CANDLES: Candle[] = [
-  ...makeCandles("005930", 5930, [[0, 362000], [12, 380000], [70, 189200], [135, 288000], [160, 252000], [175, 281000], [190, 250000], [199, 257000]], 200, 100, 22000000),
-  ...makeCandles("999901", 9901, [[0, 31000], [60, 42000], [90, 36000], [130, 52000], [150, 49500], [175, 54800], [199, 53200]], 200, 100, 900000),
-  ...makeCandles("999902", 9902, [[0, 12000], [80, 24500], [120, 19000], [150, 26800], [199, 21400]], 200, 50, 1500000),
-  ...makeCandles("999903", 9903, [[0, 72000], [90, 98000], [140, 131500], [170, 118000], [199, 128000]], 200, 100, 600000),
-  ...makeCandles("999904", 9904, [[0, 29000], [100, 44800], [150, 46500], [170, 40000], [199, 36300]], 200, 50, 800000),
+  // 삼성전자: 6/19 고점 380,000 → 7/6 325,000 → 7/29 저점 189,200 → 8월 288,000 → 9/21 273,000 → 10/6 약 257,000 (모양만 실제, 값은 가짜)
+  ...makeCandles("005930", 5930, [["2025-09-20", 230000], ["2026-01-15", 250000], ["2026-04-20", 310000], ["2026-06-19", 380000], ["2026-07-06", 325000], ["2026-07-29", 189200], ["2026-08-20", 288000], ["2026-09-05", 252000], ["2026-09-21", 273000], ["2026-10-06", 257000]], 260, 100, 22000000, [189200, 380000]),
+  ...makeCandles("999901", 9901, [["2025-12-15", 31000], ["2026-03-10", 42000], ["2026-04-20", 36000], ["2026-06-15", 52000], ["2026-07-15", 49500], ["2026-08-20", 54800], ["2026-10-06", 53200]], 260, 100, 900000),
+  ...makeCandles("999902", 9902, [["2025-12-15", 12000], ["2026-04-01", 24500], ["2026-06-01", 19000], ["2026-07-20", 26800], ["2026-10-06", 21400]], 260, 50, 1500000),
+  ...makeCandles("999903", 9903, [["2025-12-15", 72000], ["2026-04-15", 98000], ["2026-07-01", 131500], ["2026-08-25", 118000], ["2026-10-06", 128000]], 260, 100, 600000),
+  ...makeCandles("999904", 9904, [["2025-12-15", 29000], ["2026-05-01", 44800], ["2026-07-10", 46500], ["2026-08-15", 40000], ["2026-10-06", 36300]], 260, 50, 800000),
 ];
+
+// ---------- 일봉 기반 재계산 (52주 = 252거래일, 베이스 시작 = 직전 2단계 고점) ----------
+for (const su of SEED_SETUPS) {
+  const st = candleStats(SEED_CANDLES.filter((c) => c.code === su.code));
+  if (!st) continue;
+  su.high_52w = st.high_52w; su.high_52w_date = st.high_52w_date;
+  su.low_52w = st.low_52w; su.low_52w_date = st.low_52w_date;
+  su.base_start = st.base_start;
+  su.footprint_weeks = st.footprint_weeks;
+  su.drawdown_pct = st.drawdown_pct;
+  su.drawdown_vs_market = su.market_drawdown_pct ? Math.round((st.drawdown_pct / su.market_drawdown_pct) * 10) / 10 : null;
+  const tt6 = su.trend_template.find((i) => i.key === "tt6");
+  const tt7 = su.trend_template.find((i) => i.key === "tt7");
+  if (tt6) { tt6.pass = st.pct_from_low >= 25; tt6.value = `52주 저가 ${st.low_52w.toLocaleString("ko-KR")}(${st.low_52w_date.slice(5)}) 대비 ${st.pct_from_low >= 0 ? "+" : ""}${st.pct_from_low}%`; }
+  if (tt7) { tt7.pass = st.pct_from_high >= -25; tt7.value = `52주 고가 ${st.high_52w.toLocaleString("ko-KR")}(${st.high_52w_date.slice(5)}) 대비 ${st.pct_from_high}%`; }
+  su.trend_template_score = score(su.trend_template);
+  su.checklist_score = score(su.checklist);
+}

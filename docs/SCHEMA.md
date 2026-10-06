@@ -101,3 +101,13 @@ Supabase 본체에는 아직 실행하지 않았다.
 4. Vercel에서 Redeploy. 로그인 화면이 이메일 입력으로 바뀐다. 다른 이메일은 발송 자체를 거부한다. `SITE_PASSCODE`는 남겨둬도 된다(매직링크 설정이 비면 폴백).
 
 Supabase 기본 메일러는 시간당 3통 제한이라 혼자 쓰기엔 충분하다. 링크는 한 번만 쓸 수 있고 세션은 브라우저에 남는다.
+
+## 9. 3차 (2026-10-06, 모바일 검토) — `supabase/migrations/20261006_03_authors_52w_easy.sql`
+
+전부 추가만. 2차 다음에 실행하고 `supabase/seed.sql` 재실행.
+
+- 작성자 `claude_code` 추가, 가설 상태 `draft`(비움 미승인) 추가. 시드 가설은 전부 claude_code 초안이고 삼성전자는 draft. UV-2는 valid만 인정하므로 draft는 유니버스 승인 불가. 승인은 사이트 '가설 승인' 버튼 → `sb_thesis_log`에 기록.
+- `sb_setups`에 `high_52w/low_52w(+date)`, `base_start`. 정의는 `src/lib/setup-calc.ts`: 52주 = 최근 252거래일 최고가·최저가, 베이스 시작 = 직전 2단계 고점(=52주 고가 날짜), 발자국 W = 베이스 시작~기준일, 고점 대비 조정 = 52주 고가 대비. 봇도 같은 정의를 써야 한다. 시드 셋업은 이 함수로 재계산(삼성전자 16W, 52주 고가 380,000 6/19, TT7 불통과 → TT 5/8).
+- `sb_events.source` (brain/bium/seed/kis/dart/krx_calendar).
+- UV-4는 가짜 일봉(data_source=seed)이거나 값이 없으면 '판정 보류'로 막지 않는다(`uv4Status`). 실제 일봉이 들어오면 자동으로 판정.
+- 쉬운 모드(기본): 쿠키 `sb_view`. 상단 '자세히/쉽게'로 전환. 용어 치환은 `TERMS`(문턱·안전벨트·본전 기다리는 사람들·오르막…), 산 위 위치는 TT 8항목으로 어림(`mountainStage`), '다음에 일어나야 할 일'은 단계·가설 상태에서 생성(`nextStep`). 홈 '오늘 할 일'은 가설 승인·유니버스 승인·퇴출 승인·실적 전 축소만.

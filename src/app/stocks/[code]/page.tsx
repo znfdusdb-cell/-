@@ -7,6 +7,9 @@ import { fmtNum, fmtPct, pctChange, udClass } from "@/lib/format";
 import { CandleChart } from "@/components/CandleChart";
 import { StageMoveButtons } from "@/components/StageMoveButtons";
 import { Badge } from "@/components/StockCard";
+import { EasyDetail } from "@/components/EasyDetail";
+import { viewMode } from "@/lib/view";
+import { ThesisApproveButton } from "@/components/ThesisApproveButton";
 import { Section, FootprintPanel, CheckPanel, ThesisPanel, PositionPanel, EventsPanel, StageLogPanel, OrdersTable, SnapshotsPanel } from "@/components/DetailPanels";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +22,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
   const { stock, thesis, setup, position } = d;
   const chg = pctChange(d.last_close, d.prev_close);
   const fakeCandles = d.candles.some((c) => c.source === "seed");
+  if ((await viewMode()) === "easy") return <EasyDetail d={d} settings={settings} />;
   const violated = thesis?.status === "suspect" || thesis?.invalidation_conditions.some((c) => c.violated);
 
   return (
@@ -59,7 +63,8 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
       )}
 
       <Section title={`단계: ${STAGE_LABEL[stock.stage]}`} right={<span className="text-[11px] text-fg-3">{STAGE_HINT[stock.stage]}</span>}>
-        <StageMoveButtons code={stock.code} stage={stock.stage} universeBlocked={universeGuard(thesis, setup, settings)} />
+        {thesis?.status === "draft" && thesis.invalidation_conditions.length > 0 && <div className="mb-2"><ThesisApproveButton thesisId={thesis.id} code={stock.code} /></div>}
+        <StageMoveButtons code={stock.code} stage={stock.stage} universeBlocked={universeGuard(thesis, setup, settings)} botActive={Boolean(settings.bot_started_at)} />
         {stock.stage_reason && <p className="mt-2 text-xs text-fg-3">최근 이동 이유: {stock.stage_reason}</p>}
       </Section>
 

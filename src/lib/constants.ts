@@ -42,6 +42,25 @@ export const POSITION_STATE_LABEL: Record<PositionState, string> = {
   manual: "수동 보유",
 };
 
+export const AUTHOR_LABEL: Record<"brain" | "bium" | "bot" | "claude_code", string> = {
+  brain: "브레인",
+  bium: "비움",
+  bot: "봇",
+  claude_code: "claude_code 초안",
+};
+
+/** 쉬운 모드 용어. 단어를 누르면 한 줄 설명. */
+export const TERMS: Record<string, { easy: string; pro: string; desc: string }> = {
+  pivot: { easy: "문턱", pro: "피봇", desc: "쉬는 곳(베이스)의 맨 윗가격. 이걸 거래량과 함께 넘는 날 봇이 산다." },
+  stop: { easy: "안전벨트", pro: "손절선", desc: "여기 아래로 내려가면 이유 묻지 않고 판다. 산 가격의 -6%에서 시작해 종가가 오르면 위로만 올라간다." },
+  overhead: { easy: "본전 기다리는 사람들", pro: "매물대", desc: "예전에 비싸게 샀다가 물린 사람들. 그 가격 근처에 오면 팔려고 해서 잘 안 올라간다." },
+  stage2: { easy: "오르막", pro: "2단계", desc: "큰 흐름이 올라가는 중. 봇은 오르막에서만 산다. 내리막 속 평평한 곳은 쉬는 곳이 아니다." },
+  base: { easy: "쉬는 곳", pro: "베이스", desc: "오르다가 잠깐 멈춰 흔들리는 구간. 흔들림이 점점 작아지고 거래량이 마르면 좋은 쉼이다." },
+  cbox: { easy: "좁게 쉬는 칸", pro: "C 박스", desc: "컵이 다 차기 전에 중간쯤 좁게(5~10%) 쉬는 곳. 이 칸의 윗가격이 문턱이 된다." },
+  universe: { easy: "살 수 있는 목록", pro: "유니버스", desc: "비움이 승인한 종목만 들어간다. 봇은 이 목록 밖 종목을 절대 사지 않는다." },
+  tennis: { easy: "테니스공", pro: "정상 반응", desc: "문턱을 넘고 살짝 내려와도 1~2주 안에 다시 튀어 오르면 건강하다. 돌처럼 가라앉으면 경고." },
+};
+
 export const ACCOUNT_LABEL: Record<"kis_bot" | "kb_manual", string> = {
   kis_bot: "한투 봇 계좌",
   kb_manual: "KB 수동 보유",
@@ -74,6 +93,7 @@ export const REGIME_HINT: Record<RegimeSignal, string> = {
 };
 
 export const THESIS_STATUS_LABEL: Record<ThesisStatus, string> = {
+  draft: "비움 미승인",
   valid: "유효",
   suspect: "위반 의심",
   discarded: "폐기",

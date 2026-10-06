@@ -1,7 +1,7 @@
 export type Stage = "radar" | "review" | "universe" | "holding" | "exited";
 export type Market = "KOSPI" | "KOSDAQ";
-export type ThesisStatus = "valid" | "suspect" | "discarded";
-export type Author = "brain" | "bium" | "bot";
+export type ThesisStatus = "draft" | "valid" | "suspect" | "discarded";
+export type Author = "brain" | "bium" | "bot" | "claude_code";
 export type SetupType = "vcp" | "cup3c" | "flat" | "power_play" | "none";
 export type PositionState =
   | "scout"
@@ -76,6 +76,11 @@ export interface Setup {
   cbox_high: number | null;
   cbox_low: number | null;
   cbox_start: string | null;
+  high_52w: number | null;
+  high_52w_date: string | null;
+  low_52w: number | null;
+  low_52w_date: string | null;
+  base_start: string | null;
   volume_dry_days: number | null;
   trend_template: CheckItem[];
   trend_template_score: number;
@@ -130,6 +135,7 @@ export interface MarketEvent {
   title: string;
   event_date: string;
   note: string | null;
+  source: string;
 }
 
 export interface Prediction {
@@ -212,4 +218,14 @@ export interface Violation {
   order_id: number;
   rule_id: string;
   reason: string;
+}
+
+export type ViewMode = "easy" | "detail";
+
+export interface Todo {
+  kind: "approve_universe" | "approve_exit" | "approve_thesis" | "event_reduce";
+  code: string;
+  name: string;
+  title: string;
+  detail: string;
 }

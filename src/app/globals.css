@@ -45,3 +45,7 @@ body {
 .num { font-variant-numeric: tabular-nums; }
 .scroll-x { overflow-x: auto; scrollbar-width: none; }
 .scroll-x::-webkit-scrollbar { display: none; }
+
+/* 쉬운 모드 글꼴 (아티팩트 '미너비니 10장 그림 공부'와 맞춤) */
+.font-easy { font-family: "Gowun Dodum", -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; font-size: 16px; }
+.font-easy h1, .font-easy h2, .font-easy h3, .font-easy .font-bold, .font-easy .font-semibold { font-family: "Jua", "Gowun Dodum", sans-serif; font-weight: 400; }

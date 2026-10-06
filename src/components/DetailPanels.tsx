@@ -1,5 +1,5 @@
 import type { Setup, Thesis, Position, StageLog, OrderLog, MarketEvent, CheckItem, Violation, BalanceSnapshot, Settings } from "@/lib/types";
-import { SETUP_TYPE_LABEL, THESIS_STATUS_LABEL, POSITION_STATE_LABEL, STAGE_LABEL, RULE_MAP, EVENT_TYPE_LABEL, ACCOUNT_LABEL, SETTING_KEYS } from "@/lib/constants";
+import { SETUP_TYPE_LABEL, THESIS_STATUS_LABEL, POSITION_STATE_LABEL, STAGE_LABEL, RULE_MAP, EVENT_TYPE_LABEL, ACCOUNT_LABEL, SETTING_KEYS, AUTHOR_LABEL } from "@/lib/constants";
 import { upcomingClosures, KRX_CALENDAR_UPDATED, KRX_CALENDAR_COVERS_UNTIL } from "@/lib/krx-calendar";
 import { fmtNum, fmtPct, footprint, fmtDate, fmtDateTime, pctChange, udClass, daysBetween, todayKST } from "@/lib/format";
 import { Badge } from "./StockCard";
@@ -19,17 +19,20 @@ export function Section({ title, right, children }: { title: string; right?: Rea
 export function FootprintPanel({ setup, lastClose }: { setup: Setup | null; lastClose: number | null }) {
   if (!setup) return <Section title="발자국·셋업"><p className="text-xs text-fg-3">봇 계산값 없음</p></Section>;
   const toPivot = setup.pivot ? pctChange(lastClose, setup.pivot) : null;
+  const cboxWide = setup.cbox_high && setup.cbox_low ? (setup.cbox_high - setup.cbox_low) / setup.cbox_high > 0.1 : false;
   return (
     <Section title="발자국·셋업" right={<span className="flex items-center gap-1 text-[11px] text-fg-3">{setup.data_source === "seed" && <Badge tone="warn">가짜 일봉 기준</Badge>}{fmtDate(setup.as_of)} 계산</span>}>
       <div className="flex items-baseline gap-3">
         <span className="num text-2xl font-bold">{footprint(setup.footprint_weeks, setup.max_contraction_pct, setup.min_contraction_pct, setup.t_count)}</span>
         <span className="text-sm text-fg-2">{SETUP_TYPE_LABEL[setup.setup_type]}</span>
       </div>
-      <p className="mt-0.5 text-[11px] text-fg-3">주수W 최대조정/최소조정 횟수T</p>
+      <p className="mt-0.5 text-[11px] text-fg-3">주수W 최대조정/최소조정 횟수T · 베이스 시작 {setup.base_start ? `${fmtDate(setup.base_start)} (직전 2단계 고점)` : "—"}</p>
       <dl className="num mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs sm:grid-cols-3">
         <KV k="피봇" v={fmtNum(setup.pivot)} />
         <KV k="피봇까지" v={fmtPct(toPivot, 1)} cls={udClass(toPivot)} />
-        <KV k="C 박스" v={setup.cbox_high ? `${fmtNum(setup.cbox_low)} ~ ${fmtNum(setup.cbox_high)}` : "—"} />
+        <KV k={cboxWide ? "C 후보 (아직 넓음)" : "C 박스"} v={setup.cbox_high ? `${fmtNum(setup.cbox_low)} ~ ${fmtNum(setup.cbox_high)}${cboxWide ? ` (${fmtNum(((setup.cbox_high - (setup.cbox_low ?? 0)) / setup.cbox_high) * 100, 0)}% 폭)` : ""}` : "—"} cls={cboxWide ? "text-warn" : undefined} />
+        <KV k="52주 고가 (252거래일)" v={setup.high_52w ? `${fmtNum(setup.high_52w)} (${fmtDate(setup.high_52w_date)})` : "—"} />
+        <KV k="52주 저가 (252거래일)" v={setup.low_52w ? `${fmtNum(setup.low_52w)} (${fmtDate(setup.low_52w_date)})` : "—"} />
         <KV k="거래량 마른 일수" v={setup.volume_dry_days != null ? `${setup.volume_dry_days}일` : "—"} />
         <KV k="고점 대비 조정" v={fmtPct(setup.drawdown_pct, 1)} />
         <KV k={`${setup.benchmark ?? "시장"} 대비 조정 배수`} v={setup.drawdown_vs_market != null ? `${fmtNum(setup.drawdown_vs_market, 1)}배 (${setup.benchmark ?? "시장"} ${fmtPct(setup.market_drawdown_pct, 1)})` : "—"} cls={setup.drawdown_vs_market != null && setup.drawdown_vs_market >= 2 ? "text-stop" : undefined} />
@@ -80,17 +83,18 @@ export function ThesisPanel({ thesis }: { thesis: Thesis | null }) {
     );
   }
   const anyViolated = thesis.invalidation_conditions.some((c) => c.violated);
-  const tone = thesis.status === "suspect" || anyViolated ? "stop" : thesis.status === "discarded" ? "muted" : "go";
+  const tone = thesis.status === "suspect" || anyViolated ? "stop" : thesis.status === "discarded" ? "muted" : thesis.status === "draft" ? "warn" : "go";
   return (
     <Section
       title="가설 · 무효화 조건"
       right={
         <span className="flex items-center gap-1 text-[11px]">
           <Badge tone={tone}>{THESIS_STATUS_LABEL[thesis.status]}</Badge>
-          <span className="text-fg-3">{thesis.author === "bium" ? "비움" : thesis.author === "brain" ? "브레인" : "봇"} · {fmtDate(thesis.updated_at)}</span>
+          <span className="text-fg-3">{AUTHOR_LABEL[thesis.author]} · {fmtDate(thesis.updated_at)}</span>
         </span>
       }
     >
+      {thesis.status === "draft" && <p className="mb-2 rounded-lg border border-warn/50 bg-warn/10 p-2 text-xs text-warn">claude_code가 쓴 초안. 비움이 읽고 '가설 승인'을 눌러야 유효해진다. 작성자는 지어내지 않는다.</p>}
       <p className="text-sm leading-relaxed">{thesis.hypothesis}</p>
       <h3 className="mt-3 text-[11px] font-semibold text-fg-3">무효화 조건 (이 중 하나라도 맞으면 가설은 틀린 것)</h3>
       {thesis.invalidation_conditions.length === 0 ? (
@@ -153,6 +157,7 @@ export function EventsPanel({ events }: { events: MarketEvent[] }) {
               <Badge tone="muted">{EVENT_TYPE_LABEL[e.event_type]}</Badge>
               <span className="text-fg">{e.title}</span>
               {e.note && <span className="text-fg-3">· {e.note}</span>}
+              <span className="ml-auto shrink-0 text-[10px] text-fg-3">출처 {e.source}</span>
             </li>
           );
         })}
@@ -182,7 +187,40 @@ export function StageLogPanel({ log }: { log: StageLog[] }) {
 export function OrdersTable({ orders, names, violations }: { orders: OrderLog[]; names?: Record<string, string>; violations?: Map<number, Violation[]> }) {
   if (!orders.length) return <p className="text-xs text-fg-3">주문 없음</p>;
   return (
-    <div className="-mx-4 overflow-x-auto px-4">
+    <>
+    {/* 폰: 카드형 */}
+    <ul className="space-y-2 sm:hidden">
+      {orders.map((o) => {
+        const rule = o.rule_id ? RULE_MAP[o.rule_id] : null;
+        const vs = violations?.get(o.id) ?? [];
+        const manual = o.source === "manual";
+        const bad = !manual && (vs.length > 0 || o.is_violation || !o.rule_id);
+        return (
+          <li key={o.id} className={`rounded-lg border p-3 text-xs ${bad ? "border-stop/60 bg-stop/5" : "border-line"}`}>
+            <div className="flex items-center justify-between">
+              <span className="num text-fg-2">{fmtDateTime(o.ts)}</span>
+              <span className="flex items-center gap-1">
+                {manual && <span className="rounded border border-line px-1 text-[10px] text-fg-3">수동</span>}
+                <span className={`font-semibold ${o.side === "buy" ? "text-up" : "text-down"}`}>{o.side === "buy" ? "매수" : "매도"}</span>
+              </span>
+            </div>
+            <div className="num mt-1 flex items-baseline gap-2">
+              {names && <span className="font-semibold">{names[o.code] ?? o.code}</span>}
+              <span>{fmtNum(o.qty)}주{o.planned_qty !== null && o.planned_qty !== o.qty ? <span className="text-stop"> (계산 {o.planned_qty})</span> : null}</span>
+              <span className="text-fg-2">@ {fmtNum(o.price)}</span>
+            </div>
+            <div className="mt-1">
+              {bad ? <span className="font-semibold text-stop">규칙 위반 {vs.length ? vs.map((v) => v.rule_id).join(", ") : o.rule_id ? `(${o.rule_id})` : "· 근거 없음"}</span>
+                   : <span><span className="text-fg">{o.rule_id ?? "—"}</span> <span className="text-fg-2">{rule?.title ?? o.rule_text}</span></span>}
+              {vs.map((v, i) => <div key={i} className="text-stop/90">{v.reason}</div>)}
+              {(o.rule_text && rule) || o.note ? <div className="text-fg-3">{[o.rule_text && rule ? o.rule_text : null, o.note].filter(Boolean).join(" · ")}</div> : null}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+    {/* 데스크톱: 표 */}
+    <div className="-mx-4 hidden overflow-x-auto px-4 sm:block">
       <table className="num w-full min-w-[560px] text-left text-xs">
         <thead className="text-fg-3">
           <tr className="border-b border-line">
@@ -223,6 +261,7 @@ export function OrdersTable({ orders, names, violations }: { orders: OrderLog[];
         </tbody>
       </table>
     </div>
+    </>
   );
 }
 
@@ -252,7 +291,7 @@ export function ClosuresPanel({ from, days = 45 }: { from: string; days?: number
   const list = upcomingClosures(from, days);
   const expired = KRX_CALENDAR_COVERS_UNTIL < from;
   return (
-    <Section title="휴장 달력 (EV-2)" right={<span className="text-[11px] text-fg-3">KRX 달력 {KRX_CALENDAR_UPDATED} 갱신</span>}>
+    <Section title="휴장 달력 (EV-2)" right={<span className="text-[11px] text-fg-3">KRX 달력 {KRX_CALENDAR_UPDATED} 갱신 · 장기 = 연속 3일 이상</span>}>
       {expired && <p className="mb-2 text-xs text-stop">달력이 {KRX_CALENDAR_COVERS_UNTIL}까지만 있다. krx-calendar.ts 갱신 필요.</p>}
       {list.length === 0 ? (
         <p className="text-xs text-fg-3">{days}일 안에 공휴일 휴장 없음</p>

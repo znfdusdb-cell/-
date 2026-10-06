@@ -2,6 +2,8 @@ import { getRepo } from "@/lib/repo";
 import { MarketLight } from "@/components/MarketLight";
 import { PipelineBoard } from "@/components/PipelineBoard";
 import { UpcomingEvents } from "@/components/UpcomingEvents";
+import { EasyHome } from "@/components/EasyHome";
+import { viewMode } from "@/lib/view";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +11,7 @@ export default async function Home() {
   const repo = getRepo();
   const [regime, items, events, settings] = await Promise.all([repo.latestRegime(), repo.summaries(), repo.upcomingEvents(14), repo.settings()]);
   const names = Object.fromEntries(items.map((i) => [i.stock.code, i.stock.name]));
+  if ((await viewMode()) === "easy") return <EasyHome items={items} regime={regime} events={events} settings={settings} />;
   return (
     <div className="space-y-4">
       <MarketLight regime={regime} settings={settings} />

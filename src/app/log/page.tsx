@@ -2,7 +2,9 @@ import { getRepo } from "@/lib/repo";
 import { RULES } from "@/lib/constants";
 import { fmtDate } from "@/lib/format";
 import { Section, OrdersTable, ClosuresPanel, SettingsPanel } from "@/components/DetailPanels";
-import { todayKST } from "@/lib/format";
+import { todayKST, fmtNum, fmtDateTime } from "@/lib/format";
+import { viewMode } from "@/lib/view";
+import { streakSentence } from "@/lib/easy";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,42 @@ export default async function LogPage() {
   const cats = Array.from(new Set(RULES.map((r) => r.category)));
   const vByOrder = new Map<number, typeof audit.violations>();
   for (const v of audit.violations) vByOrder.set(v.order_id, [...(vByOrder.get(v.order_id) ?? []), v]);
+
+  if ((await viewMode()) === "easy") {
+    const st = streakSentence(audit.days, audit.since, audit.violations.length, audit.settings.bot_started_at ?? null);
+    return (
+      <div className="space-y-4 font-easy">
+        <section className="rounded-2xl border border-line bg-bg-2 p-5 text-center">
+          <div className="text-xs text-fg-3">봇이 규칙을 지킨 날</div>
+          <div className={`mt-1 text-4xl font-bold ${audit.days !== null && audit.days >= 30 ? "text-go" : ""}`}>{st.big}</div>
+          <p className="mt-1 text-sm text-fg-2">{st.line}</p>
+        </section>
+        <section className="rounded-2xl border border-line bg-bg-2 p-4">
+          <h2 className="mb-2 text-xs text-fg-3">봇이 한 일</h2>
+          {audit.orders.length === 0 ? (
+            <p className="text-sm text-fg-2">아직 없어요.</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {audit.orders.slice(0, 30).map((o) => {
+                const vs = vByOrder.get(o.id) ?? [];
+                const bad = o.source === "bot" && (vs.length > 0 || o.is_violation || !o.rule_id);
+                return (
+                  <li key={o.id} className={`rounded-lg border p-3 ${bad ? "border-stop/60" : "border-line"}`}>
+                    <div className="num text-[11px] text-fg-3">{fmtDateTime(o.ts)}{o.source === "manual" ? " · 손으로" : ""}</div>
+                    <div>
+                      <span className={o.side === "buy" ? "text-up" : "text-down"}>{o.side === "buy" ? "샀어요" : "팔았어요"}</span> {names[o.code] ?? o.code} {fmtNum(o.qty)}주, 한 주에 {fmtNum(o.price)}원
+                    </div>
+                    <div className="text-[11px] text-fg-2">{bad ? `규칙을 어겼어요: ${vs.map((v) => v.reason).join(" / ") || o.note || ""}` : `이유: ${o.rule_text ?? (o.rule_id ? RULES.find((r) => r.rule_id === o.rule_id)?.title : "") ?? ""}`}</div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+        <ClosuresPanel from={todayKST()} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
