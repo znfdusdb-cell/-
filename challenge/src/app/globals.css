@@ -54,6 +54,10 @@ html, body {
   overscroll-behavior-y: none;
 }
 
+/* 앱 안 글씨 선택·복사 금지 (입력칸은 예외) */
+body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+input, textarea, select, [contenteditable="true"] { -webkit-user-select: text; user-select: text; }
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", system-ui, sans-serif;
   font-size: 15px;
