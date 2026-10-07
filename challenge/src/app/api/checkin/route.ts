@@ -3,6 +3,7 @@ import { currentUser } from "@/lib/current-user";
 import { getRepo } from "@/lib/repo";
 import { dayStatus, effectiveStartDate, levelFromXp, rewardFor, summarize } from "@/lib/game";
 import { normalizeMethods } from "@/lib/methods";
+import { loadBoard } from "@/lib/data";
 import { fmtDateKo, fmtHmKo, kstDate } from "@/lib/time";
 import type { Checkin } from "@/lib/types";
 
@@ -134,7 +135,14 @@ export async function POST(req: Request) {
   }
   const before = levelFromXp(user.xp);
   const level = levelFromXp(totalXp);
+  // 오늘(이번 기간) 완료한 사람 중 몇 번째인지 (완료 연출용)
+  let completedRank: number | null = null;
+  if (reward.completed) {
+    const board = await loadBoard(ch, now);
+    completedRank = board.filter((r) => !r.waiting && !r.summary.eliminated && !r.pending).length;
+  }
   return Response.json({
+    completedRank,
     ok: true,
     replaced: false,
     checkin: { ...created, xp: reward.xp },

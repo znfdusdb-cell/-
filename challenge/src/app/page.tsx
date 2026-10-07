@@ -13,18 +13,26 @@ import { AudioRecordButton, CheckinButton, LinkCheckinButton } from "@/component
 import { InstallHint } from "@/components/InstallHint";
 import { WeightPanel } from "@/components/WeightPanel";
 import { RechallengeButton } from "@/components/RechallengeButton";
+import { GiftUploadButton } from "@/components/GiftUploadButton";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ go?: string; slot?: string }> }) {
   const user = await currentUser();
   if (!user) redirect("/login");
-  const mine = await loadMyChallenges(user);
+  const sp = await searchParams;
+  const mineAll = await loadMyChallenges(user);
+  // 알림에서 들어온 챌린지를 맨 위로
+  const mine = sp.go ? [...mineAll].sort((a, b) => Number(b.challenge.id === sp.go) - Number(a.challenge.id === sp.go)) : mineAll;
   const pub = toPublic(user);
   const level = levelFromXp(user.xp);
   const nextPerk = LEVEL_PERKS.find((p) => p.level > level);
   const today = kstDate();
   const repo = getRepo();
+  // 탈락자가 이번 탈락 벌칙(기프티콘)을 올렸는지
+  const giftSent = Object.fromEntries(
+    await Promise.all(mine.filter((m) => m.summary.eliminated).map(async (m) => [m.participation.id, (await repo.listGiftsSentSince(user.id, m.challenge.id, m.participation.joined_at)).length > 0] as const)),
+  );
   const weightLogs = Object.fromEntries(
     await Promise.all(
       mine.filter((m) => m.challenge.config.goal === "weight").map(async (m) => [m.participation.id, await repo.listWeightLogs(m.participation.id)] as const),
@@ -55,8 +63,9 @@ export default async function HomePage() {
       )}
 
       <div className="space-y-3 mt-3">
-        {mine.map(({ challenge: ch, participation: p, summary: s }) => {
+        {mine.map(({ challenge: ch, participation: p, summary: s, todayCounts, todayPeople }) => {
           const waiting = today < s.startDate;
+          const focus = sp.go === ch.id;
           const methods: Method[] = ch.config.kind === "count" ? (normalizeMethods(p.goal.methods).length ? normalizeMethods(p.goal.methods) : ch.config.goal === "hobby" ? inferMethods(p.goal.hobby ?? "") : ["camera", "album", "link"]) : [];
           return (
             <section key={ch.id} className={`card p-4 ${s.eliminated ? "border-bad" : ""}`}>
@@ -69,17 +78,24 @@ export default async function HomePage() {
               {/* 손실 프레이밍 */}
               {s.eliminated ? (
                 <div className="mt-3 rounded-2xl bg-bad-soft border border-bad/30 p-3">
-                  <div className="font-extrabold text-bad">탈락 · 실패 {s.fails}번</div>
+                  <div className="font-extrabold text-bad">탈락 · 이번 달 실패 {s.fails}번</div>
                   <div className="text-sm mt-0.5">벌칙: <b>{ch.penalty}</b></div>
-                  <RechallengeButton challengeId={ch.id} />
+                  {giftSent[p.id] ? (
+                    <>
+                      <div className="text-xs text-ok font-bold mt-2">벌칙 기프티콘 전달 완료</div>
+                      <RechallengeButton challengeId={ch.id} />
+                    </>
+                  ) : (
+                    <GiftUploadButton challengeId={ch.id} />
+                  )}
                 </div>
               ) : (
                 <div className="mt-3 rounded-xl bg-red-soft px-3 py-2 text-xs leading-relaxed">
                   <div className="text-fg-2">
                     {ch.max_fails > 0 ? (
-                      <>실패 <b className="text-bad num">{s.fails}</b><span className="num">/{ch.max_fails}</span> · <b className="text-fg">{ch.max_fails - s.fails}번</b> 더 실패하면 탈락</>
+                      <>이번 달 실패 <b className="text-bad num">{s.fails}</b><span className="num">/{ch.max_fails}</span> · <b className="text-fg">{ch.max_fails - s.fails}번</b> 더 실패하면 탈락 · 실패마다 경험치 {s.kind === "slots" ? "−30" : "−60"}</>
                     ) : (
-                      <>실패 <b className="text-bad num">{s.fails}</b>번</>
+                      <>이번 달 실패 <b className="text-bad num">{s.fails}</b>번 · 실패마다 경험치 {s.kind === "slots" ? "−30" : "−60"}</>
                     )}
                   </div>
                   <div className="font-bold text-red">잃는 것: {ch.penalty}</div>
@@ -101,10 +117,10 @@ export default async function HomePage() {
                           {state === "done" ? "완료" : state === "open" ? "지금" : state === "missed" ? "실패" : "대기"}
                         </span>
                       </div>
-                      <div className="text-[11px] text-fg-3 num">{slot.start}~{slot.end}</div>
+                      <div className="text-[11px] text-fg-3 num">{slot.start}~{slot.end}{(todayCounts[slot.key] ?? 0) > 0 ? ` · ${todayCounts[slot.key]}명 인증` : ""}</div>
                       <div className="mt-2">
                         {state === "done" && checkin && <div className="text-xs text-ok num">{fmtTimeKo(checkin.taken_at)} 인증</div>}
-                        {state === "open" && <CheckinButton challengeId={ch.id} slot={slot.key} label="촬영 인증" className="btn btn-red w-full text-sm py-2" />}
+                        {state === "open" && <CheckinButton challengeId={ch.id} slot={slot.key} label="촬영 인증" className="btn btn-red w-full text-sm py-2" autoOpen={focus && (!sp.slot || sp.slot === slot.key)} />}
                         {state === "upcoming" && <div className="text-xs text-fg-3">{fmtHmKo(slot.start)}부터</div>}
                         {state === "missed" && <div className="text-xs text-bad">시간이 지났어요</div>}
                       </div>
@@ -114,7 +130,7 @@ export default async function HomePage() {
               ) : (
                 <div className="mt-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="font-bold">이번 주 {s.current.count}/{s.current.required}회{s.current.complete ? " 완료" : ""}</span>
+                    <span className="font-bold">이번 주 {s.current.count}/{s.current.required}회{s.current.complete ? " 완료" : ""}{todayPeople > 0 ? <span className="text-fg-3 font-normal text-xs"> · 오늘 {todayPeople}명 인증</span> : null}</span>
                     <span className={`text-xs num ${s.current.daysLeft <= 1 && !s.current.complete ? "text-bad font-bold" : "text-fg-3"}`}>{s.current.daysLeft === 0 ? "오늘까지" : `D-${s.current.daysLeft}`}</span>
                   </div>
                   <div className="h-2 rounded-full bg-bg-3 mt-1.5 overflow-hidden">
@@ -123,7 +139,7 @@ export default async function HomePage() {
                   <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(methods.length, 4)}, minmax(0,1fr))` }}>
                     {methods.map((m, i) => {
                       const cls = `btn text-sm px-2 ${i === 0 && !s.current.complete ? "btn-red" : "btn-ghost"}`;
-                      if (m === "camera") return <CheckinButton key={m} challengeId={ch.id} mode="camera" label={METHOD_LABEL[m]} className={cls} />;
+                      if (m === "camera") return <CheckinButton key={m} challengeId={ch.id} mode="camera" label={METHOD_LABEL[m]} className={cls} autoOpen={focus && i === 0} />;
                       if (m === "album") return <CheckinButton key={m} challengeId={ch.id} mode="album" label={METHOD_LABEL[m]} className={cls} />;
                       if (m === "audio") return <AudioRecordButton key={m} challengeId={ch.id} label={METHOD_LABEL[m]} className={cls} />;
                       return <LinkCheckinButton key={m} challengeId={ch.id} label={METHOD_LABEL[m]} className={cls} />;

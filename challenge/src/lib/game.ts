@@ -16,6 +16,10 @@ export const XP = {
   periodComplete: 40,
   /** 횟수형 연속 기간 보너스 (× min(streak, 5)) */
   periodStreakPer: 20,
+  /** 시간대형 하루 실패 (음수) */
+  failDay: -30,
+  /** 횟수형 기간 실패 (음수) */
+  failPeriod: -60,
 };
 
 /** 레벨 n 에 도달하는 데 필요한 누적 경험치. L1=0, L2=100, L3=300, L4=600, L5=1000, L6=1500 … */
@@ -243,20 +247,47 @@ export function countSummary(cfg: CountConfig, p: Participation, checkins: Check
   return { kind: "count", current, streak, failPeriods, completePeriods, totalCounted, startDate: start };
 }
 
+/** 실패로 확정된 단위 (시간대형: 날짜, 횟수형: 기간 시작일) */
+export type FailedUnit = { key: string; date: string; xp: number };
+
+/** 참여 시작 이후 실패한 단위 전부 (오늘 포함, 확정된 것만) */
+export function failedUnits(cfg: ChallengeConfig, p: Participation, checkins: Checkin[], now: Date = new Date()): FailedUnit[] {
+  const start = effectiveStartDate(p, cfg);
+  const today = kstDate(now);
+  const out: FailedUnit[] = [];
+  if (today < start) return out;
+  if (cfg.kind === "slots") {
+    for (let d = start; d <= today; d = addDays(d, 1)) {
+      if (dayStatus(cfg, checkins, d, now).failed) out.push({ key: `day:${d}`, date: d, xp: XP.failDay });
+    }
+  } else {
+    const cur = periodOf(cfg, start, today);
+    for (let i = 0; i <= cur.index; i++) {
+      const st = periodStatus(cfg, start, checkins, addDays(start, i * cfg.period_days), now);
+      if (st.failed) out.push({ key: `period:${st.start}`, date: st.start, xp: XP.failPeriod });
+    }
+  }
+  return out;
+}
+
 export type Summary = (SlotsSummary | CountSummary) & {
-  /** 지금까지 실패 횟수 (시간대형: 실패한 날, 횟수형: 실패한 기간) */
+  /** 이번 달(KST) 실패 횟수 — 탈락 판정 기준 */
   fails: number;
+  /** 참여 이후 전체 실패 횟수 (통계용) */
+  totalFails: number;
   maxFails: number;
-  /** 실패가 한도에 닿아 탈락 */
+  /** 이번 달 실패가 한도에 닿아 탈락 */
   eliminated: boolean;
 };
 
 export function summarize(ch: Challenge, p: Participation, checkins: Checkin[], now: Date = new Date()): Summary {
   const mine = checkins.filter((c) => c.participation_id === p.id);
   const base = ch.config.kind === "slots" ? slotsSummary(ch.config, p, mine, now) : countSummary(ch.config, p, mine, now);
-  const fails = base.kind === "slots" ? base.failDays : base.failPeriods;
+  const units = failedUnits(ch.config, p, mine, now);
+  const monthStart = kstDate(now).slice(0, 7) + "-01";
+  const fails = units.filter((u) => u.date >= monthStart).length;
   const maxFails = ch.max_fails ?? 0;
-  return { ...base, fails, maxFails, eliminated: maxFails > 0 && fails >= maxFails };
+  return { ...base, fails, totalFails: units.length, maxFails, eliminated: maxFails > 0 && fails >= maxFails };
 }
 
 /** 체중 목표 계산. remainingKg 는 아직 더 빼야 하는 양, ratio 는 0~1 진행도 */

@@ -39,11 +39,11 @@ export function ChallengeForm({ challenge }: { challenge?: Challenge }) {
           <input name="penalty" className="input" defaultValue={challenge?.penalty ?? "톡방에 메가커피 아메리카노 쿠폰 쏘기"} maxLength={80} required />
         </div>
         <div>
-          <label className="label">탈락 기준(회)</label>
+          <label className="label">한 달 실패 허용(회)</label>
           <input name="max_fails" type="number" min="0" max="30" inputMode="numeric" className="input" defaultValue={challenge?.max_fails ?? 3} required />
         </div>
       </div>
-      <p className="text-[11px] text-fg-3 -mt-2">실패가 탈락 기준에 닿으면 탈락하고 벌칙을 해요. 0이면 탈락 없음.</p>
+      <p className="text-[11px] text-fg-3 -mt-2">실패 1번마다 경험치가 깎이고, 한 달 안에 이 횟수에 닿으면 탈락해서 벌칙(기프티콘)을 올려요. 0이면 탈락 없음.</p>
       {editing && (
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="is_active" defaultChecked={challenge!.is_active} /> 참여 가능(비활성화하면 목록에서 숨김)

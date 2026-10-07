@@ -17,7 +17,7 @@ const TABS = [
 ];
 const ADMIN = { href: "/admin", label: "관리", d: "M12 3l2 3h3l1 3-2 2 1 3-3 1-2 3-2-3-3-1 1-3-2-2 1-3h3zM12 10a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" };
 
-export function TabBar({ isAdmin }: { isAdmin: boolean }) {
+export function TabBar({ isAdmin, meBadge = 0 }: { isAdmin: boolean; meBadge?: number }) {
   const path = usePathname();
   const tabs = isAdmin ? [...TABS, ADMIN] : TABS;
   return (
@@ -26,9 +26,10 @@ export function TabBar({ isAdmin }: { isAdmin: boolean }) {
         {tabs.map((t) => {
           const active = t.href === "/" ? path === "/" : path.startsWith(t.href);
           return (
-            <Link key={t.href} href={t.href} className={`flex flex-col items-center gap-0.5 pt-2 pb-1.5 text-[11px] font-semibold ${active ? "text-red" : "text-fg-3"}`}>
+            <Link key={t.href} href={t.href} className={`relative flex flex-col items-center gap-0.5 pt-2 pb-1.5 text-[11px] font-semibold ${active ? "text-red" : "text-fg-3"}`}>
               <Icon d={t.d} />
               {t.label}
+              {t.href === "/me" && meBadge > 0 && <span className="absolute top-1 right-[calc(50%-18px)] min-w-4 h-4 px-1 rounded-full bg-red text-white text-[10px] font-bold flex items-center justify-center num">{meBadge}</span>}
             </Link>
           );
         })}

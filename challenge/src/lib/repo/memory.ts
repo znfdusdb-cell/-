@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Challenge, Checkin, Participation, PushSubscriptionRow, User, WeightLog } from "../types";
+import type { Challenge, Checkin, Gift, Participation, PushSubscriptionRow, User, WeightLog } from "../types";
 import type { CheckinQuery, ParticipantRow, Repo } from "./types";
 
 type Store = {
@@ -10,6 +10,7 @@ type Store = {
   photos: Map<string, { bytes: Uint8Array; contentType: string }>;
   pushSubs: PushSubscriptionRow[];
   weights: WeightLog[];
+  gifts: Gift[];
   notices: Set<string>;
   xpLog: { user_id: string; delta: number; reason: string; created_at: string }[];
 };
@@ -26,6 +27,7 @@ function store(): Store {
       photos: new Map(),
       pushSubs: [],
       weights: [],
+      gifts: [],
       notices: new Set(),
       xpLog: [],
     };
@@ -72,6 +74,7 @@ export class MemoryRepo implements Repo {
     s.checkins = s.checkins.filter((c) => c.user_id !== id);
     s.weights = s.weights.filter((w) => !pids.has(w.participation_id));
     s.pushSubs = s.pushSubs.filter((x) => x.user_id !== id);
+    s.gifts = s.gifts.filter((g) => g.from_user_id !== id && g.to_user_id !== id);
   }
   async addXp(userId: string, delta: number, reason: string) {
     const u = store().users.find((x) => x.id === userId);
@@ -178,6 +181,25 @@ export class MemoryRepo implements Repo {
     const row: WeightLog = { id: randomUUID(), created_at: now(), ...data };
     s.weights.push(row);
     return clone(row);
+  }
+
+  async createGift(data: Omit<Gift, "id" | "created_at" | "opened_at">) {
+    const g: Gift = { id: randomUUID(), created_at: now(), opened_at: null, ...data };
+    store().gifts.push(g);
+    return clone(g);
+  }
+  async listGiftsReceived(userId: string) {
+    return clone(store().gifts.filter((g) => g.to_user_id === userId).sort((a, b) => b.created_at.localeCompare(a.created_at)));
+  }
+  async listGiftsSentSince(userId: string, challengeId: string, sinceIso: string) {
+    return clone(store().gifts.filter((g) => g.from_user_id === userId && g.challenge_id === challengeId && g.created_at >= sinceIso));
+  }
+  async markGiftOpened(id: string, userId: string) {
+    const g = store().gifts.find((x) => x.id === id && x.to_user_id === userId);
+    if (g && !g.opened_at) g.opened_at = now();
+  }
+  async countUnreadGifts(userId: string) {
+    return store().gifts.filter((g) => g.to_user_id === userId && !g.opened_at).length;
   }
 
   async putPhoto(path: string, bytes: Uint8Array, contentType: string) {

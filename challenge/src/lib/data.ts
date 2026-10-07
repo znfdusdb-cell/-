@@ -1,10 +1,35 @@
 import "server-only";
 import { getRepo, type ParticipantRow } from "./repo";
-import { summarize, weightProgress, type Summary } from "./game";
+import { failedUnits, summarize, weightProgress, type Summary } from "./game";
 import { kstDate } from "./time";
 import type { Challenge, Checkin, Participation, User } from "./types";
 
-export type MyChallenge = { challenge: Challenge; participation: Participation; summary: Summary; checkins: Checkin[] };
+export type MyChallenge = {
+  challenge: Challenge;
+  participation: Participation;
+  summary: Summary;
+  checkins: Checkin[];
+  /** 오늘 이 챌린지에서 슬롯별 인증한 사람 수 (사회적 증거) */
+  todayCounts: Record<string, number>;
+  /** 오늘(이번 주) 인증을 1건 이상 한 사람 수 */
+  todayPeople: number;
+};
+
+/**
+ * 실패 1건마다 경험치를 한 번만 깎는다 (ch_notice_log 키로 멱등). 깎인 총량을 돌려준다.
+ * 호출: 본인이 홈을 열 때, 그리고 크론이 돌 때.
+ */
+export async function applyFailPenalties(ch: Challenge, p: Participation, checkins: Checkin[], now = new Date()): Promise<number> {
+  const repo = getRepo();
+  let total = 0;
+  for (const u of failedUnits(ch.config, p, checkins.filter((c) => c.participation_id === p.id), now)) {
+    if (await repo.claimNotice(`xpfail:${p.id}:${u.key}`)) {
+      await repo.addXp(p.user_id, u.xp, `${ch.title} 실패 (${u.date})`);
+      total += u.xp;
+    }
+  }
+  return total;
+}
 
 /** 내가 참여 중인 챌린지 + 오늘/이번 기간 상태 */
 export async function loadMyChallenges(user: User, now = new Date()): Promise<MyChallenge[]> {
@@ -12,15 +37,33 @@ export async function loadMyChallenges(user: User, now = new Date()): Promise<My
   const [parts, challenges] = await Promise.all([repo.listParticipationsByUser(user.id), repo.listChallenges({ includeInactive: true })]);
   const active = parts.filter((p) => p.status === "active");
   if (active.length === 0) return [];
-  const checkins = await repo.listCheckins({ participationIds: active.map((p) => p.id) });
+  const today = kstDate(now);
+  const [checkins, todayAll] = await Promise.all([
+    repo.listCheckins({ participationIds: active.map((p) => p.id) }),
+    repo.listCheckins({ from: today, to: today }),
+  ]);
   const out: MyChallenge[] = [];
   for (const p of active) {
     const ch = challenges.find((c) => c.id === p.challenge_id);
     if (!ch) continue;
     const mine = checkins.filter((c) => c.participation_id === p.id);
-    out.push({ challenge: ch, participation: p, summary: summarize(ch, p, mine, now), checkins: mine });
+    await applyFailPenalties(ch, p, mine, now);
+    const todays = todayAll.filter((c) => c.challenge_id === ch.id);
+    const todayCounts: Record<string, number> = {};
+    for (const c of todays) todayCounts[c.slot] = (todayCounts[c.slot] ?? 0) + 1;
+    out.push({ challenge: ch, participation: p, summary: summarize(ch, p, mine, now), checkins: mine, todayCounts, todayPeople: new Set(todays.map((c) => c.user_id)).size });
   }
   return out.sort((a, b) => Number(b.challenge.is_default) - Number(a.challenge.is_default));
+}
+
+/** 탈락자의 기프티콘을 받을 사람: 같은 챌린지의 성공 중인 멤버 중 랜덤 (실패 0 우선 → 실패 적은 순). 없으면 null */
+export async function pickGiftRecipient(challenge: Challenge, fromUserId: string, now = new Date()): Promise<User | null> {
+  const board = await loadBoard(challenge, now);
+  const pool = board.filter((r) => r.participant.user_id !== fromUserId && !r.summary.eliminated && !r.waiting);
+  if (pool.length === 0) return null;
+  const min = Math.min(...pool.map((r) => r.summary.fails));
+  const best = pool.filter((r) => r.summary.fails === min);
+  return best[Math.floor(Math.random() * best.length)].participant.user;
 }
 
 export type BoardRow = {

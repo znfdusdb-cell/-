@@ -198,6 +198,8 @@ export async function rechallenge(_prev: ActionResult | null, fd: FormData): Pro
   const repo = getRepo();
   const p = await repo.getParticipation(user.id, str(fd, "challenge_id"));
   if (!p || p.status !== "active") return { ok: false, error: "참여 중이 아니에요" };
+  const gifts = await repo.listGiftsSentSince(user.id, p.challenge_id, p.joined_at);
+  if (gifts.length === 0) return { ok: false, error: "먼저 벌칙 기프티콘을 올려 주세요" };
   await repo.updateParticipation(p.id, { joined_at: new Date().toISOString(), start_date: null });
   revalidatePath("/", "layout");
   return { ok: true, message: "다음 월요일부터 다시 시작해요" };
@@ -339,6 +341,38 @@ export async function adminStartNow(_prev: ActionResult | null, fd: FormData): P
   await repo.updateParticipation(p.id, { start_date: ch.config.kind === "count" ? monday : today });
   revalidatePath("/", "layout");
   return { ok: true, message: `${target.display_name} 바로 시작` };
+}
+
+/** 선물함에서 열기 (읽음 처리) */
+export async function openGift(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const me = await requireUser();
+  await getRepo().markGiftOpened(str(fd, "gift_id"), me.id);
+  return { ok: true };
+}
+
+/** 콕 찌르기: 같은 챌린지의 아직 인증 안 한 멤버에게 푸시. 하루 1번 */
+export async function nudge(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const me = await requireUser();
+  const repo = getRepo();
+  const ch = await repo.getChallenge(str(fd, "challenge_id"));
+  if (!ch) return { ok: false, error: "없는 챌린지" };
+  const target = await repo.getUserById(str(fd, "user_id"));
+  if (!target || target.id === me.id) return { ok: false, error: "대상이 없어요" };
+  const [mine, theirs] = await Promise.all([repo.getParticipation(me.id, ch.id), repo.getParticipation(target.id, ch.id)]);
+  if (!mine || mine.status !== "active" || !theirs || theirs.status !== "active") return { ok: false, error: "같은 챌린지 참여자끼리만" };
+  const { loadBoard } = await import("@/lib/data");
+  const row = (await loadBoard(ch)).find((r) => r.participant.user_id === target.id);
+  if (!row || !row.pending) return { ok: false, error: `${target.display_name}님은 지금 찌를 게 없어요` };
+  if (!(await repo.claimNotice(`nudge:${kstDate()}:${me.id}:${target.id}`))) return { ok: false, error: "오늘은 이미 찔렀어요 (하루 1번)" };
+  let what = "인증";
+  let slot = "";
+  if (row.summary.kind === "slots") {
+    const open = row.summary.today.slots.find((x) => x.state === "open") ?? row.summary.today.slots.find((x) => x.state === "upcoming");
+    if (open) { what = `${open.slot.label} 인증`; slot = open.slot.key; }
+  } else what = "이번 주 인증";
+  const { sendPushToUsers } = await import("@/lib/push");
+  const r = await sendPushToUsers([target.id], { title: `👉 ${me.display_name}님이 콕 찔렀어요`, body: `아직 ${what} 전이에요. 지금 올려요!`, url: `/?go=${ch.id}${slot ? `&slot=${slot}` : ""}`, tag: `nudge-${ch.id}` });
+  return r.total === 0 ? { ok: true, message: `찔렀어요. (${target.display_name}님은 알림을 안 켜서 폰엔 안 가요)` } : { ok: true, message: `${target.display_name}님을 찔렀어요` };
 }
 
 /** 관리자: 특정 멤버에게 테스트 알림 */
