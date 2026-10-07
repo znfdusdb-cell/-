@@ -39,8 +39,9 @@ export function EasyDetail({ d, settings }: { d: StockDetail; settings: Settings
         <p className="mt-1 text-base leading-relaxed">{nextStep(d, settings)}</p>
         <div className="mt-3 space-y-2">
           {thesis?.status === "draft" && thesis.invalidation_conditions.length > 0 && <ThesisApproveButton thesisId={thesis.id} code={stock.code} />}
-          <StageMoveButtons code={stock.code} stage={stock.stage} universeBlocked={guard} botActive={botActive} />
+          <StageMoveButtons code={stock.code} stage={stock.stage} universeBlocked={guard} botActive={botActive} botHasPosition={position?.account === "kis_bot" && !position.closed_at} />
           {uv4.status === "pending" && stock.stage === "review" && <p className="text-[11px] text-fg-3">{uv4.text}</p>}
+          {thesis?.status === "draft" && stock.code === "005930" && <p className="text-[11px] text-fg-3">10/8 잠정실적 결과를 본 뒤 승인하기로 했어요.</p>}
         </div>
       </section>
 
@@ -69,7 +70,7 @@ export function EasyDetail({ d, settings }: { d: StockDetail; settings: Settings
           <Lights items={setup?.checklist ?? []} />
           <ul className="mt-2 space-y-0.5 text-xs">
             {(setup?.checklist ?? []).map((c) => (
-              <li key={c.key} className={c.pass ? "text-fg" : "text-fg-3"}>{c.pass ? "●" : "○"} {c.label}</li>
+              <li key={c.key} className={c.pass ? "text-fg" : "text-fg-3"}>{c.pass ? "●" : c.pending ? "?" : "○"} {c.label}{c.pending ? " (데이터 부족)" : ""}</li>
             ))}
           </ul>
         </div>
@@ -85,14 +86,25 @@ export function EasyDetail({ d, settings }: { d: StockDetail; settings: Settings
           <p className="mt-1 text-sm text-warn">아직 없어요. 가설과 '틀렸다고 인정할 조건'부터.</p>
         ) : (
           <>
-            <p className="mt-1 text-sm leading-relaxed">{thesis.hypothesis}</p>
+            {thesis.hypothesis_plain ? (
+              <>
+                <p className="mt-1 text-base leading-relaxed">{thesis.hypothesis_plain}</p>
+                <details className="mt-1 text-xs text-fg-3"><summary>원문 보기</summary><p className="mt-1 leading-relaxed">{thesis.hypothesis}</p></details>
+              </>
+            ) : (
+              <p className="mt-1 text-sm leading-relaxed">{thesis.hypothesis}</p>
+            )}
+            {thesis.status === "draft" && <p className="mt-2 rounded-lg border border-warn/50 bg-warn/10 p-2 text-xs text-warn">이해가 안 되면 승인하지 마세요. 승인은 감이 아니라 '읽고 이해했다'는 확인이에요.</p>}
             <h3 className="mt-3 text-[11px] text-fg-3">이러면 틀린 거다</h3>
             {thesis.invalidation_conditions.length === 0 ? (
               <p className="text-sm text-warn">비어 있어요. 이게 없으면 살 수 있는 목록에 못 올려요.</p>
             ) : (
               <ol className="mt-1 space-y-1 text-sm">
                 {thesis.invalidation_conditions.map((c, i) => (
-                  <li key={i} className={c.violated ? "font-semibold text-stop" : ""}>{i + 1}. {c.text}{c.violated && c.note ? ` — 깨짐 (${c.note})` : ""}</li>
+                  <li key={i} className={c.violated ? "font-semibold text-stop" : ""}>
+                    {i + 1}. {c.plain ?? c.text}{c.violated && c.note ? ` — 깨짐 (${c.note})` : ""}
+                    {c.plain && <div className="text-[11px] font-normal text-fg-3">({c.text})</div>}
+                  </li>
                 ))}
               </ol>
             )}

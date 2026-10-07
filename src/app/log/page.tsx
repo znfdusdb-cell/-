@@ -47,7 +47,7 @@ export default async function LogPage() {
             </ul>
           )}
         </section>
-        <ClosuresPanel from={todayKST()} />
+        <ClosuresPanel from={todayKST()} longTradingDays={Number(audit.settings.long_closure_trading_days ?? 2)} />
       </div>
     );
   }
@@ -92,7 +92,7 @@ export default async function LogPage() {
         <OrdersTable orders={audit.orders} names={names} violations={vByOrder} />
       </Section>
 
-      <ClosuresPanel from={todayKST()} />
+      <ClosuresPanel from={todayKST()} longTradingDays={Number(audit.settings.long_closure_trading_days ?? 2)} />
       <SettingsPanel settings={audit.settings} />
 
       <Section title="규칙 카탈로그">

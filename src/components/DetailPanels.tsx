@@ -21,7 +21,7 @@ export function FootprintPanel({ setup, lastClose }: { setup: Setup | null; last
   const toPivot = setup.pivot ? pctChange(lastClose, setup.pivot) : null;
   const cboxWide = setup.cbox_high && setup.cbox_low ? (setup.cbox_high - setup.cbox_low) / setup.cbox_high > 0.1 : false;
   return (
-    <Section title="발자국·셋업" right={<span className="flex items-center gap-1 text-[11px] text-fg-3">{setup.data_source === "seed" && <Badge tone="warn">가짜 일봉 기준</Badge>}{fmtDate(setup.as_of)} 계산</span>}>
+    <Section title="발자국·셋업" right={<span className="flex items-center gap-1 text-[11px] text-fg-3">{setup.data_source === "seed" && <Badge tone="muted">가짜 일봉 기준</Badge>}{fmtDate(setup.as_of)} 계산</span>}>
       <div className="flex items-baseline gap-3">
         <span className="num text-2xl font-bold">{footprint(setup.footprint_weeks, setup.max_contraction_pct, setup.min_contraction_pct, setup.t_count)}</span>
         <span className="text-sm text-fg-2">{SETUP_TYPE_LABEL[setup.setup_type]}</span>
@@ -31,8 +31,8 @@ export function FootprintPanel({ setup, lastClose }: { setup: Setup | null; last
         <KV k="피봇" v={fmtNum(setup.pivot)} />
         <KV k="피봇까지" v={fmtPct(toPivot, 1)} cls={udClass(toPivot)} />
         <KV k={cboxWide ? "C 후보 (아직 넓음)" : "C 박스"} v={setup.cbox_high ? `${fmtNum(setup.cbox_low)} ~ ${fmtNum(setup.cbox_high)}${cboxWide ? ` (${fmtNum(((setup.cbox_high - (setup.cbox_low ?? 0)) / setup.cbox_high) * 100, 0)}% 폭)` : ""}` : "—"} cls={cboxWide ? "text-warn" : undefined} />
-        <KV k="52주 고가 (252거래일)" v={setup.high_52w ? `${fmtNum(setup.high_52w)} (${fmtDate(setup.high_52w_date)})` : "—"} />
-        <KV k="52주 저가 (252거래일)" v={setup.low_52w ? `${fmtNum(setup.low_52w)} (${fmtDate(setup.low_52w_date)})` : "—"} />
+        <KV k="52주 고가 (252거래일)" v={setup.high_52w ? `${fmtNum(setup.high_52w)} (${fmtDate(setup.high_52w_date)})` : "데이터 부족"} cls={setup.high_52w ? undefined : "text-fg-3"} />
+        <KV k="52주 저가 (252거래일)" v={setup.low_52w ? `${fmtNum(setup.low_52w)} (${fmtDate(setup.low_52w_date)})` : "데이터 부족"} cls={setup.low_52w ? undefined : "text-fg-3"} />
         <KV k="거래량 마른 일수" v={setup.volume_dry_days != null ? `${setup.volume_dry_days}일` : "—"} />
         <KV k="고점 대비 조정" v={fmtPct(setup.drawdown_pct, 1)} />
         <KV k={`${setup.benchmark ?? "시장"} 대비 조정 배수`} v={setup.drawdown_vs_market != null ? `${fmtNum(setup.drawdown_vs_market, 1)}배 (${setup.benchmark ?? "시장"} ${fmtPct(setup.market_drawdown_pct, 1)})` : "—"} cls={setup.drawdown_vs_market != null && setup.drawdown_vs_market >= 2 ? "text-stop" : undefined} />
@@ -53,16 +53,17 @@ function KV({ k, v, cls }: { k: string; v: string; cls?: string }) {
 
 export function CheckPanel({ title, items, max }: { title: string; items: CheckItem[]; max: number }) {
   const n = items.filter((i) => i.pass).length;
+  const pend = items.filter((i) => i.pending).length;
   return (
-    <Section title={title} right={<span className={`num text-sm font-semibold ${n === max ? "text-go" : n >= max - 2 ? "text-warn" : "text-fg-2"}`}>{n}/{max}</span>}>
+    <Section title={title} right={<span className={`num text-sm font-semibold ${n === max ? "text-go" : n >= max - 2 ? "text-warn" : "text-fg-2"}`}>{n}/{max}{pend ? <span className="ml-1 text-[11px] font-normal text-fg-3">보류 {pend}</span> : null}</span>}>
       {items.length === 0 ? (
         <p className="text-xs text-fg-3">계산값 없음</p>
       ) : (
         <ul className="space-y-1 text-xs">
           {items.map((it) => (
             <li key={it.key} className="flex gap-2">
-              <span className={`mt-0.5 inline-block h-3.5 w-3.5 shrink-0 rounded-sm border text-center text-[10px] leading-3 ${it.pass ? "border-go bg-go/20 text-go" : "border-line text-fg-3"}`}>{it.pass ? "✓" : ""}</span>
-              <span className={it.pass ? "text-fg" : "text-fg-2"}>
+              <span className={`mt-0.5 inline-block h-3.5 w-3.5 shrink-0 rounded-sm border text-center text-[10px] leading-3 ${it.pass ? "border-go bg-go/20 text-go" : it.pending ? "border-dashed border-fg-3 text-fg-3" : "border-line text-fg-3"}`}>{it.pass ? "✓" : it.pending ? "?" : ""}</span>
+              <span className={it.pass ? "text-fg" : it.pending ? "text-fg-3" : "text-fg-2"}>
                 {it.label}
                 {it.value && <span className="num ml-1 text-fg-3">({it.value})</span>}
               </span>
@@ -94,8 +95,9 @@ export function ThesisPanel({ thesis }: { thesis: Thesis | null }) {
         </span>
       }
     >
-      {thesis.status === "draft" && <p className="mb-2 rounded-lg border border-warn/50 bg-warn/10 p-2 text-xs text-warn">claude_code가 쓴 초안. 비움이 읽고 '가설 승인'을 눌러야 유효해진다. 작성자는 지어내지 않는다.</p>}
+      {thesis.status === "draft" && <p className="mb-2 rounded-lg border border-warn/50 bg-warn/10 p-2 text-xs text-warn">claude_code가 쓴 초안. 비움이 읽고 '가설 승인'을 눌러야 유효해진다. 이해가 안 되면 승인하지 마세요. 승인은 감이 아니라 '읽고 이해했다'는 확인이다.</p>}
       <p className="text-sm leading-relaxed">{thesis.hypothesis}</p>
+      {thesis.hypothesis_plain && <p className="mt-1 rounded-lg bg-bg-3 p-2 text-sm leading-relaxed text-fg-2">쉬운 말: {thesis.hypothesis_plain}</p>}
       <h3 className="mt-3 text-[11px] font-semibold text-fg-3">무효화 조건 (이 중 하나라도 맞으면 가설은 틀린 것)</h3>
       {thesis.invalidation_conditions.length === 0 ? (
         <p className="mt-1 rounded-lg border border-warn/50 bg-warn/10 p-2 text-xs text-warn">비어 있음 → 유니버스 승인 불가. 한화오션 때처럼 '언제 틀렸다고 인정할지'를 먼저 적어라.</p>
@@ -106,6 +108,7 @@ export function ThesisPanel({ thesis }: { thesis: Thesis | null }) {
               <span className={`num shrink-0 ${c.violated ? "text-stop" : "text-fg-3"}`}>{i + 1}.</span>
               <div>
                 <div className={c.violated ? "font-semibold text-stop" : "text-fg"}>{c.text}</div>
+                {c.plain && <div className="text-fg-3">쉬운 말: {c.plain}</div>}
                 {c.violated && <div className="text-stop/90">위반{c.note ? ` · ${c.note}` : ""}</div>}
               </div>
             </li>
@@ -287,11 +290,11 @@ export function SnapshotsPanel({ snapshots }: { snapshots: BalanceSnapshot[] }) 
   );
 }
 
-export function ClosuresPanel({ from, days = 45 }: { from: string; days?: number }) {
-  const list = upcomingClosures(from, days);
+export function ClosuresPanel({ from, days = 45, longTradingDays = 2 }: { from: string; days?: number; longTradingDays?: number }) {
+  const list = upcomingClosures(from, days, longTradingDays);
   const expired = KRX_CALENDAR_COVERS_UNTIL < from;
   return (
-    <Section title="휴장 달력 (EV-2)" right={<span className="text-[11px] text-fg-3">KRX 달력 {KRX_CALENDAR_UPDATED} 갱신 · 장기 = 연속 3일 이상</span>}>
+    <Section title="휴장 달력 (EV-2)" right={<span className="text-[11px] text-fg-3">KRX 달력 {KRX_CALENDAR_UPDATED} 갱신 · 장기 = 주말 빼고 {longTradingDays}거래일 이상 연속 휴장</span>}>
       {expired && <p className="mb-2 text-xs text-stop">달력이 {KRX_CALENDAR_COVERS_UNTIL}까지만 있다. krx-calendar.ts 갱신 필요.</p>}
       {list.length === 0 ? (
         <p className="text-xs text-fg-3">{days}일 안에 공휴일 휴장 없음</p>
@@ -300,7 +303,7 @@ export function ClosuresPanel({ from, days = 45 }: { from: string; days?: number
           {list.map((c) => (
             <li key={c.start} className="flex gap-2">
               <span className={`num w-10 shrink-0 font-semibold ${c.long ? "text-warn" : "text-fg"}`}>D-{daysBetween(from, c.start)}</span>
-              <span className="text-fg">{c.start.slice(5)}~{c.end.slice(5)} ({c.days}일 휴장{c.long ? " · 장기: 손절선 작동 불가" : ""})</span>
+              <span className="text-fg">{c.start.slice(5)}~{c.end.slice(5)} ({c.days}일, 거래일 {c.closedTradingDays}일 휴장{c.long ? " · 장기: 안전벨트 작동 불가" : ""})</span>
               <span className="text-fg-3">{c.names.join(", ")}</span>
             </li>
           ))}
@@ -312,19 +315,23 @@ export function ClosuresPanel({ from, days = 45 }: { from: string; days?: number
 
 export function SettingsPanel({ settings }: { settings: Settings }) {
   return (
-    <Section title="설정값 (sb_settings)" right={<span className="text-[11px] text-fg-3">null = 비움 미확정</span>}>
-      <dl className="num grid grid-cols-1 gap-x-4 gap-y-1 text-xs sm:grid-cols-2">
+    <Section title="설정값 (sb_settings)" right={<span className="text-[11px] text-fg-3">백테스트 근거 없이 변경 금지</span>}>
+      <ul className="space-y-2 text-xs">
         {SETTING_KEYS.map((k) => {
           const v = settings[k.key];
           const empty = v === null || v === undefined || v === "";
           return (
-            <div key={k.key} className="flex justify-between gap-2 border-b border-line/60 py-1">
-              <dt className="text-fg-3">{k.label}</dt>
-              <dd className={empty ? "text-warn" : "text-fg"}>{empty ? "미확정" : `${k.key === "bot_account_balance" ? fmtNum(Number(v)) : v}${k.unit ?? ""}`}</dd>
-            </div>
+            <li key={k.key} className="border-b border-line/60 pb-2 last:border-0">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="font-semibold text-fg">{k.label}</span>
+                <span className={`num ${empty ? "text-fg-3" : "text-fg"}`}>{empty ? "미확정" : `${k.key === "bot_account_balance" ? fmtNum(Number(v)) : v}${k.unit ?? ""}`}</span>
+              </div>
+              <div className="text-fg-2">{k.easy}</div>
+              <div className="text-[11px] text-fg-3">정한 사람: {k.decided_by} · 다시 보는 때: {k.review_at}</div>
+            </li>
           );
         })}
-      </dl>
+      </ul>
     </Section>
   );
 }

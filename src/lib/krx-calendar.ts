@@ -75,8 +75,8 @@ export function nextTradingDay(date: string): string {
 }
 
 /** 다가오는 휴장 구간 (연속 비거래일 묶음). 주말만인 구간은 제외하고, 공휴일을 포함한 구간만. */
-export function upcomingClosures(from: string, horizonDays: number): { start: string; end: string; days: number; names: string[]; long: boolean }[] {
-  const out: { start: string; end: string; days: number; names: string[]; long: boolean }[] = [];
+export function upcomingClosures(from: string, horizonDays: number, longTradingDays = 2): { start: string; end: string; days: number; closedTradingDays: number; names: string[]; long: boolean }[] {
+  const out: { start: string; end: string; days: number; closedTradingDays: number; names: string[]; long: boolean }[] = [];
   let d = from;
   const until = addDays(from, horizonDays);
   while (d <= until) {
@@ -84,15 +84,16 @@ export function upcomingClosures(from: string, horizonDays: number): { start: st
       const start = d;
       const names: string[] = [];
       let hasHoliday = false;
+      let closedTradingDays = 0;   // 주말 제외, 평일인데 닫힌 날 수
       while (!isTradingDay(d) && d <= addDays(until, 7)) {
         const n = holidayName(d)!;
-        if (KRX_HOLIDAYS[d]) { hasHoliday = true; names.push(`${d.slice(5)} ${n}`); }
+        if (KRX_HOLIDAYS[d]) { hasHoliday = true; names.push(`${d.slice(5)} ${n}`); if (dow(d) !== 0 && dow(d) !== 6) closedTradingDays++; }
         d = addDays(d, 1);
       }
       const end = addDays(d, -1);
       const days = Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1;
-      // 거래일 기준 연속 비거래일 3일 이상(주말+공휴일)이면 '장기 휴장': 손절선이 며칠간 작동 못 한다 (EV-2)
-      if (hasHoliday) out.push({ start, end, days, names, long: days >= 3 });
+      // 장기 휴장 = 주말 제외 연속 휴장 거래일 수 ≥ 설정값(sb_settings.long_closure_trading_days, 기본 2). 그동안 손절선이 작동 못 한다 (EV-2)
+      if (hasHoliday) out.push({ start, end, days, closedTradingDays, names, long: closedTradingDays >= longTradingDays });
     } else {
       d = addDays(d, 1);
     }

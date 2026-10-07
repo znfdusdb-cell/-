@@ -45,7 +45,7 @@ export function MountainPos({ stage, fake }: { stage: Mountain; fake?: boolean }
         <text x="196" y="80" fontSize="10" fill="#626b7d">4 내리막</text>
         <circle cx={x} cy={y} r="9" fill={stage === 2 ? "#f04452" : stage === 4 ? "#3182f6" : "#f59e0b"} stroke="#0b0d12" strokeWidth="3" />
       </svg>
-      {fake && <span className="absolute right-0 top-0 rounded-full border border-warn/60 bg-warn/15 px-1.5 text-[10px] text-warn">가짜 일봉</span>}
+      {fake && <span className="absolute right-0 top-0 rounded-full border border-line bg-bg-3 px-1.5 text-[10px] text-fg-3">가짜 일봉</span>}
     </div>
   );
 }
@@ -58,7 +58,7 @@ export function Lights({ items, max = 7 }: { items: CheckItem[]; max?: number })
     <div>
       <div className="flex gap-1">
         {cells.map((c, i) => (
-          <span key={i} title={c?.label} className={`h-3 flex-1 rounded-sm ${c?.pass ? "bg-go" : "bg-line"}`} />
+          <span key={i} title={c?.label} className={`h-3 flex-1 rounded-sm ${c?.pass ? "bg-go" : c?.pending ? "border border-dashed border-fg-3 bg-transparent" : "bg-line"}`} />
         ))}
       </div>
       <div className="mt-1 text-[11px] text-fg-3">{items.length ? `${n}/${max} 켜짐 · 7개 다 켜지면 살 준비가 된 가격` : "아직 안 재봄"}</div>

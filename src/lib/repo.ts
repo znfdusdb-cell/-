@@ -147,7 +147,7 @@ function rowToStock(r: Row): Stock {
   return { code: r.code as string, name: r.name as string, market: r.market as Stock["market"], sector: (r.sector as string) ?? null, stage: r.stage as Stage, stage_changed_at: r.stage_changed_at as string, stage_reason: (r.stage_reason as string) ?? null, is_seed: Boolean(r.is_seed) };
 }
 function rowToThesis(r: Row): Thesis {
-  return { id: Number(r.id), code: r.code as string, hypothesis: r.hypothesis as string, invalidation_conditions: (r.invalidation_conditions as Thesis["invalidation_conditions"]) ?? [], author: r.author as Author, status: r.status as Thesis["status"], created_at: r.created_at as string, updated_at: r.updated_at as string };
+  return { id: Number(r.id), code: r.code as string, hypothesis: r.hypothesis as string, hypothesis_plain: (r.hypothesis_plain as string) ?? null, invalidation_conditions: (r.invalidation_conditions as Thesis["invalidation_conditions"]) ?? [], author: r.author as Author, status: r.status as Thesis["status"], created_at: r.created_at as string, updated_at: r.updated_at as string };
 }
 function rowToSetup(r: Row): Setup {
   return {

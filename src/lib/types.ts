@@ -43,12 +43,14 @@ export interface InvalidationCondition {
   text: string;
   violated: boolean;
   note?: string | null;
+  plain?: string | null;   // 쉬운 말 재서술
 }
 
 export interface Thesis {
   id: number;
   code: string;
   hypothesis: string;
+  hypothesis_plain: string | null;
   invalidation_conditions: InvalidationCondition[];
   author: Author;
   status: ThesisStatus;
@@ -61,6 +63,7 @@ export interface CheckItem {
   label: string;
   pass: boolean;
   value?: string | null;
+  pending?: boolean;   // 데이터 부족 등으로 판정 보류 (회색, 점수 제외)
 }
 
 export interface Setup {

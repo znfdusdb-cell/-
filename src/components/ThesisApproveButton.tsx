@@ -17,7 +17,7 @@ export function ThesisApproveButton({ thesisId, code }: { thesisId: number; code
         </button>
       ) : (
         <div className="rounded-lg border border-line bg-bg-3 p-3 text-sm">
-          <p className="text-fg-2">이 가설과 '틀렸다고 인정할 조건'을 내 것으로 삼는다. 승인하면 살 수 있는 목록 승인이 열린다.</p>
+          <p className="text-fg-2">읽고 이해했고, 이 가설과 '틀렸다고 인정할 조건'을 내 것으로 삼는다. 이해가 안 되면 취소. 승인하면 살 수 있는 목록 승인이 열린다.</p>
           {err && <p className="mt-1 text-stop">{err}</p>}
           <div className="mt-2 flex gap-2">
             <button onClick={() => setAsk(false)} disabled={pending} className="flex-1 rounded-lg border border-line px-3 py-2">취소</button>

@@ -37,7 +37,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px]">
             <Badge tone="fg">{STAGE_LABEL[stock.stage]}</Badge>
             {violated && <Badge tone="stop">무효화 조건 위반</Badge>}
-            {stock.is_seed && <Badge tone="warn">가짜 시드</Badge>}
+            {stock.is_seed && <Badge tone="muted">가짜 시드</Badge>}
             <span className="text-fg-3">{stock.market} · {stock.sector ?? "업종 미정"}</span>
           </div>
         </div>
@@ -45,7 +45,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           {fakeCandles ? (
             <>
               <div className="text-2xl font-bold text-fg-3">—</div>
-              <div className="text-[11px] text-warn">가짜 일봉 (현재가 없음)</div>
+              <div className="text-[11px] text-fg-3">가짜 일봉 (현재가 없음)</div>
             </>
           ) : (
             <>
@@ -64,7 +64,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
 
       <Section title={`단계: ${STAGE_LABEL[stock.stage]}`} right={<span className="text-[11px] text-fg-3">{STAGE_HINT[stock.stage]}</span>}>
         {thesis?.status === "draft" && thesis.invalidation_conditions.length > 0 && <div className="mb-2"><ThesisApproveButton thesisId={thesis.id} code={stock.code} /></div>}
-        <StageMoveButtons code={stock.code} stage={stock.stage} universeBlocked={universeGuard(thesis, setup, settings)} botActive={Boolean(settings.bot_started_at)} />
+        <StageMoveButtons code={stock.code} stage={stock.stage} universeBlocked={universeGuard(thesis, setup, settings)} botActive={Boolean(settings.bot_started_at)} botHasPosition={position?.account === "kis_bot" && !position.closed_at} />
         {stock.stage_reason && <p className="mt-2 text-xs text-fg-3">최근 이동 이유: {stock.stage_reason}</p>}
       </Section>
 

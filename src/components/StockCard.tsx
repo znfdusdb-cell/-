@@ -26,7 +26,7 @@ export function StockCard({ s }: { s: StockSummary }) {
         </div>
         <div className="num text-right">
           {setup?.data_source === "seed" ? (
-            <div className="text-[11px] text-warn">현재가 없음</div>
+            <div className="text-[11px] text-fg-3">현재가 없음</div>
           ) : (
             <>
               <div className="font-semibold">{fmtNum(s.last_close)}</div>
@@ -42,7 +42,7 @@ export function StockCard({ s }: { s: StockSummary }) {
         {position && position.account === "kb_manual" && <Badge tone="muted">{ACCOUNT_LABEL.kb_manual} · {position.qty}주</Badge>}
         {position && position.account === "kis_bot" && <Badge tone="fg">{POSITION_STATE_LABEL[position.state]} · {position.qty}주</Badge>}
         {position?.is_unverified && <Badge tone="warn">숫자 미확인</Badge>}
-        {setup?.data_source === "seed" && <Badge tone="warn">가짜 일봉 기준</Badge>}
+        {setup?.data_source === "seed" && <Badge tone="muted">가짜 일봉 기준</Badge>}
         {setup && setup.setup_type !== "none" && <Badge tone="muted">{SETUP_TYPE_LABEL[setup.setup_type]}</Badge>}
       </div>
 

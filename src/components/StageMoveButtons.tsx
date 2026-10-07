@@ -6,7 +6,7 @@ import type { Stage } from "@/lib/types";
 import { ALLOWED_MOVES, STAGE_LABEL } from "@/lib/constants";
 import { moveStageAction } from "@/app/actions";
 
-export function StageMoveButtons({ code, stage, universeBlocked, botActive = true }: { code: string; stage: Stage; universeBlocked: string | null; botActive?: boolean }) {
+export function StageMoveButtons({ code, stage, universeBlocked, botActive = true, botHasPosition = false }: { code: string; stage: Stage; universeBlocked: string | null; botActive?: boolean; botHasPosition?: boolean }) {
   const [pick, setPick] = useState<{ to: Stage; label: string; danger?: boolean } | null>(null);
   const [reason, setReason] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -33,7 +33,9 @@ export function StageMoveButtons({ code, stage, universeBlocked, botActive = tru
     <div>
       <div className="flex flex-wrap gap-2">
         {moves.map((m) => {
-          const blocked = m.to === "universe" ? universeBlocked : m.to === "exited" && !botActive ? "봇 가동 전: 퇴출 승인해도 팔 봇이 없다" : null;
+          const blocked = m.to === "universe" ? universeBlocked
+            : m.to === "exited" ? (!botHasPosition ? "봇 계좌에 이 종목 포지션이 없어 팔 것이 없다 (KB 수동 보유는 봇 대상 아님)" : !botActive ? "봇 가동 전" : null)
+            : null;
           return (
             <button
               key={m.to}
@@ -49,7 +51,7 @@ export function StageMoveButtons({ code, stage, universeBlocked, botActive = tru
         {!moves.length && <span className="text-xs text-fg-3">이 단계에서 사이트가 할 수 있는 이동 없음</span>}
       </div>
       {universeBlocked && stage === "review" && <p className="mt-2 text-xs text-warn">{universeBlocked}</p>}
-      {!botActive && stage === "review" && <p className="mt-1 text-xs text-fg-3">퇴출 승인(봇 매도)은 봇 가동일이 정해진 뒤 열린다.</p>}
+      {stage === "review" && !botHasPosition && <p className="mt-1 text-xs text-fg-3">퇴출 승인(봇 매도)은 봇 계좌에 이 종목 포지션이 있을 때만 열린다.</p>}
 
       {pick && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 p-4 sm:items-center" onClick={() => !pending && setPick(null)}>

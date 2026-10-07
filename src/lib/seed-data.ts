@@ -115,24 +115,27 @@ export const SEED_STAGE_LOG: StageLog[] = [
 export const SEED_THESES: Thesis[] = [
   {
     id: 1, code: "005930", author: "claude_code", status: "draft",
-    hypothesis: "HBM 구조적 수요 + 범용 D램 가격 반등으로 2026 하반기 실적 컨센서스 상향. 3C 베이스(A 380,000→189,200, B 288,000 회복) 완성 후 C 박스 고점 돌파 시 2단계 재개.",
+    hypothesis: "3분기 컨센서스 사상 최대(FnGuide 매출 200조7657억, 영업이익 106조9435억, 2026-10-06 보도). 최근 원화 강세로 전망치 소폭 하향 분석 있음. 가격은 3C 베이스 진행 중(A 380,000→189,200, B 288,000 회복, C 후보 아직 넓음). C 박스 고점 288,000 돌파 시 2단계 재개가 가설. 10/8 잠정실적 결과 확인 후 승인.",
+    hypothesis_plain: "회사 실적은 역대 최고로 예상돼요. 가격은 큰 폭락 뒤 절반쯤 되찾고 지금 숨 고르는 중이에요. 288,000원 문턱을 거래량과 함께 넘으면 다시 오르막이 시작된다고 보는 거예요. 10월 8일 실적 발표를 보고 나서 승인하세요.",
     invalidation_conditions: [
-      { text: "288,000 돌파 실패 후 C 박스 하단(250,000) 종가 이탈", violated: false, note: null },
-      { text: "HBM4 주요 고객 인증 지연 공식 발표", violated: false, note: null },
-      { text: "분기 영업이익 컨센서스 10% 이상 하회", violated: false, note: null },
-      { text: "필라델피아 반도체지수 대비 상대강도 3개월 연속 하위", violated: false, note: null },
+      { text: "288,000 돌파 실패 후 C 박스 하단(250,000) 종가 이탈", violated: false, note: null, plain: "문턱을 못 넘고 250,000원 아래에서 하루를 마치면 틀린 거예요." },
+      { text: "HBM4 주요 고객 인증 지연 공식 발표", violated: false, note: null, plain: "핵심 제품(HBM4)이 큰 고객 검사를 통과 못 했다고 회사가 공식 발표하면 틀린 거예요." },
+      { text: "3분기 영업이익이 컨센서스 10% 이상 하회 (FnGuide 106조9435억 기준 약 96.2조 이하). 10/8 잠정실적으로 검증", violated: false, note: null, plain: "10월 8일 발표한 영업이익이 96조 2천억 원보다 적으면 틀린 거예요." },
+      { text: "필라델피아 반도체지수 대비 상대강도 3개월 연속 하위", violated: false, note: null, plain: "미국 반도체 지수보다 석 달 내리 못 오르면 틀린 거예요." },
     ],
     created_at: "2026-10-06T09:00:00+09:00", updated_at: "2026-10-06T09:00:00+09:00",
   },
   {
     id: 2, code: "999902", author: "claude_code", status: "draft",
     hypothesis: "[가짜] 신약 3상 결과 발표 전 기관 매집. 2분기 연속 컨센서스 상회.",
+    hypothesis_plain: null,
     invalidation_conditions: [],   // 비어 있음 → 유니버스 승인 불가 상태를 보여주는 카드
     created_at: "2026-10-02T09:30:00+09:00", updated_at: "2026-10-02T09:30:00+09:00",
   },
   {
     id: 3, code: "999903", author: "claude_code", status: "valid",
     hypothesis: "[가짜] LNG선 수주 잔고 3년치 + 신조선가 상승. 4~7주 플랫 베이스 고점 돌파 대기. (가짜 카드라 '유효' 상태로 둠)",
+    hypothesis_plain: "[가짜] 배 주문이 3년치 밀려 있고 배값도 오르고 있어요. 평평하게 쉬는 곳의 윗가격을 넘으면 사요.",
     invalidation_conditions: [
       { text: "신조선가 지수 2개월 연속 하락", violated: false, note: null },
       { text: "베이스 하단(-12%) 종가 이탈", violated: false, note: null },
@@ -142,6 +145,7 @@ export const SEED_THESES: Thesis[] = [
   {
     id: 4, code: "999904", author: "claude_code", status: "suspect",
     hypothesis: "[가짜] 중동 리스크로 유가 90달러 이상 유지 시 정제 마진 확대.",
+    hypothesis_plain: "[가짜] 기름값이 비싸게 유지되면 돈을 더 번다는 가설이었어요.",
     invalidation_conditions: [
       { text: "WTI 70달러 하회", violated: true, note: "9/24 종가 68.4달러" },
       { text: "정제 마진 5달러 이하", violated: false, note: null },
@@ -239,10 +243,11 @@ export const SEED_ORDERS: OrderLog[] = [
 export const SEED_SETTINGS: Settings = {
   bot_started_at: null,
   bot_account_balance: null,
-  max_weight_per_stock_pct: null,
-  max_weight_per_sector_pct: null,
+  max_weight_per_stock_pct: "20",     // v1 Claude 초기값: '나만의 ETF 최소 5종목'
+  max_weight_per_sector_pct: "40",
   uv4_drawdown_pct: "60",
-  uv4_market_multiple: "2",
+  uv4_market_multiple: "2",           // 책 범위 2~3배 중 엄격한 쪽
+  long_closure_trading_days: "2",     // 주말 제외 연속 휴장 거래일
   regime_vkospi_reduce: null,
   regime_vkospi_wait: null,
   regime_lev_etf_share_reduce: null,
@@ -251,7 +256,7 @@ export const SEED_SETTINGS: Settings = {
 
 // ---------- 이벤트 ----------
 export const SEED_EVENTS: MarketEvent[] = [
-  { id: 1, code: "005930", event_type: "earnings", title: "3분기 잠정실적", event_date: "2026-10-08", note: "EV-1: 발표 전 축소 여부 비움 승인", source: "seed" },
+  { id: 1, code: "005930", event_type: "earnings", title: "3분기 잠정실적 발표 (10/8 목)", event_date: "2026-10-08", note: "FnGuide 컨센서스 매출 200조7657억·영업이익 106조9435억. EV-1: 발표 전 축소 여부 비움 승인", source: "news:파이낸셜포스트·국제뉴스 2026-10-06" },
   { id: 2, code: null, event_type: "macro", title: "미국 CPI 발표", event_date: "2026-10-14", note: null, source: "seed" },
   { id: 3, code: null, event_type: "holiday", title: "한글날 휴장", event_date: "2026-10-09", note: "하루 휴장. 손절선 하루 미작동", source: "krx_calendar" },
   { id: 4, code: "999903", event_type: "earnings", title: "[가짜] 3분기 실적", event_date: "2026-10-28", note: null, source: "seed" },
@@ -304,10 +309,20 @@ for (const su of SEED_SETUPS) {
   su.footprint_weeks = st.footprint_weeks;
   su.drawdown_pct = st.drawdown_pct;
   su.drawdown_vs_market = su.market_drawdown_pct ? Math.round((st.drawdown_pct / su.market_drawdown_pct) * 10) / 10 : null;
+  if (!st.has_52w) {
+    // 실제 252거래일 없음 → 52주 항목 판정 보류 (회색, 점수 제외)
+    for (const k of ["tt6", "tt7"]) {
+      const it = su.trend_template.find((i) => i.key === k);
+      if (it) { it.pass = false; it.pending = true; it.value = `데이터 부족 (실제 일봉 ${st.candles_count}거래일 / 252 필요)`; }
+    }
+    su.trend_template_score = score(su.trend_template);
+    su.checklist_score = score(su.checklist);
+    continue;
+  }
   const tt6 = su.trend_template.find((i) => i.key === "tt6");
   const tt7 = su.trend_template.find((i) => i.key === "tt7");
-  if (tt6) { tt6.pass = st.pct_from_low >= 25; tt6.value = `52주 저가 ${st.low_52w.toLocaleString("ko-KR")}(${st.low_52w_date.slice(5)}) 대비 ${st.pct_from_low >= 0 ? "+" : ""}${st.pct_from_low}%`; }
-  if (tt7) { tt7.pass = st.pct_from_high >= -25; tt7.value = `52주 고가 ${st.high_52w.toLocaleString("ko-KR")}(${st.high_52w_date.slice(5)}) 대비 ${st.pct_from_high}%`; }
+  if (tt6) { tt6.pass = st.pct_from_low >= 25; tt6.value = `52주 저가 ${st.low_52w!.toLocaleString("ko-KR")}(${st.low_52w_date!.slice(5)}) 대비 ${st.pct_from_low >= 0 ? "+" : ""}${st.pct_from_low}%`; }
+  if (tt7) { tt7.pass = st.pct_from_high >= -25; tt7.value = `52주 고가 ${st.high_52w!.toLocaleString("ko-KR")}(${st.high_52w_date!.slice(5)}) 대비 ${st.pct_from_high}%`; }
   su.trend_template_score = score(su.trend_template);
   su.checklist_score = score(su.checklist);
 }

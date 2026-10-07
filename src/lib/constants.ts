@@ -66,18 +66,19 @@ export const ACCOUNT_LABEL: Record<"kis_bot" | "kb_manual", string> = {
   kb_manual: "KB 수동 보유",
 };
 
-/** sb_settings 키와 설명. 값 null = 비움 미확정. */
-export const SETTING_KEYS: { key: string; label: string; unit?: string }[] = [
-  { key: "bot_started_at", label: "봇 가동일" },
-  { key: "bot_account_balance", label: "봇 계좌 잔고", unit: "원" },
-  { key: "max_weight_per_stock_pct", label: "SZ-1 종목당 비중 상한", unit: "%" },
-  { key: "max_weight_per_sector_pct", label: "SZ-1 업종당 비중 상한", unit: "%" },
-  { key: "uv4_drawdown_pct", label: "UV-4 고점 대비 조정 상한", unit: "%" },
-  { key: "uv4_market_multiple", label: "UV-4 시장 대비 조정 배수 상한", unit: "배" },
-  { key: "regime_vkospi_reduce", label: "시장 필터: VKOSPI 축소 기준" },
-  { key: "regime_vkospi_wait", label: "시장 필터: VKOSPI 관망 기준" },
-  { key: "regime_lev_etf_share_reduce", label: "시장 필터: 레버리지 ETF 비중 축소 기준", unit: "%" },
-  { key: "regime_ma200_slope_min_pct", label: "시장 필터: 200일선 기울기 최소", unit: "%" },
+/** sb_settings 키와 쉬운 설명. 값 null = 미확정. decided_by/review_at 은 DB 메타(없으면 여기 기본값). */
+export const SETTING_KEYS: { key: string; label: string; unit?: string; easy: string; decided_by: string; review_at: string }[] = [
+  { key: "bot_started_at", label: "봇 가동일", easy: "봇이 처음 일을 시작한 날. 이날부터 '규칙 지킨 날'을 센다.", decided_by: "비움", review_at: "모의투자 시작 때" },
+  { key: "bot_account_balance", label: "봇 계좌 잔고", unit: "원", easy: "봇이 쓸 수 있는 돈 전부(주식 평가액 + 예수금). 비중 계산의 분모.", decided_by: "봇이 매일 갱신", review_at: "자동" },
+  { key: "max_weight_per_stock_pct", label: "SZ-1 종목당 비중 상한", unit: "%", easy: "한 종목에 넣을 수 있는 최대 비율. 20%면 최소 5종목으로 나눠 담는다는 뜻.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
+  { key: "max_weight_per_sector_pct", label: "SZ-1 업종당 비중 상한", unit: "%", easy: "같은 업종(예: 반도체)에 몰아 넣을 수 있는 최대 비율.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
+  { key: "uv4_drawdown_pct", label: "UV-4 고점 대비 조정 상한", unit: "%", easy: "꼭대기에서 이만큼 넘게 떨어진 종목은 살 수 있는 목록에 못 올린다. 위에 물린 사람이 너무 많다.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
+  { key: "uv4_market_multiple", label: "UV-4 시장 대비 조정 배수 상한", unit: "배", easy: "시장이 10% 빠질 때 이 종목이 20% 빠졌으면 2배. 이보다 약하면 못 올린다.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
+  { key: "long_closure_trading_days", label: "장기 휴장 기준", unit: "거래일", easy: "주말 빼고 이만큼 연속으로 장이 닫히면 '장기 휴장'. 그동안 안전벨트가 못 움직여서 미리 알린다.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
+  { key: "regime_vkospi_reduce", label: "시장 필터: VKOSPI 축소 기준", easy: "시장 불안 지수가 이 값을 넘으면 '흐림'. 평소의 절반만 산다.", decided_by: "미확정", review_at: "4단계 시장 필터 검증" },
+  { key: "regime_vkospi_wait", label: "시장 필터: VKOSPI 관망 기준", easy: "이 값을 넘으면 '폭풍'. 새로 사지 않는다.", decided_by: "미확정", review_at: "4단계 시장 필터 검증" },
+  { key: "regime_lev_etf_share_reduce", label: "시장 필터: 레버리지 ETF 비중 축소 기준", unit: "%", easy: "2배짜리 상품이 거래의 이만큼을 차지하면 시장이 과열된 것. '흐림'으로 본다.", decided_by: "미확정", review_at: "4단계 시장 필터 검증" },
+  { key: "regime_ma200_slope_min_pct", label: "시장 필터: 200일선 기울기 최소", unit: "%", easy: "긴 평균선이 이만큼도 안 오르면 큰 흐름이 오르막이 아니다.", decided_by: "미확정", review_at: "4단계 시장 필터 검증" },
 ];
 
 export const REGIME_LABEL: Record<RegimeSignal, string> = {

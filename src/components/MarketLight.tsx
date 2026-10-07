@@ -17,8 +17,8 @@ export function MarketLight({ regime, settings }: { regime: MarketRegime | null;
   const th = (k: string) => (settings[k] === null || settings[k] === undefined ? "미확정" : settings[k]);
   const undecided = ["regime_vkospi_reduce", "regime_vkospi_wait", "regime_lev_etf_share_reduce", "regime_ma200_slope_min_pct"].some((k) => settings[k] === null || settings[k] === undefined);
   return (
-    <section className={`relative rounded-xl border bg-bg-2 p-4 ${regime.is_seed ? "border-warn/50" : "border-line"}`}>
-      {regime.is_seed && <span className="absolute right-3 top-3 rounded-full border border-warn/60 bg-warn/15 px-2 py-0.5 text-[11px] text-warn">시드 데이터</span>}
+    <section className="relative rounded-xl border border-line bg-bg-2 p-4">
+      {regime.is_seed && <span className="absolute right-3 top-3 rounded-full border border-line bg-bg-3 px-2 py-0.5 text-[11px] text-fg-3">시드 데이터</span>}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-1.5 rounded-full bg-bg-3 px-2 py-1.5">
           {(["trade", "reduce", "wait"] as const).map((k) => (
@@ -46,7 +46,7 @@ export function MarketLight({ regime, settings }: { regime: MarketRegime | null;
           ))}
         </ul>
       )}
-      <p className={`mt-2 text-[11px] ${undecided ? "text-warn" : "text-fg-3"}`}>
+      <p className="mt-2 text-[11px] text-fg-3">
         판정 임계값{undecided ? " 미확정 (4단계 시장 필터 검증 때 비움이 확정)" : ""}: VKOSPI 축소 {th("regime_vkospi_reduce")} · 관망 {th("regime_vkospi_wait")} · 레버리지 ETF 비중 {th("regime_lev_etf_share_reduce")}{settings.regime_lev_etf_share_reduce ? "%" : ""} · 200일선 기울기 최소 {th("regime_ma200_slope_min_pct")}{settings.regime_ma200_slope_min_pct ? "%" : ""}
       </p>
     </section>

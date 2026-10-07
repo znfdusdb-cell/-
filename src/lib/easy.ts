@@ -47,7 +47,7 @@ export function nextStep(s: StockSummary, settings: Settings): string {
     case "review":
       if (!thesis) return "가설과 '틀렸다고 인정할 조건'이 아직 없어요. 그걸 적어야 다음으로 가요." + kb;
       if (thesis.status === "suspect") return "가설이 깨졌어요. 퇴출을 승인하면 봇이 팔아요. 그 전까지 안전벨트는 그대로예요." + kb;
-      if (thesis.status === "draft") return "가설 초안이 있어요. 읽어보고 맞으면 '가설 승인'을 눌러요." + kb;
+      if (thesis.status === "draft") return "가설 초안이 있어요. 쉬운 말 설명을 읽고 이해됐을 때만 '가설 승인'을 눌러요. 이해가 안 되면 누르지 마세요." + kb;
       if (guard) return `살 수 있는 목록에 올리기 전 걸리는 게 있어요: ${guard.replace(/^UV-\d: /, "")}` + kb;
       return "비움이 '살 수 있는 목록 승인'을 누르길 기다려요. 승인하면 봇이 문턱을 지켜봐요." + kb;
     case "universe":

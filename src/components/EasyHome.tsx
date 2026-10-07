@@ -36,12 +36,12 @@ export function EasyHome({ items, regime, events, settings }: { items: StockSumm
       </section>
 
       {/* 시장 날씨 */}
-      <section className={`flex items-center gap-4 rounded-2xl border bg-bg-2 p-4 ${regime?.is_seed ? "border-warn/50" : "border-line"}`}>
+      <section className="flex items-center gap-4 rounded-2xl border border-line bg-bg-2 p-4">
         <WeatherIcon kind={w.icon} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="text-xl font-bold">{w.word}</span>
-            {regime?.is_seed && <Badge tone="warn">시드 데이터</Badge>}
+            {regime?.is_seed && <Badge tone="muted">시드 데이터</Badge>}
           </div>
           <p className="text-sm text-fg-2">{w.line}</p>
         </div>

@@ -88,7 +88,7 @@ export function CandleChart({ candles, setup, position }: { candles: Candle[]; s
   const fake = candles.some((c) => c.source === "seed");
   return (
     <div className="relative">
-      {fake && <span className="absolute left-0 top-0 z-10 rounded-full border border-warn/60 bg-warn/15 px-2 py-0.5 text-[11px] text-warn">가짜 일봉 (실제 적재 전)</span>}
+      {fake && <span className="absolute left-0 top-0 z-10 rounded-full border border-line bg-bg-3 px-2 py-0.5 text-[11px] text-fg-3">가짜 일봉 (실제 적재 전)</span>}
       <div ref={ref} className="h-80 w-full" />
       <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-fg-3">
         <Legend c="#f59e0b" t="피봇 (C 박스/베이스 고점)" />
