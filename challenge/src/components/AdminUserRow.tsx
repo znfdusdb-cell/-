@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { adminUpdateUser } from "@/app/actions";
+import { adminDeleteUser, adminUpdateUser } from "@/app/actions";
 import { FormMessage, SubmitButton } from "./Form";
 
 type Row = { id: string; username: string; display_name: string; role: string; xp: number; level: number; pushCount: number; lastLogin: string };
@@ -9,6 +9,8 @@ type Row = { id: string; username: string; display_name: string; role: string; x
 export function AdminUserRow({ user }: { user: Row }) {
   const [open, setOpen] = useState(false);
   const [state, action] = useActionState(adminUpdateUser, null);
+  const [delState, delAction] = useActionState(adminDeleteUser, null);
+  const [confirmDel, setConfirmDel] = useState(false);
   return (
     <div className="card p-3">
       <button type="button" className="w-full flex items-center gap-3 text-left" onClick={() => setOpen((o) => !o)}>
@@ -38,6 +40,21 @@ export function AdminUserRow({ user }: { user: Row }) {
               <input type="hidden" name="op" value="role" />
               <input type="hidden" name="role" value={user.role === "admin" ? "member" : "admin"} />
               <SubmitButton className="btn btn-ghost text-sm w-full">{user.role === "admin" ? "관리자 해제" : "관리자로 지정"}</SubmitButton>
+            </form>
+          )}
+          {user.username !== "비움" && (
+            <form action={delAction} className="flex items-center gap-2 flex-wrap pt-2 border-t border-line">
+              <input type="hidden" name="user_id" value={user.id} />
+              {confirmDel ? (
+                <>
+                  <span className="text-xs text-bad">계정·인증·기록이 전부 지워져요. 되돌릴 수 없어요.</span>
+                  <SubmitButton className="btn text-xs py-1.5 px-3 bg-bad text-white">퇴출 확정</SubmitButton>
+                  <button type="button" className="text-xs text-fg-3" onClick={() => setConfirmDel(false)}>취소</button>
+                </>
+              ) : (
+                <button type="button" className="text-xs text-bad underline" onClick={() => setConfirmDel(true)}>멤버 퇴출</button>
+              )}
+              <FormMessage state={delState} />
             </form>
           )}
           <FormMessage state={state} />

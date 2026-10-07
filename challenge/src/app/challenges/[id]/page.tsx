@@ -10,6 +10,7 @@ import { JoinForm } from "@/components/JoinForm";
 import { LeaveButton } from "@/components/LeaveButton";
 import { StartNowButton } from "@/components/StartNowButton";
 import { FailRule } from "@/components/FailRule";
+import { KickButton } from "@/components/KickButton";
 
 export const dynamic = "force-dynamic";
 
@@ -58,30 +59,59 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
         {board.length === 0 ? (
           <div className="card p-6 text-center text-fg-2 text-sm">첫 참가자가 되어 보세요</div>
         ) : (
-          <ol className="space-y-2">
-            {board.map(({ participant: p, summary: s }, i) => (
-              <li key={p.id} className={`card p-3 flex items-center gap-3 ${p.user_id === user.id ? "border-fg" : ""} ${s.eliminated ? "opacity-70" : ""}`}>
-                <div className="text-lg font-extrabold w-6 text-center text-fg-3 num">{i + 1}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold truncate">{p.user.display_name}</span>
-                    <span className="text-[11px] text-red font-bold">Lv.{levelFromXp(p.user.xp)}</span>
-                    {s.eliminated ? <span className="chip bg-bad-soft text-bad">탈락</span> : s.startDate > today ? <span className="chip bg-bg-3 text-fg-2">{fmtDateKo(s.startDate)} 시작</span> : null}
-                  </div>
-                  <div className="text-xs text-fg-2 mt-0.5 truncate">
-                    {ch.config.goal === "hobby" && p.goal.hobby ? <>{p.goal.hobby} · </> : null}
-                    {ch.config.goal === "weight" && p.goal.days ? <>{p.goal.days}일 도전 · </> : null}
-                    {fmtDateKo(s.startDate)}부터
-                  </div>
-                  {isAdmin(user) && s.startDate > today && <StartNowButton userId={p.user_id} challengeId={ch.id} />}
-                </div>
-                <div className="text-right text-xs num">
-                  <div className="font-extrabold">{s.streak} 연속</div>
-                  <div className={s.fails > 0 ? "text-bad" : "text-fg-3"}>실패 {s.fails}{ch.max_fails > 0 ? `/${ch.max_fails}` : ""}</div>
-                </div>
-              </li>
-            ))}
-          </ol>
+          <>
+            {joined && (
+              <div className="flex gap-3 text-[11px] text-fg-3 mb-2">
+                <span><span className="inline-block w-2.5 h-2.5 rounded-sm bg-red-soft border border-red/40 align-middle mr-1" />아직 인증 전</span>
+                <span><span className="inline-block w-2.5 h-2.5 rounded-sm bg-ok-soft border border-ok/40 align-middle mr-1" />오늘 완료</span>
+              </div>
+            )}
+            <ol className="space-y-2">
+              {board.map(({ participant: p, summary: s, pending, waiting, weight }, i) => {
+                const tone = s.eliminated ? "bg-bad-soft border-bad/30 opacity-70" : waiting ? "bg-bg-3/60 border-line" : pending ? "bg-red-soft border-red/40" : "bg-ok-soft border-ok/40";
+                return (
+                  <li key={p.id} className={`rounded-2xl border p-3 ${tone} ${p.user_id === user.id ? "ring-2 ring-fg/80" : ""}`}>
+                    <div className="flex items-center gap-3">
+                      <div className="text-lg font-extrabold w-6 text-center text-fg-3 num">{i + 1}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold truncate">{p.user.display_name}</span>
+                          <span className="text-[11px] text-red font-bold">Lv.{levelFromXp(p.user.xp)}</span>
+                          {s.eliminated ? <span className="chip bg-bad text-white">탈락</span> : waiting ? <span className="chip bg-bg-2 text-fg-2">{fmtDateKo(s.startDate)} 시작</span> : pending ? <span className="chip bg-red text-white">인증 전</span> : <span className="chip bg-ok text-white">완료</span>}
+                        </div>
+                        <div className="text-xs text-fg-2 mt-0.5 truncate">
+                          {ch.config.goal === "hobby" && p.goal.hobby ? <>{p.goal.hobby} · </> : null}
+                          {ch.config.goal === "weight" && p.goal.days ? <>{p.goal.days}일 도전 · </> : null}
+                          {fmtDateKo(s.startDate)}부터
+                        </div>
+                      </div>
+                      <div className="text-right text-xs num shrink-0">
+                        <div className="font-extrabold">{s.streak} 연속</div>
+                        <div className={s.fails > 0 ? "text-bad" : "text-fg-3"}>실패 {s.fails}{ch.max_fails > 0 ? `/${ch.max_fails}` : ""}</div>
+                      </div>
+                    </div>
+                    {weight && (
+                      <div className="mt-2 pl-9">
+                        <div className="flex justify-between text-[11px] text-fg-2 num">
+                          <span>목표 −{weight.targetLoss}kg</span>
+                          <span>{weight.reached ? "달성" : `${weight.lost}kg 감량 · ${Math.round(weight.ratio * 100)}%`}</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-bg-2 border border-line mt-1 overflow-hidden">
+                          <div className={`h-full rounded-full ${weight.reached ? "bg-ok" : "bg-red"}`} style={{ width: `${Math.max(2, weight.ratio * 100)}%` }} />
+                        </div>
+                      </div>
+                    )}
+                    {((isAdmin(user) && waiting) || ((isAdmin(user) || ch.created_by === user.id) && p.user_id !== user.id)) && (
+                      <div className="mt-1.5 pl-9 flex gap-3 items-center flex-wrap">
+                        {isAdmin(user) && waiting && <StartNowButton userId={p.user_id} challengeId={ch.id} />}
+                        {(isAdmin(user) || ch.created_by === user.id) && p.user_id !== user.id && <KickButton challengeId={ch.id} userId={p.user_id} name={p.user.display_name} />}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          </>
         )}
       </section>
     </Shell>

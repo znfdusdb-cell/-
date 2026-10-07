@@ -64,6 +64,15 @@ export class MemoryRepo implements Repo {
     Object.assign(u, patch);
     return clone(u);
   }
+  async deleteUser(id: string) {
+    const s = store();
+    const pids = new Set(s.participations.filter((p) => p.user_id === id).map((p) => p.id));
+    s.users = s.users.filter((u) => u.id !== id);
+    s.participations = s.participations.filter((p) => p.user_id !== id);
+    s.checkins = s.checkins.filter((c) => c.user_id !== id);
+    s.weights = s.weights.filter((w) => !pids.has(w.participation_id));
+    s.pushSubs = s.pushSubs.filter((x) => x.user_id !== id);
+  }
   async addXp(userId: string, delta: number, reason: string) {
     const u = store().users.find((x) => x.id === userId);
     if (!u) throw new Error("user not found");
@@ -157,6 +166,10 @@ export class MemoryRepo implements Repo {
 
   async listWeightLogs(participationId: string) {
     return clone(store().weights.filter((w) => w.participation_id === participationId).sort((a, b) => a.local_date.localeCompare(b.local_date)));
+  }
+  async listWeightLogsMany(ids: string[]) {
+    const set = new Set(ids);
+    return clone(store().weights.filter((w) => set.has(w.participation_id)).sort((a, b) => a.local_date.localeCompare(b.local_date)));
   }
   async upsertWeightLog(data: Omit<WeightLog, "id" | "created_at">) {
     const s = store();

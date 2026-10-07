@@ -23,6 +23,8 @@ export interface Repo {
   listUsers(): Promise<User[]>;
   createUser(data: Pick<User, "username" | "display_name" | "password_hash" | "role" | "gender">): Promise<User>;
   updateUser(id: string, patch: Partial<Omit<User, "id">>): Promise<User>;
+  /** 계정과 기록 전부 삭제 (참여·인증·체중·알림 구독 포함) */
+  deleteUser(id: string): Promise<void>;
   /** 경험치 가감 + 로그. 새 xp 반환 */
   addXp(userId: string, delta: number, reason: string): Promise<number>;
 
@@ -49,6 +51,7 @@ export interface Repo {
 
   // weight
   listWeightLogs(participationId: string): Promise<WeightLog[]>;
+  listWeightLogsMany(participationIds: string[]): Promise<WeightLog[]>;
   upsertWeightLog(data: Omit<WeightLog, "id" | "created_at">): Promise<WeightLog>;
 
   // photos
