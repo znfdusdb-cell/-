@@ -8,7 +8,7 @@ import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { RULES } from "../src/lib/constants";
 import {
-  SEED_STOCKS, SEED_STAGE_LOG, SEED_THESES, SEED_SETUPS, SEED_POSITIONS, SEED_ORDERS, SEED_EVENTS, SEED_PREDICTIONS, SEED_REGIME, SEED_CANDLES, SEED_SETTINGS, SEED_SNAPSHOTS,
+  SEED_STOCKS, SEED_STAGE_LOG, SEED_THESES, SEED_SETUPS, SEED_POSITIONS, SEED_ORDERS, SEED_EVENTS, SEED_PREDICTIONS, SEED_REGIME, SEED_CANDLES, SEED_SETTINGS, SEED_SNAPSHOTS, SEED_PROPOSALS, SEED_RISK_LOG, SEED_SIGNALS,
 } from "../src/lib/seed-data";
 
 type Row = Record<string, unknown>;
@@ -28,6 +28,9 @@ const TABLES: { table: string; rows: Row[]; conflict: string }[] = [
   { table: "sb_market_regime", rows: SEED_REGIME as unknown as Row[], conflict: "as_of" },
   { table: "sb_candles", rows: SEED_CANDLES as unknown as Row[], conflict: "code,date" },
   { table: "sb_settings", rows: Object.entries(SEED_SETTINGS).map(([key, value]) => ({ key, value })), conflict: "key" },
+  { table: "sb_proposals", rows: strip(SEED_PROPOSALS as unknown as Row[], ["id"]), conflict: "" },
+  { table: "sb_risk_log", rows: SEED_RISK_LOG as unknown as Row[], conflict: "as_of" },
+  { table: "sb_signals", rows: strip(SEED_SIGNALS as unknown as Row[], ["id"]), conflict: "code,signal_date,kind" },
 ];
 
 function lit(v: unknown): string {
@@ -42,6 +45,8 @@ function toSQL(): string {
   const out: string[] = ["-- 자동 생성: npx tsx scripts/seed.ts --sql  (수정은 src/lib/seed-data.ts 에서)", "begin;"];
   // 시드 종목 재실행 시 중복 방지: 시드 종목의 하위 행을 먼저 지운다 (cascade).
   out.push(`delete from sb_stocks where code in (${SEED_STOCKS.map((s) => lit(s.code)).join(",")});`);
+  out.push(`delete from sb_proposals where reason like '[가짜]%';`);
+  out.push(`delete from sb_balance_snapshots where note like '[가짜]%';`);
   for (const t of TABLES) {
     if (!t.rows.length) continue;
     const cols = Object.keys(t.rows[0]);
@@ -71,6 +76,8 @@ async function main() {
   const db = createClient(url, key, { auth: { persistSession: false } });
   const del = await db.from("sb_stocks").delete().in("code", SEED_STOCKS.map((s) => s.code));
   if (del.error) throw del.error;
+  await db.from("sb_proposals").delete().like("reason", "[가짜]%");
+  await db.from("sb_balance_snapshots").delete().like("note", "[가짜]%");
   for (const t of TABLES) {
     const q = t.conflict ? db.from(t.table).upsert(t.rows, { onConflict: t.conflict }) : db.from(t.table).insert(t.rows);
     const { error } = await q;

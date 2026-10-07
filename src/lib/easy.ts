@@ -2,7 +2,8 @@
  * 쉬운 모드용 번역: 숫자 → 그림 위치, 한 문장.
  * 톤은 아티팩트 "미너비니 10장 그림 공부"(계단·문턱·테니스공·안전벨트)와 맞춘다.
  */
-import type { StockSummary, MarketRegime, Todo, Settings, MarketEvent, CheckItem } from "./types";
+import type { StockSummary, MarketRegime, Todo, Settings, MarketEvent, CheckItem, Proposal } from "./types";
+import { PROPOSAL_KIND_LABEL, SETTING_KEYS } from "./constants";
 import { universeGuard } from "./guards";
 import { fmtNum, daysBetween, todayKST } from "./format";
 
@@ -64,9 +65,13 @@ export function nextStep(s: StockSummary, settings: Settings): string {
 }
 
 /** 홈 '오늘 할 일': 비움 결정이 필요한 것만 */
-export function buildTodos(items: StockSummary[], events: MarketEvent[], settings: Settings): Todo[] {
+export function buildTodos(items: StockSummary[], events: MarketEvent[], settings: Settings, proposals: Proposal[] = []): Todo[] {
   const out: Todo[] = [];
   const t = todayKST();
+  for (const p of proposals.filter((x) => x.status === "pending")) {
+    const label = p.kind === "setting" ? (SETTING_KEYS.find((k) => k.key === p.target)?.label ?? p.target) : p.target;
+    out.push({ kind: "proposal", code: "", name: label, title: `${PROPOSAL_KIND_LABEL[p.kind]} 변경 제안 결정`, detail: p.plain ?? `${label}: ${p.current_value ?? "없음"} → ${p.proposed_value}`, proposal: p });
+  }
   for (const s of items) {
     const { stock, thesis, setup } = s;
     if (stock.stage === "review" && thesis?.status === "suspect") {

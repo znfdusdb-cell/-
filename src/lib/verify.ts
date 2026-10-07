@@ -9,12 +9,13 @@
  *  EX-1 손절가 도달 후 미체결·지연     — 보유 중 일봉 저가가 손절선 이하인데 당일·익거래일 매도 없음
  *  EN-8 주문 수량 ≠ 계산 수량         — planned_qty 와 qty 불일치 또는 planned_qty 없음
  *  RR-1 손익비 미기록·2:1 미만         — 매수 주문의 stop_price/target_price
- *  SZ-1 종목당·업종당 비중 상한 초과   — 주문 시각 잔고(account_balance_at) 기준. 상한 미설정이면 판정 보류
+ *  SZ-1 업종당 비중 상한 초과         — 주문 시각 잔고(account_balance_at) 기준. 상한 미설정이면 판정 보류
+ *  RS-1 리스크 단계 상한 초과         — 종목당 비중·거래당 리스크가 그날 단계(sb_risk_log, 없으면 settings.risk_level) 상한 초과
  *  EV-2 휴장일 주문                   — KRX 달력 기준 비거래일
  *  RULE rule_id 없는 주문
  * 한계: 손절선은 트레일링으로 움직이므로 EX-1 은 포지션의 최종 손절선 기준 근사치다.
  */
-import type { OrderLog, StageLog, Setup, Position, Candle, Violation, Stage, Settings, Stock } from "./types";
+import type { OrderLog, StageLog, Setup, Position, Candle, Violation, Stage, Settings, Stock, RiskLog, RiskLevel } from "./types";
 import { isTradingDay, holidayName, nextTradingDay } from "./krx-calendar";
 
 export interface VerifyContext {
@@ -25,6 +26,12 @@ export interface VerifyContext {
   positions: Position[];
   candles: Candle[];    // 보유 종목 일봉
   settings: Settings;
+  riskLog?: RiskLog[];  // 일자별 리스크 단계
+}
+
+function levelAt(ctx: VerifyContext, day: string): RiskLevel {
+  const logs = (ctx.riskLog ?? []).filter((r) => r.as_of <= day).sort((a, b) => b.as_of.localeCompare(a.as_of));
+  return logs[0]?.level ?? ((ctx.settings.risk_level as RiskLevel) || "normal");
 }
 
 function stageAt(ctx: VerifyContext, code: string, ts: string): Stage | null {
@@ -45,7 +52,6 @@ export function verifyOrders(ctx: VerifyContext): Violation[] {
   const out: Violation[] = [];
   const orders = [...ctx.orders].sort((a, b) => a.ts.localeCompare(b.ts));
   const start = ctx.settings.bot_started_at ?? "9999-12-31";
-  const maxStock = numSetting(ctx.settings, "max_weight_per_stock_pct");
   const maxSector = numSetting(ctx.settings, "max_weight_per_sector_pct");
   const sectorOf = (code: string) => ctx.stocks.find((s) => s.code === code)?.sector ?? null;
 
@@ -87,13 +93,20 @@ export function verifyOrders(ctx: VerifyContext): Violation[] {
         else if (reward / risk < 2) out.push({ order_id: o.id, rule_id: "RR-1", reason: `손익비 ${(reward / risk).toFixed(2)}:1 (2:1 미만)` });
       }
 
-      // SZ-1
+      // SZ-1 (업종) + RS-1 (종목 비중·거래 리스크는 그날 리스크 단계 상한)
       if (o.account_balance_at === null) {
         out.push({ order_id: o.id, rule_id: "SZ-1", reason: "주문 시각 계좌 잔고 미기록 → 비중 판정 불가" });
-      } else if (maxStock !== null || maxSector !== null) {
-        const afterStock = ((h?.qty ?? 0) * (h ? h.cost / Math.max(h.qty, 1) : 0)) + o.qty * o.price;
+      } else {
+        const lvl = levelAt(ctx, day);
+        const maxStock = numSetting(ctx.settings, `risk_stock_pct_${lvl}`) ?? numSetting(ctx.settings, "max_weight_per_stock_pct");
+        const maxTradeRisk = numSetting(ctx.settings, `risk_trade_pct_${lvl}`);
+        const afterStock = (h?.cost ?? 0) + o.qty * o.price;
         const pctStock = (afterStock / o.account_balance_at) * 100;
-        if (maxStock !== null && pctStock > maxStock) out.push({ order_id: o.id, rule_id: "SZ-1", reason: `종목 비중 ${pctStock.toFixed(1)}% > 상한 ${maxStock}%` });
+        if (maxStock !== null && pctStock > maxStock) out.push({ order_id: o.id, rule_id: "RS-1", reason: `종목 비중 ${pctStock.toFixed(1)}% > ${lvl} 단계 상한 ${maxStock}%` });
+        if (maxTradeRisk !== null && o.stop_price !== null && o.price > o.stop_price) {
+          const riskPct = ((o.price - o.stop_price) * o.qty / o.account_balance_at) * 100;
+          if (riskPct > maxTradeRisk) out.push({ order_id: o.id, rule_id: "RS-1", reason: `거래당 리스크 ${riskPct.toFixed(2)}% > ${lvl} 단계 상한 ${maxTradeRisk}%` });
+        }
         if (maxSector !== null) {
           const sec = sectorOf(o.code);
           let sectorValue = o.qty * o.price;

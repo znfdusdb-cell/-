@@ -67,3 +67,11 @@ export async function setViewAction(formData: FormData) {
   jar.set("sb_view", mode, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
   redirect(back.startsWith("/") ? back : "/");
 }
+
+export async function decideProposalAction(input: { id: number; decision: "approve" | "reject"; note: string }) {
+  const note = input.note.trim();
+  if (input.decision === "reject" && note.length < 2) return { ok: false as const, error: "거절 이유를 적어라" };
+  const res = await getRepo().decideProposal(input.id, input.decision, note || "사이트 버튼 승인");
+  if (res.ok) { revalidatePath("/"); revalidatePath("/log"); }
+  return res;
+}

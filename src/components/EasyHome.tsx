@@ -1,5 +1,7 @@
 import Link from "next/link";
-import type { StockSummary, MarketRegime, Settings, MarketEvent, Stage } from "@/lib/types";
+import type { StockSummary, MarketRegime, Settings, MarketEvent, Stage, Proposal, RiskLog } from "@/lib/types";
+import { ProposalCard } from "./ProposalCard";
+import { RISK_LEVEL_LABEL, RISK_LEVEL_EASY } from "@/lib/constants";
 import { buildTodos, regimeSentence, nextStep, mountainStage } from "@/lib/easy";
 import { Lights, MountainPos, WeatherIcon } from "./EasyBits";
 import { Term } from "./Term";
@@ -13,8 +15,9 @@ const GROUPS: { stage: Stage; title: string; hint: string }[] = [
   { stage: "exited", title: "정리됨", hint: "다시 문턱을 넘으면 다시 볼 것" },
 ];
 
-export function EasyHome({ items, regime, events, settings }: { items: StockSummary[]; regime: MarketRegime | null; events: MarketEvent[]; settings: Settings }) {
-  const todos = buildTodos(items, events, settings);
+export function EasyHome({ items, regime, events, settings, proposals, risk }: { items: StockSummary[]; regime: MarketRegime | null; events: MarketEvent[]; settings: Settings; proposals: Proposal[]; risk: RiskLog | null }) {
+  const todos = buildTodos(items, events, settings, proposals);
+  const lvl = risk?.level ?? ((settings.risk_level as "caution" | "normal" | "bold") || "normal");
   const w = regimeSentence(regime);
   return (
     <div className="space-y-4 font-easy">
@@ -25,12 +28,16 @@ export function EasyHome({ items, regime, events, settings }: { items: StockSumm
           <p className="mt-1 text-xl font-semibold">할 일 없음. 봇이 알아서 지켜보고 있어요.</p>
         ) : (
           <div className="mt-2 space-y-2">
-            {todos.map((t) => (
-              <Link key={t.kind + t.code} href={`/stocks/${t.code}`} className="block rounded-xl bg-fg px-4 py-3 text-bg active:scale-[0.99]">
-                <div className="text-lg font-bold">{t.title}</div>
-                <div className="text-sm opacity-80">{t.detail}</div>
-              </Link>
-            ))}
+            {todos.map((t) =>
+              t.kind === "proposal" && t.proposal ? (
+                <ProposalCard key={"p" + t.proposal.id} p={t.proposal} easy />
+              ) : (
+                <Link key={t.kind + t.code} href={`/stocks/${t.code}`} className="block rounded-xl bg-fg px-4 py-3 text-bg active:scale-[0.99]">
+                  <div className="text-lg font-bold">{t.title}</div>
+                  <div className="text-sm opacity-80">{t.detail}</div>
+                </Link>
+              ),
+            )}
           </div>
         )}
       </section>
@@ -44,6 +51,7 @@ export function EasyHome({ items, regime, events, settings }: { items: StockSumm
             {regime?.is_seed && <Badge tone="muted">시드 데이터</Badge>}
           </div>
           <p className="text-sm text-fg-2">{w.line}</p>
+          <p className="mt-1 text-xs text-fg-3">{RISK_LEVEL_LABEL[lvl]} 단계 · {RISK_LEVEL_EASY[lvl]}</p>
         </div>
       </section>
 

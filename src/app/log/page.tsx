@@ -2,6 +2,7 @@ import { getRepo } from "@/lib/repo";
 import { RULES } from "@/lib/constants";
 import { fmtDate } from "@/lib/format";
 import { Section, OrdersTable, ClosuresPanel, SettingsPanel } from "@/components/DetailPanels";
+import { RiskDialPanel, TradesPanel, OpportunityPanel, ProposalHistoryPanel } from "@/components/RiskPanels";
 import { todayKST, fmtNum, fmtDateTime } from "@/lib/format";
 import { viewMode } from "@/lib/view";
 import { streakSentence } from "@/lib/easy";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function LogPage() {
   const repo = getRepo();
-  const [audit, items] = await Promise.all([repo.ruleAudit(), repo.summaries()]);
+  const [audit, items, riskData, proposals] = await Promise.all([repo.ruleAudit(), repo.summaries(), repo.riskPanel(), repo.proposals("all")]);
   const names = Object.fromEntries(items.map((i) => [i.stock.code, i.stock.name]));
   const cats = Array.from(new Set(RULES.map((r) => r.category)));
   const vByOrder = new Map<number, typeof audit.violations>();
@@ -92,6 +93,10 @@ export default async function LogPage() {
         <OrdersTable orders={audit.orders} names={names} violations={vByOrder} />
       </Section>
 
+      <RiskDialPanel d={riskData} settings={audit.settings} />
+      <TradesPanel d={riskData} settings={audit.settings} />
+      <OpportunityPanel d={riskData} settings={audit.settings} />
+      <ProposalHistoryPanel list={proposals} />
       <ClosuresPanel from={todayKST()} longTradingDays={Number(audit.settings.long_closure_trading_days ?? 2)} />
       <SettingsPanel settings={audit.settings} />
 

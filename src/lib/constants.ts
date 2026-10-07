@@ -75,6 +75,20 @@ export const SETTING_KEYS: { key: string; label: string; unit?: string; easy: st
   { key: "uv4_drawdown_pct", label: "UV-4 고점 대비 조정 상한", unit: "%", easy: "꼭대기에서 이만큼 넘게 떨어진 종목은 살 수 있는 목록에 못 올린다. 위에 물린 사람이 너무 많다.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
   { key: "uv4_market_multiple", label: "UV-4 시장 대비 조정 배수 상한", unit: "배", easy: "시장이 10% 빠질 때 이 종목이 20% 빠졌으면 2배. 이보다 약하면 못 올린다.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
   { key: "long_closure_trading_days", label: "장기 휴장 기준", unit: "거래일", easy: "주말 빼고 이만큼 연속으로 장이 닫히면 '장기 휴장'. 그동안 안전벨트가 못 움직여서 미리 알린다.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
+  { key: "risk_level", label: "RS-1 현재 리스크 단계", easy: "오늘 봇이 얼마나 조심하는지. 조심/보통/과감 셋 중 하나. 봇이 매일 장 전에 정한다.", decided_by: "봇이 매일 판정", review_at: "자동" },
+  { key: "risk_stock_pct_caution", label: "RS-1 조심: 종목당 비중", unit: "%", easy: "조심 단계일 때 한 종목에 넣는 최대 비율.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
+  { key: "risk_trade_pct_caution", label: "RS-1 조심: 거래당 리스크", unit: "%", easy: "조심 단계일 때 한 번 틀리면 잃어도 되는 돈(계좌 대비).", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
+  { key: "risk_stock_pct_normal", label: "RS-1 보통: 종목당 비중", unit: "%", easy: "보통 단계(기본)일 때 한 종목 최대 비율.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
+  { key: "risk_trade_pct_normal", label: "RS-1 보통: 거래당 리스크", unit: "%", easy: "보통 단계일 때 한 번 틀리면 잃어도 되는 돈.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
+  { key: "risk_stock_pct_bold", label: "RS-1 과감: 종목당 비중", unit: "%", easy: "과감 단계일 때 한 종목 최대 비율. 30거래 결과가 좋을 때만 올라간다.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
+  { key: "risk_trade_pct_bold", label: "RS-1 과감: 거래당 리스크", unit: "%", easy: "과감 단계일 때 한 번 틀리면 잃어도 되는 돈.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
+  { key: "risk_min_trades_for_bold", label: "RS-1 과감 전 최소 거래 수", unit: "건", easy: "이만큼 거래를 끝내 보기 전엔 과감 단계로 못 간다. 실력은 결과로 확인한 뒤에만.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
+  { key: "risk_consecutive_loss_down", label: "RS-1 연속 손절 하향 기준", unit: "회", easy: "이만큼 연달아 손절하면 바로 조심 단계로 내린다.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
+  { key: "target_return_pct_min", label: "RS-3 목표 수익률 하한", unit: "%", easy: "1년에 이만큼은 벌자는 목표. 표시만 하고 규칙은 안 바꾼다.", decided_by: "비움", review_at: "표시 전용" },
+  { key: "target_return_pct_max", label: "RS-3 목표 수익률 상한", unit: "%", easy: "1년 목표의 윗선. 넘어도 규칙을 과감하게 바꾸지 않는다.", decided_by: "비움", review_at: "표시 전용" },
+  { key: "universe_target_stocks", label: "유니버스 목표 종목 수", unit: "종목", easy: "기회를 늘리려면 살 수 있는 목록이 이만큼은 돼야 한다.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
+  { key: "universe_target_sectors", label: "유니버스 목표 업종 수", unit: "업종", easy: "한 업종에만 몰리지 않게 업종도 이만큼.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
+  { key: "universe_sector_warn_pct", label: "유니버스 업종 쏠림 경고", unit: "%", easy: "한 업종이 목록의 이만큼을 넘으면 쏠림 경고.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
   { key: "regime_vkospi_reduce", label: "시장 필터: VKOSPI 축소 기준", easy: "시장 불안 지수가 이 값을 넘으면 '흐림'. 평소의 절반만 산다.", decided_by: "미확정", review_at: "4단계 시장 필터 검증" },
   { key: "regime_vkospi_wait", label: "시장 필터: VKOSPI 관망 기준", easy: "이 값을 넘으면 '폭풍'. 새로 사지 않는다.", decided_by: "미확정", review_at: "4단계 시장 필터 검증" },
   { key: "regime_lev_etf_share_reduce", label: "시장 필터: 레버리지 ETF 비중 축소 기준", unit: "%", easy: "2배짜리 상품이 거래의 이만큼을 차지하면 시장이 과열된 것. '흐림'으로 본다.", decided_by: "미확정", review_at: "4단계 시장 필터 검증" },
@@ -162,8 +176,19 @@ export const RULES: Rule[] = [
   { rule_id: "EX-6", category: "손절·매도", title: "최대 하락폭 매도 검토", description: "2단계 시작 이후 최대 일간·주간 하락폭이 나오면 실적과 무관하게 매도 검토." },
   { rule_id: "EX-7", category: "손절·매도", title: "실패 재설정", description: "손절 후에도 관심종목 유지. 원래 피봇 재돌파 + 거래량이면 재매수. 아니면 새 베이스 대기." },
   { rule_id: "EX-8", category: "손절·매도", title: "연속 손실 시 축소", description: "연속 손실이 나면 포지션 크기를 줄인다." },
+  { rule_id: "RS-1", category: "리스크", title: "리스크 다이얼", description: "조심(종목 10%·거래 리스크 0.6%) / 보통(20%·1.2%) / 과감(30%·1.8%), 업종 40% 고정. 매일 장 전 판정. 하향은 즉시(시장 흐림, 연속 손절 2회, 최근 30거래 기댓값 마이너스 중 하나), 상향은 한 단계씩(시장 맑음, 누적 30거래 이상, 최근 30거래 기댓값 플러스 전부). 단계 상한 초과 주문은 위반. MF-2는 조심 단계로 통합." },
+  { rule_id: "RS-2", category: "리스크", title: "평가 단위 30거래", description: "성적 리뷰·규칙 변경 근거는 종료 거래 30건 단위만. 30건마다 리포트. 월 수익률은 표시만, 변경 근거 불가." },
+  { rule_id: "RS-3", category: "리스크", title: "목표 수익률로 규칙 변경 금지", description: "목표 수익률로 비중·손절·진입 조건을 바꾸지 않는다. \"목표 연 20~30% · 지금 페이스 연 N%\" 표시만." },
   { rule_id: "EV-1", category: "이벤트", title: "실적 발표 전 알림", description: "실적 발표 전 알림. 포지션 축소 여부는 비움 승인." },
   { rule_id: "EV-2", category: "이벤트", title: "장기 휴장 전 알림", description: "손절선이 며칠간 작동 못 하는 장기 휴장 전 알림. 갭하락 시 시초가 체결을 전제로 크기 결정." },
 ];
 
 export const RULE_MAP: Record<string, Rule> = Object.fromEntries(RULES.map((r) => [r.rule_id, r]));
+
+export const RISK_LEVEL_LABEL: Record<"caution" | "normal" | "bold", string> = { caution: "조심", normal: "보통", bold: "과감" };
+export const RISK_LEVEL_EASY: Record<"caution" | "normal" | "bold", string> = {
+  caution: "조심 단계예요. 한 종목에 10%까지만, 한 번 틀리면 계좌의 0.6%만 잃게 담아요.",
+  normal: "보통 단계예요. 한 종목에 20%까지, 한 번 틀리면 계좌의 1.2%만 잃게 담아요.",
+  bold: "과감 단계예요. 30거래 결과가 좋아서 한 종목에 30%까지 담아요.",
+};
+export const PROPOSAL_KIND_LABEL: Record<"setting" | "rule" | "stage", string> = { setting: "설정값", rule: "규칙", stage: "단계" };

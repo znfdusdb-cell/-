@@ -108,6 +108,10 @@ export interface Position {
   entry_rule_id: string | null;
   is_unverified: boolean;
   note: string | null;
+  initial_stop_price: number | null;
+  exit_price: number | null;
+  realized_pnl: number | null;
+  r_multiple: number | null;
   opened_at: string;
   closed_at: string | null;
   updated_at: string;
@@ -214,6 +218,7 @@ export interface BalanceSnapshot {
   avg_price: number | null;
   market_price: number | null;
   cash: number | null;
+  total_value: number | null;
   note: string | null;
 }
 
@@ -226,9 +231,81 @@ export interface Violation {
 export type ViewMode = "easy" | "detail";
 
 export interface Todo {
-  kind: "approve_universe" | "approve_exit" | "approve_thesis" | "event_reduce";
+  kind: "approve_universe" | "approve_exit" | "approve_thesis" | "event_reduce" | "proposal";
   code: string;
   name: string;
   title: string;
   detail: string;
+  proposal?: Proposal;
+}
+
+export type ProposalKind = "setting" | "rule" | "stage";
+export type ProposalStatus = "pending" | "approved" | "rejected" | "applied";
+export interface Proposal {
+  id: number;
+  kind: ProposalKind;
+  target: string;
+  current_value: string | null;
+  proposed_value: string;
+  reason: string;
+  evidence: string | null;
+  plain: string | null;
+  proposer: Author;
+  status: ProposalStatus;
+  approved_at: string | null;
+  apply_at: string | null;
+  applied_at: string | null;
+  decision_note: string | null;
+  created_at: string;
+}
+
+export type RiskLevel = "caution" | "normal" | "bold";
+export interface RiskLog {
+  as_of: string;
+  level: RiskLevel;
+  prev_level: RiskLevel | null;
+  market_signal: RegimeSignal | null;
+  consecutive_losses: number | null;
+  trades_total: number | null;
+  ev_30_r: number | null;
+  reasons: string[];
+}
+
+export interface Signal {
+  id: number;
+  code: string;
+  signal_date: string;
+  kind: string;
+  entered: boolean;
+  skip_reason: string | null;
+  note: string | null;
+}
+
+/** 30거래 평가 (RS-2) — 종료 포지션에서 사이트가 계산 */
+export interface TradeStats {
+  closed: number;              // 종료 거래 수
+  last30: number[];            // 최근 30건 R
+  ev_r: number | null;         // 평균 R
+  win_rate: number | null;
+  batch_no: number;            // 몇 번째 30건 묶음인지 (1부터)
+  in_batch: number;            // 현재 묶음 안에서 몇 건째
+}
+
+export interface Pace {
+  start_value: number | null;
+  start_date: string | null;
+  now_value: number | null;
+  now_date: string | null;
+  annualized_pct: number | null;
+}
+
+export interface Opportunity {
+  month: string;
+  signals: number;
+  entries: number;
+  sectors: number;
+  universe_stocks: number;
+  universe_sectors: number;
+  top_sector: string | null;
+  top_sector_pct: number | null;
 }

@@ -4,6 +4,10 @@ begin;
 
 delete from sb_stocks where code in ('005930','999901','999902','999903','999904');
 
+delete from sb_proposals where reason like '[가짜]%';
+
+delete from sb_balance_snapshots where note like '[가짜]%';
+
 insert into sb_rules (rule_id,category,title,description) values
 ('MF-1','시장 필터','관망이면 신규 진입 없음','코스피·코스닥 200일선 방향, VKOSPI, 단일종목 레버리지 ETF 거래대금 비중으로 거래/축소/관망 판정. 관망 시 신규 진입 금지.'),
 ('MF-2','시장 필터','축소면 포지션 크기 절반','시장 신호가 축소일 때 모든 신규 포지션 크기를 정상의 절반으로.'),
@@ -29,6 +33,9 @@ insert into sb_rules (rule_id,category,title,description) values
 ('EX-6','손절·매도','최대 하락폭 매도 검토','2단계 시작 이후 최대 일간·주간 하락폭이 나오면 실적과 무관하게 매도 검토.'),
 ('EX-7','손절·매도','실패 재설정','손절 후에도 관심종목 유지. 원래 피봇 재돌파 + 거래량이면 재매수. 아니면 새 베이스 대기.'),
 ('EX-8','손절·매도','연속 손실 시 축소','연속 손실이 나면 포지션 크기를 줄인다.'),
+('RS-1','리스크','리스크 다이얼','조심(종목 10%·거래 리스크 0.6%) / 보통(20%·1.2%) / 과감(30%·1.8%), 업종 40% 고정. 매일 장 전 판정. 하향은 즉시(시장 흐림, 연속 손절 2회, 최근 30거래 기댓값 마이너스 중 하나), 상향은 한 단계씩(시장 맑음, 누적 30거래 이상, 최근 30거래 기댓값 플러스 전부). 단계 상한 초과 주문은 위반. MF-2는 조심 단계로 통합.'),
+('RS-2','리스크','평가 단위 30거래','성적 리뷰·규칙 변경 근거는 종료 거래 30건 단위만. 30건마다 리포트. 월 수익률은 표시만, 변경 근거 불가.'),
+('RS-3','리스크','목표 수익률로 규칙 변경 금지','목표 수익률로 비중·손절·진입 조건을 바꾸지 않는다. "목표 연 20~30% · 지금 페이스 연 N%" 표시만.'),
 ('EV-1','이벤트','실적 발표 전 알림','실적 발표 전 알림. 포지션 축소 여부는 비움 승인.'),
 ('EV-2','이벤트','장기 휴장 전 알림','손절선이 며칠간 작동 못 하는 장기 휴장 전 알림. 갭하락 시 시초가 체결을 전제로 크기 결정.') on conflict (rule_id) do update set category=excluded.category, title=excluded.title, description=excluded.description;
 
@@ -65,16 +72,18 @@ insert into sb_setups (code,as_of,setup_type,footprint_weeks,max_contraction_pct
 ('999903','2026-10-06','flat',14,12,5,2,131500,131500,116000,'2026-08-25',7,'[{"key":"tt1","label":"현재가 > 150일선·200일선","pass":true,"value":null},{"key":"tt2","label":"150일선 > 200일선","pass":true,"value":null},{"key":"tt3","label":"200일선 1개월 이상 상승 (권장 4~5개월)","pass":true,"value":null},{"key":"tt4","label":"50일선 > 150일선 > 200일선","pass":true,"value":null},{"key":"tt5","label":"현재가 > 50일선","pass":true,"value":null},{"key":"tt6","label":"52주 신저가 대비 +25~30% 이상","pass":false,"value":"데이터 부족 (실제 일봉 0거래일 / 252 필요)","pending":true},{"key":"tt7","label":"52주 신고가 25% 이내","pass":false,"value":"데이터 부족 (실제 일봉 0거래일 / 252 필요)","pending":true},{"key":"tt8","label":"상대강도 상위","pass":true,"value":null}]'::jsonb,6,'[{"key":"c1","label":"큰 흐름이 2단계(상승 추세)다","pass":true},{"key":"c2","label":"상승 중 베이스(조정·횡보 구간)가 있다","pass":true},{"key":"c3","label":"흔들림이 갈수록 작아졌고 마지막 조정이 10% 이내다","pass":true},{"key":"c4","label":"베이스 동안 거래량이 줄었다","pass":true},{"key":"c5","label":"고점 대비 조정이 60% 미만이다","pass":true},{"key":"c6","label":"피봇을 거래량 급증과 함께 돌파했다","pass":false},{"key":"c7","label":"피봇 대비 +2~3% 이내에서 진입했다","pass":false}]'::jsonb,5,-5.5,-6.5,0.8,'KOSPI','[가짜] 플랫 베이스 6주차. 피봇 131,500. 거래량 마른 7일째.',null,null,null,null,'2026-07-01','seed'),
 ('999904','2026-10-06','none',14,22,11,2,null,null,null,null,0,'[{"key":"tt1","label":"현재가 > 150일선·200일선","pass":false,"value":null},{"key":"tt2","label":"150일선 > 200일선","pass":true,"value":null},{"key":"tt3","label":"200일선 1개월 이상 상승 (권장 4~5개월)","pass":true,"value":null},{"key":"tt4","label":"50일선 > 150일선 > 200일선","pass":false,"value":null},{"key":"tt5","label":"현재가 > 50일선","pass":false,"value":null},{"key":"tt6","label":"52주 신저가 대비 +25~30% 이상","pass":false,"value":"데이터 부족 (실제 일봉 0거래일 / 252 필요)","pending":true},{"key":"tt7","label":"52주 신고가 25% 이내","pass":false,"value":"데이터 부족 (실제 일봉 0거래일 / 252 필요)","pending":true},{"key":"tt8","label":"상대강도 상위","pass":false,"value":null}]'::jsonb,2,'[{"key":"c1","label":"큰 흐름이 2단계(상승 추세)다","pass":false},{"key":"c2","label":"상승 중 베이스(조정·횡보 구간)가 있다","pass":true},{"key":"c3","label":"흔들림이 갈수록 작아졌고 마지막 조정이 10% 이내다","pass":false},{"key":"c4","label":"베이스 동안 거래량이 줄었다","pass":false},{"key":"c5","label":"고점 대비 조정이 60% 미만이다","pass":true},{"key":"c6","label":"피봇을 거래량 급증과 함께 돌파했다","pass":false},{"key":"c7","label":"피봇 대비 +2~3% 이내에서 진입했다","pass":false}]'::jsonb,2,-23.2,-6.5,3.6,'KOSPI','[가짜] 50일선 이탈. 퇴출.',null,null,null,null,'2026-06-30','seed') on conflict (code,as_of) do update set setup_type=excluded.setup_type, footprint_weeks=excluded.footprint_weeks, max_contraction_pct=excluded.max_contraction_pct, min_contraction_pct=excluded.min_contraction_pct, t_count=excluded.t_count, pivot=excluded.pivot, cbox_high=excluded.cbox_high, cbox_low=excluded.cbox_low, cbox_start=excluded.cbox_start, volume_dry_days=excluded.volume_dry_days, trend_template=excluded.trend_template, trend_template_score=excluded.trend_template_score, checklist=excluded.checklist, checklist_score=excluded.checklist_score, drawdown_pct=excluded.drawdown_pct, market_drawdown_pct=excluded.market_drawdown_pct, drawdown_vs_market=excluded.drawdown_vs_market, benchmark=excluded.benchmark, notes=excluded.notes, high_52w=excluded.high_52w, high_52w_date=excluded.high_52w_date, low_52w=excluded.low_52w, low_52w_date=excluded.low_52w_date, base_start=excluded.base_start, data_source=excluded.data_source;
 
-insert into sb_positions (code,account,qty,avg_price,stop_price,state,entry_rule_id,is_unverified,note,opened_at,closed_at,updated_at) values
-('005930','kb_manual',13,257575,null,'manual',null,true,'KB 계좌 수동 보유. 봇 상태 머신·손절 자동화 대상 아님. 9/22 10:41 확인값(13주, 평단 257,575). 이후 변동 미확인 — 비움이 현재 수량·평단을 주면 교체','2026-08-13T09:00:00+09:00',null,'2026-09-22T10:41:00+09:00'),
-('999904','kis_bot',0,41200,36000,'closed','EN-3',false,'[가짜]','2026-09-15T09:40:00+09:00','2026-09-29T09:02:00+09:00','2026-09-29T09:02:00+09:00');
+insert into sb_positions (code,account,qty,avg_price,stop_price,state,entry_rule_id,is_unverified,note,initial_stop_price,exit_price,realized_pnl,r_multiple,opened_at,closed_at,updated_at) values
+('005930','kb_manual',13,257575,null,'manual',null,true,'KB 계좌 수동 보유. 봇 상태 머신·손절 자동화 대상 아님. 9/22 10:41 확인값(13주, 평단 257,575). 이후 변동 미확인 — 비움이 현재 수량·평단을 주면 교체',null,null,null,null,'2026-08-13T09:00:00+09:00',null,'2026-09-22T10:41:00+09:00'),
+('999904','kis_bot',0,41200,36000,'closed','EN-3',false,'[가짜]',38700,38600,-26000,-1.04,'2026-09-15T09:40:00+09:00','2026-09-29T09:02:00+09:00','2026-09-29T09:02:00+09:00');
 
-insert into sb_balance_snapshots (account,code,as_of,qty,avg_price,market_price,cash,note) values
-('kb_manual','005930','2026-08-18T09:00:00+09:00',1,null,null,null,'8/18 오전 잔고: 정찰병 1주, +6.19% (8/13 전후 매수)'),
-('kb_manual','005930','2026-08-18T15:14:00+09:00',10,268400,267500,null,'10주 오주문 (계획 1주). 매입금액 약 2,684,190원 → EN-8 신설 계기'),
-('kb_manual','005930','2026-08-26T09:43:00+09:00',10,259609,null,null,'8/18 이후 일부 매도·재매수 추정, 미확인'),
-('kb_manual','005930','2026-09-04T10:11:00+09:00',13,257575,null,2900000,'3주 추가: 국장 총액 증가(예수금 168만→290만)에 따른 수동 비중 조정. 정찰병 규칙 매수 아님'),
-('kb_manual','005930','2026-09-22T10:41:00+09:00',13,257575,279250,null,'마지막 확인. 이후 미확인');
+insert into sb_balance_snapshots (account,code,as_of,qty,avg_price,market_price,cash,total_value,note) values
+('kb_manual','005930','2026-08-18T09:00:00+09:00',1,null,null,null,null,'8/18 오전 잔고: 정찰병 1주, +6.19% (8/13 전후 매수)'),
+('kb_manual','005930','2026-08-18T15:14:00+09:00',10,268400,267500,null,null,'10주 오주문 (계획 1주). 매입금액 약 2,684,190원 → EN-8 신설 계기'),
+('kb_manual','005930','2026-08-26T09:43:00+09:00',10,259609,null,null,null,'8/18 이후 일부 매도·재매수 추정, 미확인'),
+('kb_manual','005930','2026-09-04T10:11:00+09:00',13,257575,null,2900000,null,'3주 추가: 국장 총액 증가(예수금 168만→290만)에 따른 수동 비중 조정. 정찰병 규칙 매수 아님'),
+('kb_manual','005930','2026-09-22T10:41:00+09:00',13,257575,279250,null,null,'마지막 확인. 이후 미확인'),
+('kis_bot',null,'2026-09-15T08:30:00+09:00',null,null,null,6200000,6200000,'[가짜] 봇 계좌 시작 잔고'),
+('kis_bot',null,'2026-10-06T15:40:00+09:00',null,null,null,6174000,6174000,'[가짜] 종가 기준');
 
 insert into sb_orders_log (ts,code,side,qty,planned_qty,price,source,stop_price,target_price,account_balance_at,rule_id,rule_text,is_violation,note) values
 ('2026-09-15T09:40:00+09:00','999904','buy',10,10,41200,'bot',38700,47000,6200000,'EN-3','정찰병 소액 진입',false,'[가짜]'),
@@ -1404,9 +1413,34 @@ insert into sb_settings (key,value) values
 ('uv4_drawdown_pct','60'),
 ('uv4_market_multiple','2'),
 ('long_closure_trading_days','2'),
+('risk_level','normal'),
+('risk_stock_pct_caution','10'),
+('risk_stock_pct_normal','20'),
+('risk_stock_pct_bold','30'),
+('risk_trade_pct_caution','0.6'),
+('risk_trade_pct_normal','1.2'),
+('risk_trade_pct_bold','1.8'),
+('risk_min_trades_for_bold','30'),
+('risk_consecutive_loss_down','2'),
+('target_return_pct_min','20'),
+('target_return_pct_max','30'),
+('universe_target_stocks','30'),
+('universe_target_sectors','8'),
+('universe_sector_warn_pct','40'),
 ('regime_vkospi_reduce',null),
 ('regime_vkospi_wait',null),
 ('regime_lev_etf_share_reduce',null),
 ('regime_ma200_slope_min_pct',null) on conflict (key) do update set value=excluded.value;
+
+insert into sb_proposals (kind,target,current_value,proposed_value,reason,evidence,plain,proposer,status,approved_at,apply_at,applied_at,decision_note,created_at) values
+('setting','regime_vkospi_reduce',null,'22','[가짜] 최근 60거래일 VKOSPI 분포에서 상위 25% 경계가 22. 그 위에서 코스피 5일 수익률 중앙값이 마이너스','[가짜] 4단계 검증 노트 2026-10-06 (7월 폭락 구간에서 관망 판정 확인 전)','시장 불안 지수가 22를 넘으면 ''흐림''으로 보자는 제안이에요. 지금은 기준이 비어 있어요.','brain','pending',null,null,null,null,'2026-10-07T07:10:00+09:00');
+
+insert into sb_risk_log (as_of,level,prev_level,market_signal,consecutive_losses,trades_total,ev_30_r,reasons) values
+('2026-10-06','normal','normal','reduce',1,1,null,'["[가짜] 종료 거래 1건이라 30거래 기댓값 미산출","시장 흐림이지만 연속 손절 1회라 하향 조건 미충족","과감 상향은 30거래 전엔 불가"]'::jsonb) on conflict (as_of) do update set level=excluded.level, prev_level=excluded.prev_level, market_signal=excluded.market_signal, consecutive_losses=excluded.consecutive_losses, trades_total=excluded.trades_total, ev_30_r=excluded.ev_30_r, reasons=excluded.reasons;
+
+insert into sb_signals (code,signal_date,kind,entered,skip_reason,note) values
+('999904','2026-09-15','pivot_breakout',true,null,'[가짜]'),
+('999903','2026-09-30','pivot_breakout',false,'거래량 미달 (개장 2시간 누적 < 50일 평균 50%)','[가짜]'),
+('999901','2026-10-02','pivot_breakout',false,'유니버스 아님 (레이더)','[가짜]') on conflict (code,signal_date,kind) do update set entered=excluded.entered, skip_reason=excluded.skip_reason, note=excluded.note;
 
 commit;

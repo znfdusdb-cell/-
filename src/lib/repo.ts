@@ -1,12 +1,13 @@
 import "server-only";
 import type {
-  Stock, Thesis, Setup, Position, OrderLog, MarketEvent, MarketRegime, Candle, StageLog, Stage, StockSummary, StockDetail, Author, Violation, Settings, BalanceSnapshot,
+  Stock, Thesis, Setup, Position, OrderLog, MarketEvent, MarketRegime, Candle, StageLog, Stage, StockSummary, StockDetail, Author, Violation, Settings, BalanceSnapshot, Proposal, RiskLog, Signal, TradeStats, Pace, Opportunity,
 } from "./types";
 import { hasSupabase, supabaseAdmin } from "./supabase";
 import {
-  SEED_STOCKS, SEED_THESES, SEED_SETUPS, SEED_POSITIONS, SEED_ORDERS, SEED_EVENTS, SEED_REGIME, SEED_CANDLES, SEED_STAGE_LOG, SEED_SETTINGS, SEED_SNAPSHOTS,
+  SEED_STOCKS, SEED_THESES, SEED_SETUPS, SEED_POSITIONS, SEED_ORDERS, SEED_EVENTS, SEED_REGIME, SEED_CANDLES, SEED_STAGE_LOG, SEED_SETTINGS, SEED_SNAPSHOTS, SEED_PROPOSALS, SEED_RISK_LOG, SEED_SIGNALS,
 } from "./seed-data";
 import { daysBetween, todayKST } from "./format";
+import { nextTradingDay } from "./krx-calendar";
 import { universeGuard } from "./guards";
 import { verifyOrders } from "./verify";
 
@@ -22,9 +23,66 @@ export interface Repo {
   settings(): Promise<Settings>;
   /** 가설 승인(draft → valid). 비움 버튼으로만. */
   approveThesis(thesisId: number, actor: Author, note: string): Promise<{ ok: true } | { ok: false; error: string }>;
+  /** 변경 문 */
+  proposals(status?: "pending" | "all"): Promise<Proposal[]>;
+  decideProposal(id: number, decision: "approve" | "reject", note: string): Promise<{ ok: true; apply_at: string | null } | { ok: false; error: string }>;
+  /** 리스크 다이얼·30거래·페이스·기회 횟수 */
+  riskPanel(): Promise<RiskPanelData>;
   moveStage(code: string, to: Stage, reason: string, actor: Author): Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
+
+export interface RiskPanelData {
+  risk: RiskLog | null;
+  riskHistory: RiskLog[];
+  trades: TradeStats;
+  pace: Pace;
+  opportunity: Opportunity;
+  signals: Signal[];
+}
+
+// ----------------------------------------------------------------------------
+// 공통 계산: 30거래 평가(RS-2), 목표 대비 페이스(RS-3), 기회 횟수
+// ----------------------------------------------------------------------------
+export function tradeStats(positions: Position[]): TradeStats {
+  const closed = positions
+    .filter((p) => p.account === "kis_bot" && p.closed_at && p.r_multiple !== null)
+    .sort((a, b) => (a.closed_at! as string).localeCompare(b.closed_at! as string));
+  const rs = closed.map((p) => p.r_multiple as number);
+  const last30 = rs.slice(-30);
+  const ev = last30.length ? last30.reduce((a, b) => a + b, 0) / last30.length : null;
+  const win = last30.length ? last30.filter((r) => r > 0).length / last30.length : null;
+  return { closed: rs.length, last30, ev_r: ev === null ? null : Math.round(ev * 100) / 100, win_rate: win === null ? null : Math.round(win * 100), batch_no: Math.floor(rs.length / 30) + 1, in_batch: rs.length % 30 };
+}
+
+export function pace(snapshots: BalanceSnapshot[]): Pace {
+  const acct = snapshots.filter((x) => x.account === "kis_bot" && x.code === null && x.total_value !== null).sort((a, b) => a.as_of.localeCompare(b.as_of));
+  if (acct.length < 2) return { start_value: acct[0]?.total_value ?? null, start_date: acct[0]?.as_of ?? null, now_value: null, now_date: null, annualized_pct: null };
+  const a = acct[0], b = acct[acct.length - 1];
+  const days = Math.max(1, daysBetween(a.as_of, b.as_of));
+  const ratio = (b.total_value as number) / (a.total_value as number);
+  const ann = (Math.pow(ratio, 365 / days) - 1) * 100;
+  return { start_value: a.total_value, start_date: a.as_of, now_value: b.total_value, now_date: b.as_of, annualized_pct: Math.round(ann * 10) / 10 };
+}
+
+export function opportunity(stocks: Pick<Stock, "code" | "stage" | "sector">[], signals: Signal[], month: string): Opportunity {
+  const m = signals.filter((x) => x.signal_date.startsWith(month));
+  const sectorOf = (c: string) => stocks.find((s) => s.code === c)?.sector ?? "미정";
+  const uni = stocks.filter((s) => s.stage === "universe" || s.stage === "holding");
+  const bySector = new Map<string, number>();
+  for (const s of uni) bySector.set(s.sector ?? "미정", (bySector.get(s.sector ?? "미정") ?? 0) + 1);
+  const top = [...bySector.entries()].sort((a, b) => b[1] - a[1])[0];
+  return {
+    month,
+    signals: m.length,
+    entries: m.filter((x) => x.entered).length,
+    sectors: new Set(m.map((x) => sectorOf(x.code))).size,
+    universe_stocks: uni.length,
+    universe_sectors: bySector.size,
+    top_sector: top?.[0] ?? null,
+    top_sector_pct: top && uni.length ? Math.round((top[1] / uni.length) * 100) : null,
+  };
+}
 
 export interface RuleAudit {
   orders: OrderLog[];            // 최신순
@@ -104,6 +162,28 @@ class SeedRepo implements Repo {
   async settings() {
     return { ...SEED_SETTINGS };
   }
+  private proposalsMem = SEED_PROPOSALS.map((p) => ({ ...p }));
+  async proposals(status: "pending" | "all" = "pending") {
+    return this.proposalsMem.filter((p) => status === "all" || p.status === "pending").sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }
+  async decideProposal(id: number, decision: "approve" | "reject", note: string) {
+    const p = this.proposalsMem.find((x) => x.id === id);
+    if (!p || p.status !== "pending") return { ok: false as const, error: "대기 중인 제안이 아니다" };
+    const now = new Date().toISOString();
+    if (decision === "reject") { p.status = "rejected"; p.decision_note = note; p.approved_at = now; return { ok: true as const, apply_at: null }; }
+    p.status = "approved"; p.approved_at = now; p.decision_note = note;
+    p.apply_at = `${nextTradingDay(todayKST())}T08:30:00+09:00`;
+    return { ok: true as const, apply_at: p.apply_at };
+  }
+  async riskPanel() {
+    const risk = [...SEED_RISK_LOG].sort((a, b) => b.as_of.localeCompare(a.as_of));
+    return {
+      risk: risk[0] ?? null, riskHistory: risk.slice(0, 30),
+      trades: tradeStats(SEED_POSITIONS), pace: pace(SEED_SNAPSHOTS),
+      opportunity: opportunity(this.stocks, SEED_SIGNALS, todayKST().slice(0, 7)),
+      signals: [...SEED_SIGNALS].sort((a, b) => b.signal_date.localeCompare(a.signal_date)).slice(0, 20),
+    };
+  }
   async approveThesis(thesisId: number) {
     const t = SEED_THESES.find((x) => x.id === thesisId);
     if (!t) return { ok: false as const, error: "가설 없음" };
@@ -116,7 +196,7 @@ class SeedRepo implements Repo {
   async ruleAudit() {
     const computed = verifyOrders({
       orders: SEED_ORDERS, stageLog: this.stageLog, stocks: this.stocks,
-      setups: SEED_SETUPS, positions: SEED_POSITIONS, candles: SEED_CANDLES, settings: SEED_SETTINGS,
+      setups: SEED_SETUPS, positions: SEED_POSITIONS, candles: SEED_CANDLES, settings: SEED_SETTINGS, riskLog: SEED_RISK_LOG,
     });
     return buildAudit(SEED_ORDERS, computed, SEED_SETTINGS);
   }
@@ -164,7 +244,7 @@ function rowToSetup(r: Row): Setup {
   };
 }
 function rowToPosition(r: Row): Position {
-  return { id: Number(r.id), code: r.code as string, account: (r.account as Position["account"]) ?? "kis_bot", qty: Number(r.qty), avg_price: Number(r.avg_price), stop_price: num(r.stop_price), state: r.state as Position["state"], entry_rule_id: (r.entry_rule_id as string) ?? null, is_unverified: Boolean(r.is_unverified), note: (r.note as string) ?? null, opened_at: r.opened_at as string, closed_at: (r.closed_at as string) ?? null, updated_at: r.updated_at as string };
+  return { id: Number(r.id), code: r.code as string, account: (r.account as Position["account"]) ?? "kis_bot", qty: Number(r.qty), avg_price: Number(r.avg_price), stop_price: num(r.stop_price), state: r.state as Position["state"], entry_rule_id: (r.entry_rule_id as string) ?? null, is_unverified: Boolean(r.is_unverified), note: (r.note as string) ?? null, initial_stop_price: num(r.initial_stop_price), exit_price: num(r.exit_price), realized_pnl: num(r.realized_pnl), r_multiple: num(r.r_multiple), opened_at: r.opened_at as string, closed_at: (r.closed_at as string) ?? null, updated_at: r.updated_at as string };
 }
 function rowToOrder(r: Row): OrderLog {
   return { id: Number(r.id), ts: r.ts as string, code: r.code as string, side: r.side as OrderLog["side"], qty: Number(r.qty), planned_qty: num(r.planned_qty), price: Number(r.price), source: (r.source as OrderLog["source"]) ?? "bot", stop_price: num(r.stop_price), target_price: num(r.target_price), account_balance_at: num(r.account_balance_at), rule_id: (r.rule_id as string) ?? null, rule_text: (r.rule_text as string) ?? null, is_violation: Boolean(r.is_violation), note: (r.note as string) ?? null };
@@ -179,7 +259,16 @@ function rowToCandle(r: Row): Candle {
   return { code: r.code as string, date: r.date as string, open: Number(r.open), high: Number(r.high), low: Number(r.low), close: Number(r.close), volume: Number(r.volume), source: (r.source as Candle["source"]) ?? "kis" };
 }
 function rowToSnapshot(r: Row): BalanceSnapshot {
-  return { id: Number(r.id), account: r.account as BalanceSnapshot["account"], code: (r.code as string) ?? null, as_of: r.as_of as string, qty: num(r.qty), avg_price: num(r.avg_price), market_price: num(r.market_price), cash: num(r.cash), note: (r.note as string) ?? null };
+  return { id: Number(r.id), account: r.account as BalanceSnapshot["account"], code: (r.code as string) ?? null, as_of: r.as_of as string, qty: num(r.qty), avg_price: num(r.avg_price), market_price: num(r.market_price), cash: num(r.cash), total_value: num(r.total_value), note: (r.note as string) ?? null };
+}
+function rowToProposal(r: Row): Proposal {
+  return { id: Number(r.id), kind: r.kind as Proposal["kind"], target: r.target as string, current_value: (r.current_value as string) ?? null, proposed_value: r.proposed_value as string, reason: r.reason as string, evidence: (r.evidence as string) ?? null, plain: (r.plain as string) ?? null, proposer: r.proposer as Author, status: r.status as Proposal["status"], approved_at: (r.approved_at as string) ?? null, apply_at: (r.apply_at as string) ?? null, applied_at: (r.applied_at as string) ?? null, decision_note: (r.decision_note as string) ?? null, created_at: r.created_at as string };
+}
+function rowToRisk(r: Row): RiskLog {
+  return { as_of: r.as_of as string, level: r.level as RiskLog["level"], prev_level: (r.prev_level as RiskLog["level"]) ?? null, market_signal: (r.market_signal as RiskLog["market_signal"]) ?? null, consecutive_losses: num(r.consecutive_losses), trades_total: num(r.trades_total), ev_30_r: num(r.ev_30_r), reasons: (r.reasons as string[]) ?? [] };
+}
+function rowToSignal(r: Row): Signal {
+  return { id: Number(r.id), code: r.code as string, signal_date: r.signal_date as string, kind: r.kind as string, entered: Boolean(r.entered), skip_reason: (r.skip_reason as string) ?? null, note: (r.note as string) ?? null };
 }
 function rowToStageLog(r: Row): StageLog {
   return { id: Number(r.id), code: r.code as string, from_stage: (r.from_stage as Stage) ?? null, to_stage: r.to_stage as Stage, reason: (r.reason as string) ?? null, actor: r.actor as Author, created_at: r.created_at as string };
@@ -290,6 +379,42 @@ class SupabaseRepo implements Repo {
     return ((data ?? []) as Row[]).map(rowToEvent);
   }
 
+  async proposals(status: "pending" | "all" = "pending") {
+    let q = this.db.from("sb_proposals").select("*").order("created_at", { ascending: false }).limit(100);
+    if (status === "pending") q = q.eq("status", "pending");
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as Row[]).map(rowToProposal);
+  }
+  async decideProposal(id: number, decision: "approve" | "reject", note: string) {
+    if (decision === "reject") {
+      const { error } = await this.db.from("sb_proposals").update({ status: "rejected", approved_at: new Date().toISOString(), decision_note: note }).eq("id", id).eq("status", "pending");
+      return error ? { ok: false as const, error: error.message } : { ok: true as const, apply_at: null };
+    }
+    const { data, error } = await this.db.rpc("sb_approve_proposal", { p_id: id, p_note: note });
+    if (error) return { ok: false as const, error: error.message };
+    return { ok: true as const, apply_at: ((data as Row | null)?.apply_at as string) ?? null };
+  }
+  async riskPanel() {
+    const month = todayKST().slice(0, 7);
+    const [rl, po, sn, sg, st] = await Promise.all([
+      this.db.from("sb_risk_log").select("*").order("as_of", { ascending: false }).limit(30),
+      this.db.from("sb_positions").select("*").eq("account", "kis_bot"),
+      this.db.from("sb_balance_snapshots").select("*").eq("account", "kis_bot").is("code", null).order("as_of", { ascending: true }),
+      this.db.from("sb_signals").select("*").order("signal_date", { ascending: false }).limit(200),
+      this.db.from("sb_stocks").select("code, stage, sector"),
+    ]);
+    const risk = ((rl.data ?? []) as Row[]).map(rowToRisk);
+    const signals = ((sg.data ?? []) as Row[]).map(rowToSignal);
+    return {
+      risk: risk[0] ?? null, riskHistory: risk,
+      trades: tradeStats(((po.data ?? []) as Row[]).map(rowToPosition)),
+      pace: pace(((sn.data ?? []) as Row[]).map(rowToSnapshot)),
+      opportunity: opportunity(((st.data ?? []) as Row[]).map((r) => ({ code: r.code as string, stage: r.stage as Stage, sector: (r.sector as string) ?? null })), signals, month),
+      signals: signals.slice(0, 20),
+    };
+  }
+
   async approveThesis(thesisId: number, actor: Author, note: string) {
     const { data: t } = await this.db.from("sb_theses").select("*").eq("id", thesisId).maybeSingle();
     if (!t) return { ok: false as const, error: "가설 없음" };
@@ -303,13 +428,14 @@ class SupabaseRepo implements Repo {
   }
 
   async ruleAudit() {
-    const [o, sl, st, su, po, settings] = await Promise.all([
+    const [o, sl, st, su, po, settings, rl] = await Promise.all([
       this.db.from("sb_orders_log").select("*").order("ts", { ascending: true }).limit(2000),
       this.db.from("sb_stage_log").select("*"),
       this.db.from("sb_stocks").select("code, stage, sector"),
       this.db.from("sb_setups").select("*"),
       this.db.from("sb_positions").select("*"),
       this.settings(),
+      this.db.from("sb_risk_log").select("*"),
     ]);
     const orders = ((o.data ?? []) as Row[]).map(rowToOrder);
     const positions = ((po.data ?? []) as Row[]).map(rowToPosition);
@@ -320,7 +446,7 @@ class SupabaseRepo implements Repo {
       orders, stageLog: ((sl.data ?? []) as Row[]).map(rowToStageLog),
       stocks: ((st.data ?? []) as Row[]).map((r) => ({ code: r.code as string, stage: r.stage as Stage, sector: (r.sector as string) ?? null })),
       setups: ((su.data ?? []) as Row[]).map(rowToSetup), positions,
-      candles: ((ca.data ?? []) as Row[]).map(rowToCandle), settings,
+      candles: ((ca.data ?? []) as Row[]).map(rowToCandle), settings, riskLog: ((rl.data ?? []) as Row[]).map(rowToRisk),
     });
     return buildAudit(orders, computed, settings);
   }

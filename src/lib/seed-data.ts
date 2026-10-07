@@ -7,7 +7,7 @@
  * 나머지 4종목은 완전히 가짜(이름 앞에 [가짜]).
  */
 import type {
-  Stock, Thesis, Setup, Position, OrderLog, MarketEvent, Prediction, MarketRegime, Candle, StageLog, CheckItem, Settings, BalanceSnapshot,
+  Stock, Thesis, Setup, Position, OrderLog, MarketEvent, Prediction, MarketRegime, Candle, StageLog, CheckItem, Settings, BalanceSnapshot, Proposal, RiskLog, Signal,
 } from "./types";
 import { TREND_TEMPLATE_ITEMS, CHECKLIST_ITEMS } from "./constants";
 import { candleStats } from "./setup-calc";
@@ -220,17 +220,36 @@ export const SEED_SETUPS: Setup[] = [
 
 // ---------- 포지션 ----------
 export const SEED_POSITIONS: Position[] = [
-  { id: 1, code: "005930", account: "kb_manual", qty: 13, avg_price: 257575, stop_price: null, state: "manual", entry_rule_id: null, is_unverified: true, note: "KB 계좌 수동 보유. 봇 상태 머신·손절 자동화 대상 아님. 9/22 10:41 확인값(13주, 평단 257,575). 이후 변동 미확인 — 비움이 현재 수량·평단을 주면 교체", opened_at: "2026-08-13T09:00:00+09:00", closed_at: null, updated_at: "2026-09-22T10:41:00+09:00" },
-  { id: 2, code: "999904", account: "kis_bot", qty: 0, avg_price: 41200, stop_price: 36000, state: "closed", entry_rule_id: "EN-3", is_unverified: false, note: "[가짜]", opened_at: "2026-09-15T09:40:00+09:00", closed_at: "2026-09-29T09:02:00+09:00", updated_at: "2026-09-29T09:02:00+09:00" },
+  { id: 1, code: "005930", account: "kb_manual", qty: 13, avg_price: 257575, stop_price: null, state: "manual", entry_rule_id: null, is_unverified: true, note: "KB 계좌 수동 보유. 봇 상태 머신·손절 자동화 대상 아님. 9/22 10:41 확인값(13주, 평단 257,575). 이후 변동 미확인 — 비움이 현재 수량·평단을 주면 교체", initial_stop_price: null, exit_price: null, realized_pnl: null, r_multiple: null, opened_at: "2026-08-13T09:00:00+09:00", closed_at: null, updated_at: "2026-09-22T10:41:00+09:00" },
+  { id: 2, code: "999904", account: "kis_bot", qty: 0, avg_price: 41200, stop_price: 36000, state: "closed", entry_rule_id: "EN-3", is_unverified: false, note: "[가짜]", initial_stop_price: 38700, exit_price: 38600, realized_pnl: -26000, r_multiple: -1.04, opened_at: "2026-09-15T09:40:00+09:00", closed_at: "2026-09-29T09:02:00+09:00", updated_at: "2026-09-29T09:02:00+09:00" },
 ];
 
 /** 확인된 시점의 잔고 스냅샷 (체결가·체결일은 지어내지 않는다) */
 export const SEED_SNAPSHOTS: BalanceSnapshot[] = [
-  { id: 1, account: "kb_manual", code: "005930", as_of: "2026-08-18T09:00:00+09:00", qty: 1, avg_price: null, market_price: null, cash: null, note: "8/18 오전 잔고: 정찰병 1주, +6.19% (8/13 전후 매수)" },
-  { id: 2, account: "kb_manual", code: "005930", as_of: "2026-08-18T15:14:00+09:00", qty: 10, avg_price: 268400, market_price: 267500, cash: null, note: "10주 오주문 (계획 1주). 매입금액 약 2,684,190원 → EN-8 신설 계기" },
-  { id: 3, account: "kb_manual", code: "005930", as_of: "2026-08-26T09:43:00+09:00", qty: 10, avg_price: 259609, market_price: null, cash: null, note: "8/18 이후 일부 매도·재매수 추정, 미확인" },
-  { id: 4, account: "kb_manual", code: "005930", as_of: "2026-09-04T10:11:00+09:00", qty: 13, avg_price: 257575, market_price: null, cash: 2900000, note: "3주 추가: 국장 총액 증가(예수금 168만→290만)에 따른 수동 비중 조정. 정찰병 규칙 매수 아님" },
-  { id: 5, account: "kb_manual", code: "005930", as_of: "2026-09-22T10:41:00+09:00", qty: 13, avg_price: 257575, market_price: 279250, cash: null, note: "마지막 확인. 이후 미확인" },
+  { id: 1, account: "kb_manual", code: "005930", as_of: "2026-08-18T09:00:00+09:00", qty: 1, avg_price: null, market_price: null, cash: null, total_value: null, note: "8/18 오전 잔고: 정찰병 1주, +6.19% (8/13 전후 매수)" },
+  { id: 2, account: "kb_manual", code: "005930", as_of: "2026-08-18T15:14:00+09:00", qty: 10, avg_price: 268400, market_price: 267500, cash: null, total_value: null, note: "10주 오주문 (계획 1주). 매입금액 약 2,684,190원 → EN-8 신설 계기" },
+  { id: 3, account: "kb_manual", code: "005930", as_of: "2026-08-26T09:43:00+09:00", qty: 10, avg_price: 259609, market_price: null, cash: null, total_value: null, note: "8/18 이후 일부 매도·재매수 추정, 미확인" },
+  { id: 4, account: "kb_manual", code: "005930", as_of: "2026-09-04T10:11:00+09:00", qty: 13, avg_price: 257575, market_price: null, cash: 2900000, total_value: null, note: "3주 추가: 국장 총액 증가(예수금 168만→290만)에 따른 수동 비중 조정. 정찰병 규칙 매수 아님" },
+  { id: 5, account: "kb_manual", code: "005930", as_of: "2026-09-22T10:41:00+09:00", qty: 13, avg_price: 257575, market_price: 279250, cash: null, total_value: null, note: "마지막 확인. 이후 미확인" },
+  { id: 6, account: "kis_bot", code: null, as_of: "2026-09-15T08:30:00+09:00", qty: null, avg_price: null, market_price: null, cash: 6200000, total_value: 6200000, note: "[가짜] 봇 계좌 시작 잔고" },
+  { id: 7, account: "kis_bot", code: null, as_of: "2026-10-06T15:40:00+09:00", qty: null, avg_price: null, market_price: null, cash: 6174000, total_value: 6174000, note: "[가짜] 종가 기준" },
+];
+
+// ---------- 제안 (변경 문). 가짜 1건: 브레인이 설정 변경을 제안한 모양 ----------
+export const SEED_PROPOSALS: Proposal[] = [
+  { id: 1, kind: "setting", target: "regime_vkospi_reduce", current_value: null, proposed_value: "22", reason: "[가짜] 최근 60거래일 VKOSPI 분포에서 상위 25% 경계가 22. 그 위에서 코스피 5일 수익률 중앙값이 마이너스", evidence: "[가짜] 4단계 검증 노트 2026-10-06 (7월 폭락 구간에서 관망 판정 확인 전)", plain: "시장 불안 지수가 22를 넘으면 '흐림'으로 보자는 제안이에요. 지금은 기준이 비어 있어요.", proposer: "brain", status: "pending", approved_at: null, apply_at: null, applied_at: null, decision_note: null, created_at: "2026-10-07T07:10:00+09:00" },
+];
+
+// ---------- 리스크 다이얼 일지 (봇이 매일 장 전 기록) ----------
+export const SEED_RISK_LOG: RiskLog[] = [
+  { as_of: SEED_AS_OF, level: "normal", prev_level: "normal", market_signal: "reduce", consecutive_losses: 1, trades_total: 1, ev_30_r: null, reasons: ["[가짜] 종료 거래 1건이라 30거래 기댓값 미산출", "시장 흐림이지만 연속 손절 1회라 하향 조건 미충족", "과감 상향은 30거래 전엔 불가"] },
+];
+
+// ---------- 규칙 신호 (기회 횟수 지표) ----------
+export const SEED_SIGNALS: Signal[] = [
+  { id: 1, code: "999904", signal_date: "2026-09-15", kind: "pivot_breakout", entered: true, skip_reason: null, note: "[가짜]" },
+  { id: 2, code: "999903", signal_date: "2026-09-30", kind: "pivot_breakout", entered: false, skip_reason: "거래량 미달 (개장 2시간 누적 < 50일 평균 50%)", note: "[가짜]" },
+  { id: 3, code: "999901", signal_date: "2026-10-02", kind: "pivot_breakout", entered: false, skip_reason: "유니버스 아님 (레이더)", note: "[가짜]" },
 ];
 
 // ---------- 주문 로그 ----------
@@ -248,6 +267,12 @@ export const SEED_SETTINGS: Settings = {
   uv4_drawdown_pct: "60",
   uv4_market_multiple: "2",           // 책 범위 2~3배 중 엄격한 쪽
   long_closure_trading_days: "2",     // 주말 제외 연속 휴장 거래일
+  risk_level: "normal",
+  risk_stock_pct_caution: "10", risk_stock_pct_normal: "20", risk_stock_pct_bold: "30",
+  risk_trade_pct_caution: "0.6", risk_trade_pct_normal: "1.2", risk_trade_pct_bold: "1.8",
+  risk_min_trades_for_bold: "30", risk_consecutive_loss_down: "2",
+  target_return_pct_min: "20", target_return_pct_max: "30",
+  universe_target_stocks: "30", universe_target_sectors: "8", universe_sector_warn_pct: "40",
   regime_vkospi_reduce: null,
   regime_vkospi_wait: null,
   regime_lev_etf_share_reduce: null,
