@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Challenge, Checkin, Participation, PushSubscriptionRow, User, WeightLog } from "../types";
+import type { Challenge, Checkin, Gift, Participation, PushSubscriptionRow, User, WeightLog } from "../types";
 import type { CheckinQuery, ParticipantRow, Repo } from "./types";
 
 export const BUCKET = "ch-photos";
@@ -167,6 +167,26 @@ export class SupabaseRepo implements Repo {
   async upsertWeightLog(data: Omit<WeightLog, "id" | "created_at">) {
     const row = await this.one<WeightLog>(this.sb.from("ch_weight_logs").upsert(data, { onConflict: "participation_id,local_date" }).select("*").single(), "upsertWeightLog");
     return { ...row, kg: Number(row.kg) };
+  }
+
+  // gifts
+  createGift(data: Omit<Gift, "id" | "created_at" | "opened_at">) {
+    return this.one<Gift>(this.sb.from("ch_gifts").insert(data).select("*").single(), "createGift");
+  }
+  listGiftsReceived(userId: string) {
+    return this.many<Gift>(this.sb.from("ch_gifts").select("*").eq("to_user_id", userId).order("created_at", { ascending: false }), "listGiftsReceived");
+  }
+  listGiftsSentSince(userId: string, challengeId: string, sinceIso: string) {
+    return this.many<Gift>(this.sb.from("ch_gifts").select("*").eq("from_user_id", userId).eq("challenge_id", challengeId).gte("created_at", sinceIso), "listGiftsSentSince");
+  }
+  async markGiftOpened(id: string, userId: string) {
+    const { error } = await this.sb.from("ch_gifts").update({ opened_at: new Date().toISOString() }).eq("id", id).eq("to_user_id", userId).is("opened_at", null);
+    if (error) fail("markGiftOpened", error);
+  }
+  async countUnreadGifts(userId: string) {
+    const { count, error } = await this.sb.from("ch_gifts").select("id", { count: "exact", head: true }).eq("to_user_id", userId).is("opened_at", null);
+    if (error) fail("countUnreadGifts", error);
+    return count ?? 0;
   }
 
   // photos

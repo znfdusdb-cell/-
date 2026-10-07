@@ -13,6 +13,8 @@ export type CheckinResult = {
   totalXp: number;
   level: number;
   gender?: "m" | "f";
+  /** 오늘(이번 기간) 완료한 사람 중 몇 번째 */
+  completedRank?: number | null;
   leveledUp: boolean;
   completed: boolean;
   streak: number;
@@ -62,20 +64,31 @@ export async function uploadCheckin(fd: FormData): Promise<CheckinResult> {
 }
 
 /** 인증 결과 모달. 닫으면 화면을 새로고침한다. */
+const CONFETTI = ["#e4002b", "#f3c84b", "#5fcf7a", "#063672", "#ff8a00", "#ffffff"];
+
 export function ResultModal({ result, onClose }: { result: CheckinResult; onClose: () => void }) {
+  const celebrate = result.completed && !result.replaced;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6 overflow-hidden" onClick={onClose}>
+      {celebrate && (
+        <div className="pointer-events-none absolute inset-0" aria-hidden>
+          {Array.from({ length: 28 }).map((_, i) => (
+            <span key={i} className="confetti" style={{ left: `${(i * 37) % 100}%`, background: CONFETTI[i % CONFETTI.length], animationDelay: `${(i % 7) * 0.12}s`, animationDuration: `${1.6 + (i % 5) * 0.25}s` }} />
+          ))}
+        </div>
+      )}
       <div className="card w-full max-w-sm p-6 text-center animate-pop" onClick={(e) => e.stopPropagation()}>
         {result.leveledUp ? (
           <>
             <div className="text-xs font-extrabold tracking-widest text-red">LEVEL UP</div>
-            <div className="flex justify-center my-1"><Character level={result.level} gender={result.gender} size={150} /></div>
+            <div className="flex justify-center my-1"><Character level={result.level} gender={result.gender} size={150} className="animate-bounce-char" /></div>
             <div className="text-2xl font-extrabold">Lv.{result.level}</div>
           </>
         ) : (
-          <div className="flex justify-center my-1"><Character level={result.level} gender={result.gender} size={110} /></div>
+          <div className="flex justify-center my-1"><Character level={result.level} gender={result.gender} size={110} className={celebrate ? "animate-bounce-char" : ""} /></div>
         )}
-        <div className="text-xl font-extrabold mt-1">{result.replaced ? "사진을 바꿨어요" : result.completed ? "완료!" : "인증 완료"}</div>
+        <div className="text-xl font-extrabold mt-1">{result.replaced ? "사진을 바꿨어요" : result.completed ? "오늘 완료!" : "인증 완료"}</div>
+        {celebrate && result.completedRank ? <div className="text-sm font-bold text-red mt-0.5">오늘 {result.completedRank}번째로 완료했어요</div> : null}
         {result.xp > 0 && <div className="text-3xl font-extrabold text-red mt-1 num">+{result.xp} XP</div>}
         <ul className="text-sm text-fg-2 mt-3 space-y-0.5">
           {result.reasons.map((r) => <li key={r}>{r}</li>)}
@@ -99,6 +112,7 @@ export function CheckinButton({
   mode = "camera",
   disabled,
   className = "btn btn-red w-full",
+  autoOpen = false,
 }: {
   challengeId: string;
   slot?: string;
@@ -106,12 +120,25 @@ export function CheckinButton({
   mode?: "camera" | "album";
   disabled?: boolean;
   className?: string;
+  /** 알림에서 들어왔을 때: 바로 카메라 열기 시도, 막히면 버튼 강조 */
+  autoOpen?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const btn = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<CheckinResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pulse, setPulse] = useState(autoOpen);
   const router = useRouter();
+
+  useEffect(() => {
+    if (!autoOpen) return;
+    btn.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    const t = window.setTimeout(() => { try { input.current?.click(); } catch {} }, 350);
+    const clean = window.setTimeout(() => router.replace("/"), 1200);
+    return () => { window.clearTimeout(t); window.clearTimeout(clean); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpen]);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -146,7 +173,7 @@ export function CheckinButton({
   return (
     <>
       <input ref={input} type="file" accept="image/*" {...(mode === "camera" ? { capture: "environment" } : {})} className="hidden" onChange={onFile} />
-      <button type="button" className={className} disabled={disabled || busy} onClick={() => input.current?.click()}>
+      <button ref={btn} type="button" className={`${className} ${pulse ? "animate-pulse-ring" : ""}`} disabled={disabled || busy} onClick={() => { setPulse(false); input.current?.click(); }}>
         {busy ? "올리는 중…" : label}
       </button>
       {error && <p className="text-sm text-bad mt-2">{error}</p>}

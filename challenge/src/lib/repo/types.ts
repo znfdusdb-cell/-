@@ -1,4 +1,4 @@
-import type { Challenge, Checkin, Participation, PushSubscriptionRow, User, WeightLog } from "../types";
+import type { Challenge, Checkin, Gift, Participation, PushSubscriptionRow, User, WeightLog } from "../types";
 
 export type CheckinQuery = {
   challengeId?: string;
@@ -53,6 +53,13 @@ export interface Repo {
   listWeightLogs(participationId: string): Promise<WeightLog[]>;
   listWeightLogsMany(participationIds: string[]): Promise<WeightLog[]>;
   upsertWeightLog(data: Omit<WeightLog, "id" | "created_at">): Promise<WeightLog>;
+
+  // gifts (탈락 벌칙 기프티콘)
+  createGift(data: Omit<Gift, "id" | "created_at" | "opened_at">): Promise<Gift>;
+  listGiftsReceived(userId: string): Promise<Gift[]>;
+  listGiftsSentSince(userId: string, challengeId: string, sinceIso: string): Promise<Gift[]>;
+  markGiftOpened(id: string, userId: string): Promise<void>;
+  countUnreadGifts(userId: string): Promise<number>;
 
   // photos
   putPhoto(path: string, bytes: Uint8Array, contentType: string): Promise<void>;

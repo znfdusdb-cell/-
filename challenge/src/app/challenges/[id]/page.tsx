@@ -11,6 +11,7 @@ import { LeaveButton } from "@/components/LeaveButton";
 import { StartNowButton } from "@/components/StartNowButton";
 import { FailRule } from "@/components/FailRule";
 import { KickButton } from "@/components/KickButton";
+import { NudgeButton } from "@/components/NudgeButton";
 
 export const dynamic = "force-dynamic";
 
@@ -87,9 +88,12 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
                       </div>
                       <div className="text-right text-xs num shrink-0">
                         <div className="font-extrabold">{s.streak} 연속</div>
-                        <div className={s.fails > 0 ? "text-bad" : "text-fg-3"}>실패 {s.fails}{ch.max_fails > 0 ? `/${ch.max_fails}` : ""}</div>
+                        <div className={s.fails > 0 ? "text-bad" : "text-fg-3"}>이달 실패 {s.fails}{ch.max_fails > 0 ? `/${ch.max_fails}` : ""}</div>
                       </div>
                     </div>
+                    {joined && pending && p.user_id !== user.id && (
+                      <div className="mt-2 pl-9"><NudgeButton challengeId={ch.id} userId={p.user_id} /></div>
+                    )}
                     {weight && (
                       <div className="mt-2 pl-9">
                         <div className="flex justify-between text-[11px] text-fg-2 num">

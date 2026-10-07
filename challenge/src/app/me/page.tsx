@@ -9,6 +9,9 @@ import { XpBar } from "@/components/XpBar";
 import { PushToggle } from "@/components/PushToggle";
 import { InstallHint } from "@/components/InstallHint";
 import { ProfileForms } from "@/components/ProfileForms";
+import { GiftBox, type GiftView } from "@/components/GiftBox";
+import { getRepo } from "@/lib/repo";
+import { fmtDateKo } from "@/lib/time";
 import { logout } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +22,21 @@ export default async function MePage() {
   const level = levelFromXp(user.xp);
   const mine = await loadMyChallenges(user);
   const totalCheckins = mine.reduce((n, m) => n + m.checkins.length, 0);
+  const repo = getRepo();
+  const gifts = await repo.listGiftsReceived(user.id);
+  const [senders, challenges, urls] = await Promise.all([
+    repo.getUsersByIds([...new Set(gifts.map((g) => g.from_user_id))]),
+    repo.listChallenges({ includeInactive: true }),
+    repo.photoUrls(gifts.map((g) => g.photo_path)),
+  ]);
+  const giftViews: GiftView[] = gifts.map((g) => ({
+    id: g.id,
+    fromName: senders.find((u) => u.id === g.from_user_id)?.display_name ?? "누군가",
+    challengeTitle: challenges.find((c) => c.id === g.challenge_id)?.title ?? "챌린지",
+    date: fmtDateKo(g.created_at.slice(0, 10)),
+    url: urls[g.photo_path] ?? null,
+    opened: Boolean(g.opened_at),
+  }));
   const bestStreak = Math.max(0, ...mine.map((m) => m.summary.streak));
 
   return (
@@ -34,6 +52,8 @@ export default async function MePage() {
           <div className="rounded-xl bg-bg-3 p-2"><div className="text-xl font-extrabold num">{bestStreak}</div><div className="text-[11px] text-fg-2">현재 최고 연속</div></div>
         </div>
       </section>
+
+      <GiftBox gifts={giftViews} />
 
       <div className="mt-3 space-y-3">
         <PushToggle vapidKey={vapidPublicKey()} />

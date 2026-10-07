@@ -31,7 +31,7 @@ export default async function ChallengesPage() {
               </div>
               <p className="text-sm text-fg-2 mt-0.5 line-clamp-2">{ch.description}</p>
               <p className="text-xs text-fg-3 mt-1">{describeConfig(ch.config)}</p>
-              <p className="text-xs mt-1"><span className="text-red font-bold">실패 시</span> {ch.penalty}{ch.max_fails > 0 ? ` (${ch.max_fails}번이면 탈락)` : ""}</p>
+              <p className="text-xs mt-1"><span className="text-red font-bold">실패 시</span> {ch.penalty}{ch.max_fails > 0 ? ` (한 달 ${ch.max_fails}번 실패면 탈락)` : ""}</p>
             </div>
           </Link>
         ))}

@@ -11,9 +11,11 @@ export function FailRule({ challenge: ch, compact = false }: { challenge: Challe
       <div className="text-[11px] font-extrabold text-red tracking-wide">실패 조건</div>
       <div className="text-sm mt-0.5">{rule}</div>
       <div className="text-sm mt-1">
-        {ch.max_fails > 0 ? <>실패 <b>{ch.max_fails}번</b>이면 탈락 → </> : <>실패하면 → </>}
+        실패 1번마다 경험치 <b>{ch.config.kind === "slots" ? "−30" : "−60"}</b>
+        {ch.max_fails > 0 ? <>, 한 달에 <b>{ch.max_fails}번</b> 실패하면 탈락 → </> : <>, 실패하면 → </>}
         <b className="text-red">{ch.penalty}</b>
       </div>
+      <div className="text-[11px] text-fg-3 mt-1">탈락하면 기프티콘을 올려야 하고, 살아남은 멤버 한 명에게 깜짝 선물로 랜덤 전달돼요.</div>
     </div>
   );
 }

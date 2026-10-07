@@ -122,3 +122,15 @@ export type PushSubscriptionRow = {
   user_agent: string;
   created_at: string;
 };
+
+/** 탈락 벌칙으로 보낸 기프티콘 (받는 사람 선물함) */
+export type Gift = {
+  id: string;
+  challenge_id: string;
+  from_user_id: string;
+  /** 받을 사람이 없으면 null */
+  to_user_id: string | null;
+  photo_path: string;
+  created_at: string;
+  opened_at: string | null;
+};
