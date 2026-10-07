@@ -9,8 +9,11 @@ const sized = (svg, w, h) => svg.replace(/width="\d+"/, `width="${w}"`).replace(
 // 아이콘: 만렙 여자 상반신 (왕관 ~ 가슴 엠블럼, 머플러·완장 포함)
 const ICON_VB = { x: 7, y: 0, w: 30, h: 30 };
 const f10top = char(10, "f", `${ICON_VB.x} ${ICON_VB.y} ${ICON_VB.w} ${ICON_VB.h}`);
-const f6 = char(6, "f");
-const m4 = char(4, "m");
+// OG: 만렙 남녀 상반신, 글자 없이 단색 배경
+const OG_VB = "7 0 30 30";
+const noAura = (svg) => svg.replace(/<ellipse[^>]*px-aura[^>]*><\/ellipse>|<ellipse[^>]*px-aura[^>]*\/>/g, "");
+const f10 = noAura(char(10, "f", OG_VB));
+const m10 = noAura(char(10, "m", OG_VB));
 
 // 44×48 스프라이트. 아이콘 안에서 픽셀 1칸 = k px (정수)
 const iconHtml = (size, rounded) => {
@@ -22,16 +25,9 @@ const iconHtml = (size, rounded) => {
 };
 
 const ogHtml = `<!doctype html><html><head><meta charset="utf-8"><style>
-body{margin:0;width:1200px;height:630px;background:#fff7f1;font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;display:flex;align-items:center;gap:24px;padding:0 70px;box-sizing:border-box;overflow:hidden;position:relative}
-.blob{position:absolute;right:-120px;top:-140px;width:520px;height:520px;border-radius:50%;background:#ffe3e6}
-.chars{display:flex;gap:0;align-items:flex-end;position:relative;flex:none}
-h1{font-size:74px;margin:0;line-height:1.05;font-weight:800;color:#1a1614;letter-spacing:-.02em;position:relative}
-p{font-size:33px;margin:16px 0 0;color:#5c5651;line-height:1.35;position:relative}
-.tag{display:inline-block;margin-top:24px;background:#e4002b;color:#fff;font-size:28px;font-weight:700;padding:10px 24px;border-radius:999px;position:relative}
-</style></head><body><div class="blob"></div>
-<div class="chars">${sized(f6, 308, 336)}${sized(m4, 242, 264)}</div>
-<div><h1>거너스 챌린지</h1><p>아스날 인사이드 톡방<br>다이어트 · 취미 인증하고 레벨업</p><div class="tag">실패하면 메가커피 쏘기</div></div>
-</body></html>`;
+body{margin:0;width:1200px;height:630px;background:#ffe3e6;display:flex;align-items:flex-end;justify-content:center;gap:40px;overflow:hidden}
+svg{display:block}
+</style></head><body>${sized(f10, 540, 540)}${sized(m10, 540, 540)}</body></html>`;
 
 const browser = await pw.chromium.launch();
 const page = await browser.newPage({ deviceScaleFactor: 1 });
