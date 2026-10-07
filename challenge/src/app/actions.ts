@@ -345,15 +345,20 @@ export async function adminStartNow(_prev: ActionResult | null, fd: FormData): P
 export async function adminSendTestPush(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   const me = await currentUser();
   if (!isAdmin(me)) return { ok: false, error: "관리자만" };
-  const { pushEnabled, sendPushToUsers } = await import("@/lib/push");
-  if (!pushEnabled()) return { ok: false, error: "서버에 알림 키(VAPID)가 없어요. Vercel 환경변수를 확인하세요" };
-  const repo = getRepo();
-  const target = await repo.getUserById(str(fd, "user_id"));
-  if (!target) return { ok: false, error: "없는 사용자" };
-  const subs = await repo.listPushSubscriptions([target.id]);
-  if (subs.length === 0) return { ok: false, error: `${target.display_name}님이 아직 알림을 안 켰어요 (홈 화면 아이콘으로 열고 → 내 정보 → 알림 켜기)` };
-  const sent = await sendPushToUsers([target.id], { title: "거너스 챌린지 테스트 알림", body: `${target.display_name}님, 알림이 잘 와요! 이제 인증 시간에 이렇게 알려 드릴게요.`, url: "/", tag: "test" });
-  return sent > 0 ? { ok: true, message: `${target.display_name}님 기기 ${sent}대에 보냈어요` } : { ok: false, error: "구독은 있는데 전송에 실패했어요 (만료된 구독은 자동 정리됨). 알림을 껐다 다시 켜 보라고 해 주세요" };
+  try {
+    const { configurePush, sendPushToUsers } = await import("@/lib/push");
+    const problem = configurePush();
+    if (problem) return { ok: false, error: problem };
+    const repo = getRepo();
+    const target = await repo.getUserById(str(fd, "user_id"));
+    if (!target) return { ok: false, error: "없는 사용자" };
+    const r = await sendPushToUsers([target.id], { title: "거너스 챌린지 테스트 알림", body: `${target.display_name}님, 알림이 잘 와요! 이제 인증 시간에 이렇게 알려 드릴게요.`, url: "/", tag: "test" });
+    if (r.total === 0) return { ok: false, error: `${target.display_name}님이 아직 알림을 안 켰어요 (홈 화면 아이콘으로 열고 → 내 정보 → 알림 켜기)` };
+    if (r.sent === 0) return { ok: false, error: r.reason ?? "전송 실패" };
+    return { ok: true, message: `${target.display_name}님 기기 ${r.sent}/${r.total}대에 보냈어요${r.reason ? ` (일부 실패: ${r.reason})` : ""}` };
+  } catch (e) {
+    return { ok: false, error: `알림 오류: ${(e as Error).message}` };
+  }
 }
 
 /** 관리자: 멤버 퇴출 (계정과 기록 전부 삭제) */
