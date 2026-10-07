@@ -29,16 +29,22 @@
 
 ## 3단계. 알림 열쇠 만들기 (1분)
 
-컴퓨터 터미널에서:
+맥 터미널에서 이 한 줄만 (저장소를 내려받을 필요 없음):
 
 ```bash
-cd challenge
-npm install
-npm run vapid
+npx web-push generate-vapid-keys
 ```
 
-세 줄이 출력됩니다. 그대로 메모장에 붙여 두세요.
-(터미널이 부담스러우면 이 단계는 건너뛰어도 됩니다. 알림만 꺼진 채로 나머지는 다 됩니다. 나중에 저한테 "알림 키 만들어줘" 하면 됩니다.)
+"Ok to proceed? (y)" 가 나오면 `y` 엔터. 결과가 이렇게 나옵니다.
+
+```
+Public Key:
+BNxxxx...        ← 이 줄이 NEXT_PUBLIC_VAPID_PUBLIC_KEY
+Private Key:
+xxxx...          ← 이 줄이 VAPID_PRIVATE_KEY
+```
+
+두 줄을 메모장에 붙여 두세요. (이 단계를 건너뛰면 알림만 꺼진 채로 나머지는 다 됩니다.)
 
 ## 4단계. Vercel에 올리기 (10분)
 
@@ -55,8 +61,8 @@ npm run vapid
 | `ADMIN_PASSWORD` | `4581` (비움 계정 첫 비밀번호. 나중에 앱 안에서 바꿀 수 있음) |
 | `INVITE_CODE` | 톡방 사람만 가입하게 할 암호 (예: `arsenal2026`). 비워 두면 링크 아는 사람은 누구나 가입 |
 | `CRON_SECRET` | 아무 긴 문장 (알림 보내기용. SESSION_SECRET과 다르게) |
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | 3단계 출력 첫째 줄의 `=` 뒤 값 |
-| `VAPID_PRIVATE_KEY` | 3단계 출력 둘째 줄의 `=` 뒤 값 |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | 3단계의 Public Key |
+| `VAPID_PRIVATE_KEY` | 3단계의 Private Key |
 | `VAPID_SUBJECT` | `mailto:내이메일주소` |
 
 5. **Deploy** 클릭. 1~2분 뒤 주소(예: `https://xxx.vercel.app`)가 나옵니다.
