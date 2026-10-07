@@ -23,6 +23,9 @@ export function vapidProblem(): string | null {
   if (!pub || !priv) return "Vercel 환경변수에 NEXT_PUBLIC_VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY 가 없어요";
   if (!/^[A-Za-z0-9_-]{86,88}$/.test(pub)) return `공개 키(NEXT_PUBLIC_VAPID_PUBLIC_KEY) 모양이 이상해요 (길이 ${pub.length}, 보통 87자). 'Public Key:' 아래 줄 전체를 그대로 넣었는지 확인`;
   if (!/^[A-Za-z0-9_-]{42,44}$/.test(priv)) return `비밀 키(VAPID_PRIVATE_KEY) 모양이 이상해요 (길이 ${priv.length}, 보통 43자). 'Private Key:' 아래 줄 전체를 그대로 넣었는지 확인`;
+  const sub = (process.env.VAPID_SUBJECT ?? "").trim();
+  if (!sub || /example\.com/.test(sub)) return "VAPID_SUBJECT 가 비어 있어요. 아이폰(애플 푸시)은 이게 없으면 거부해요 → Vercel 에 mailto:내이메일 로 넣고 Redeploy";
+  if (!/^(mailto:[^@\s]+@[^@\s]+\.[^@\s]+|https:\/\/\S+)$/i.test(sub) && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(sub)) return `VAPID_SUBJECT 모양이 이상해요 (${sub}). mailto:내이메일 형태로`;
   return null;
 }
 
@@ -70,7 +73,10 @@ export async function sendPushOne(sub: PushSubscriptionRow, payload: PushPayload
       await getRepo().deletePushSubscription(sub.endpoint).catch(() => {});
       return { ok: false, reason: "구독이 만료돼서 지웠어요. 알림을 껐다 다시 켜 주세요" };
     }
-    if (code === 401 || code === 403) return { ok: false, reason: `푸시 서버가 키를 거부했어요(${code}). 알림을 켠 뒤에 키를 바꿨다면 알림을 껐다 다시 켜야 해요. ${body}` };
+    if (code === 401 || code === 403) {
+      const apple = /push\.apple\.com/.test(sub.endpoint);
+      return { ok: false, reason: `푸시 서버가 거부했어요(${code})${apple ? " · 아이폰" : ""}. ${apple ? "애플은 VAPID_SUBJECT(mailto:이메일)가 정확해야 해요. Vercel 값 확인 → Redeploy → 그 폰에서 알림 껐다 켜기." : "알림을 켠 뒤에 키를 바꿨다면 알림을 껐다 다시 켜야 해요."} ${body}` };
+    }
     return { ok: false, reason: `전송 실패(${code ?? "?"}): ${body}` };
   }
 }
