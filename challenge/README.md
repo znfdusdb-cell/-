@@ -18,12 +18,14 @@
 
 ## 2단계. Supabase에서 값 2개 복사해 두기 (2분)
 
-같은 프로젝트에서 왼쪽 메뉴 **Project Settings → API** 에 가면:
+같은 프로젝트, 왼쪽 맨 아래 톱니바퀴(Settings)에서:
 
-- **Project URL** → 메모장에 `NEXT_PUBLIC_SUPABASE_URL` 이라고 적고 그 옆에 붙여넣기
-- **service_role** 키 (Reveal 눌러야 보임) → `SUPABASE_SERVICE_ROLE_KEY` 로 적어 두기
+- **프로젝트 URL**: 왼쪽 메뉴 **Data API** (INTEGRATIONS 아래) → 맨 위 **Project URL** 복사. `https://xxxx.supabase.co` 모양.
+  → 메모장에 `NEXT_PUBLIC_SUPABASE_URL` 이라고 적고 옆에 붙여넣기
+- **service_role 키**: 왼쪽 메뉴 **API Keys** → 위쪽 탭 **"Legacy anon, service_role API keys"** 클릭 → `service_role` 줄 **Reveal** → 복사.
+  → `SUPABASE_SERVICE_ROLE_KEY` 로 적어 두기
 
-주의: `anon` 키가 아니라 **service_role** 키입니다. 이 키는 톡방에 절대 올리지 마세요.
+주의: 첫 탭에 보이는 `sb_publishable_...` 키나 `anon` 키가 아니라 **service_role** 키입니다. 이 키는 톡방에 절대 올리지 마세요.
 
 ## 3단계. 알림 열쇠 만들기 (1분)
 
