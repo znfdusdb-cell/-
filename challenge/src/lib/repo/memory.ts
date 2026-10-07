@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Challenge, Checkin, Participation, PushSubscriptionRow, User } from "../types";
+import type { Challenge, Checkin, Participation, PushSubscriptionRow, User, WeightLog } from "../types";
 import type { CheckinQuery, ParticipantRow, Repo } from "./types";
 
 type Store = {
@@ -9,6 +9,7 @@ type Store = {
   checkins: Checkin[];
   photos: Map<string, { bytes: Uint8Array; contentType: string }>;
   pushSubs: PushSubscriptionRow[];
+  weights: WeightLog[];
   notices: Set<string>;
   xpLog: { user_id: string; delta: number; reason: string; created_at: string }[];
 };
@@ -24,6 +25,7 @@ function store(): Store {
       checkins: [],
       photos: new Map(),
       pushSubs: [],
+      weights: [],
       notices: new Set(),
       xpLog: [],
     };
@@ -151,6 +153,18 @@ export class MemoryRepo implements Repo {
   async deleteCheckin(id: string) {
     const s = store();
     s.checkins = s.checkins.filter((c) => c.id !== id);
+  }
+
+  async listWeightLogs(participationId: string) {
+    return clone(store().weights.filter((w) => w.participation_id === participationId).sort((a, b) => a.local_date.localeCompare(b.local_date)));
+  }
+  async upsertWeightLog(data: Omit<WeightLog, "id" | "created_at">) {
+    const s = store();
+    const i = s.weights.findIndex((w) => w.participation_id === data.participation_id && w.local_date === data.local_date);
+    if (i >= 0) { s.weights[i] = { ...s.weights[i], kg: data.kg }; return clone(s.weights[i]); }
+    const row: WeightLog = { id: randomUUID(), created_at: now(), ...data };
+    s.weights.push(row);
+    return clone(row);
   }
 
   async putPhoto(path: string, bytes: Uint8Array, contentType: string) {

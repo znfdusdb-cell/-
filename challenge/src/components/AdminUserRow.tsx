@@ -13,7 +13,7 @@ export function AdminUserRow({ user }: { user: Row }) {
     <div className="card p-3">
       <button type="button" className="w-full flex items-center gap-3 text-left" onClick={() => setOpen((o) => !o)}>
         <div className="flex-1 min-w-0">
-          <div className="font-semibold truncate">{user.display_name} <span className="text-fg-3 text-xs">@{user.username}</span> {user.role === "admin" && <span className="chip bg-gold/20 text-gold">관리자</span>}</div>
+          <div className="font-semibold truncate">{user.display_name} <span className="text-fg-3 text-xs">@{user.username}</span> {user.role === "admin" && <span className="chip bg-gold-soft text-gold">관리자</span>}</div>
           <div className="text-xs text-fg-2">Lv.{user.level} · {user.xp} XP · 알림 {user.pushCount} · 마지막 로그인 {user.lastLogin}</div>
         </div>
         <span className="text-fg-3">{open ? "▲" : "▼"}</span>

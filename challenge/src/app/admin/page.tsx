@@ -28,23 +28,23 @@ export default async function AdminPage() {
       </section>
 
       <section className="mt-4">
-        <h2 className="font-display text-xl mb-2">챌린지 {challenges.length}</h2>
+        <h2 className="text-lg font-extrabold mb-2">챌린지 {challenges.length}</h2>
         <div className="space-y-2">
           {challenges.map((c) => (
             <Link key={c.id} href={`/challenges/${c.id}/edit`} className="card p-3 flex items-center gap-3 block">
               <span className="text-2xl">{c.emoji}</span>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold truncate">{c.title} {!c.is_active && <span className="chip bg-bad/15 text-bad">비활성</span>}</div>
-                <div className="text-xs text-fg-2">{describeConfig(c.config)} · 🎁 {c.prize}</div>
+                <div className="text-xs text-fg-2">{describeConfig(c.config)} · 실패 시 {c.penalty}</div>
               </div>
-              <span className="text-fg-3">✏️</span>
+              <span className="text-fg-3 text-sm">수정</span>
             </Link>
           ))}
         </div>
       </section>
 
       <section className="mt-4">
-        <h2 className="font-display text-xl mb-2">멤버 {users.length}</h2>
+        <h2 className="text-lg font-extrabold mb-2">멤버 {users.length}</h2>
         <div className="space-y-2">
           {users.map((u) => (
             <AdminUserRow

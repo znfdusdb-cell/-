@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Challenge, Checkin, Participation, PushSubscriptionRow, User } from "../types";
+import type { Challenge, Checkin, Participation, PushSubscriptionRow, User, WeightLog } from "../types";
 import type { CheckinQuery, ParticipantRow, Repo } from "./types";
 
 export const BUCKET = "ch-photos";
@@ -147,6 +147,15 @@ export class SupabaseRepo implements Repo {
   async deleteCheckin(id: string) {
     const { error } = await this.sb.from("ch_checkins").delete().eq("id", id);
     if (error) fail("deleteCheckin", error);
+  }
+
+  // weight
+  listWeightLogs(participationId: string) {
+    return this.many<WeightLog>(this.sb.from("ch_weight_logs").select("*").eq("participation_id", participationId).order("local_date", { ascending: true }), "listWeightLogs");
+  }
+  async upsertWeightLog(data: Omit<WeightLog, "id" | "created_at">) {
+    const row = await this.one<WeightLog>(this.sb.from("ch_weight_logs").upsert(data, { onConflict: "participation_id,local_date" }).select("*").single(), "upsertWeightLog");
+    return { ...row, kg: Number(row.kg) };
   }
 
   // photos

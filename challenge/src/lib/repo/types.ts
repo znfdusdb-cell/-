@@ -1,4 +1,4 @@
-import type { Challenge, Checkin, Participation, PushSubscriptionRow, User } from "../types";
+import type { Challenge, Checkin, Participation, PushSubscriptionRow, User, WeightLog } from "../types";
 
 export type CheckinQuery = {
   challengeId?: string;
@@ -46,6 +46,10 @@ export interface Repo {
   createCheckin(data: Omit<Checkin, "id" | "created_at">): Promise<Checkin>;
   updateCheckin(id: string, patch: Partial<Omit<Checkin, "id">>): Promise<Checkin>;
   deleteCheckin(id: string): Promise<void>;
+
+  // weight
+  listWeightLogs(participationId: string): Promise<WeightLog[]>;
+  upsertWeightLog(data: Omit<WeightLog, "id" | "created_at">): Promise<WeightLog>;
 
   // photos
   putPhoto(path: string, bytes: Uint8Array, contentType: string): Promise<void>;

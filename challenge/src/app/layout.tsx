@@ -11,7 +11,7 @@ function siteUrl(): string {
 }
 
 const TITLE = "거너스 챌린지";
-const DESC = "아스날 인사이드 톡방 챌린지 — 다이어트·취미 인증하고 연속 기록으로 레벨업";
+const DESC = "아스날 인사이드 톡방 챌린지. 다이어트·취미 인증, 실패하면 메가커피 쏘기";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
@@ -20,12 +20,12 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   openGraph: { title: TITLE, description: DESC, siteName: TITLE, type: "website", locale: "ko_KR", url: "/", images: [{ url: "/og.png", width: 1200, height: 630, alt: TITLE }] },
   twitter: { card: "summary_large_image", title: TITLE, description: DESC, images: ["/og.png"] },
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "거너스 챌린지" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "거너스 챌린지" },
   icons: { icon: "/icons/icon-192.png", apple: "/icons/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0f1c",
+  themeColor: "#f6f5f2",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -35,11 +35,6 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet" />
-      </head>
       <body className="min-h-dvh">
         {children}
         <SwRegister />

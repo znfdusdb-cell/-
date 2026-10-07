@@ -7,7 +7,8 @@ import { ensureBootstrap, getRepo } from "@/lib/repo";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { SESSION_COOKIE, SESSION_DAYS, signSession } from "@/lib/session";
 import { currentUser, isAdmin, requireUser } from "@/lib/current-user";
-import { CREATE_CHALLENGE_LEVEL, DEFAULT_PRIZE, levelFromXp, validateConfig } from "@/lib/game";
+import { CREATE_CHALLENGE_LEVEL, DEFAULT_PENALTY, levelFromXp, validateConfig } from "@/lib/game";
+import { inferMethods, normalizeMethods } from "@/lib/methods";
 import { addDays, kstDate, kstWeekday } from "@/lib/time";
 import type { ChallengeConfig, ParticipationGoal, SlotDef } from "@/lib/types";
 
@@ -117,6 +118,8 @@ function parseGoal(fd: FormData, cfg: ChallengeConfig): { goal: ParticipationGoa
     const hobby = str(fd, "hobby");
     if (hobby.length < 1 || hobby.length > 30) return { goal, error: "취미를 1~30자로 적어 주세요" };
     goal.hobby = hobby;
+    const chosen = normalizeMethods(fd.getAll("methods").map(String));
+    goal.methods = chosen.length ? chosen : inferMethods(hobby);
   }
   return { goal };
 }
@@ -166,6 +169,30 @@ export async function updateGoal(_prev: ActionResult | null, fd: FormData): Prom
   return { ok: true, message: "목표를 바꿨어요" };
 }
 
+/** 오늘 체중 기록 (본인만). 같은 날 다시 넣으면 덮어쓴다 */
+export async function logWeight(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const user = await requireUser();
+  const repo = getRepo();
+  const p = await repo.getParticipation(user.id, str(fd, "challenge_id"));
+  if (!p || p.status !== "active") return { ok: false, error: "참여 중이 아니에요" };
+  const kg = Math.round(parseFloat(str(fd, "kg")) * 10) / 10;
+  if (!Number.isFinite(kg) || kg < 20 || kg > 300) return { ok: false, error: "체중을 숫자로 적어 주세요" };
+  await repo.upsertWeightLog({ participation_id: p.id, user_id: user.id, local_date: kstDate(), kg });
+  revalidatePath("/");
+  return { ok: true, message: "오늘 체중을 기록했어요" };
+}
+
+/** 탈락 후 다시 도전: 다음 월요일부터 새로 집계 (지난 실패는 리셋) */
+export async function rechallenge(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const user = await requireUser();
+  const repo = getRepo();
+  const p = await repo.getParticipation(user.id, str(fd, "challenge_id"));
+  if (!p || p.status !== "active") return { ok: false, error: "참여 중이 아니에요" };
+  await repo.updateParticipation(p.id, { joined_at: new Date().toISOString(), start_date: null });
+  revalidatePath("/", "layout");
+  return { ok: true, message: "다음 월요일부터 다시 시작해요" };
+}
+
 /* ───────── 챌린지 개설 · 수정 ───────── */
 
 function parseConfig(fd: FormData): { config: ChallengeConfig | null; error?: string } {
@@ -205,10 +232,12 @@ export async function createChallenge(_prev: ActionResult | null, fd: FormData):
   const title = str(fd, "title");
   const description = str(fd, "description");
   const emoji = str(fd, "emoji") || "🏆";
-  const prize = str(fd, "prize") || DEFAULT_PRIZE;
+  const penalty = str(fd, "penalty") || DEFAULT_PENALTY;
+  const maxFails = parseInt(str(fd, "max_fails") || "3", 10);
   if (title.length < 2 || title.length > 30) return { ok: false, error: "이름은 2~30자" };
   if (description.length > 200) return { ok: false, error: "설명은 200자까지" };
   if ([...emoji].length > 2) return { ok: false, error: "이모지는 1개" };
+  if (!Number.isInteger(maxFails) || maxFails < 0 || maxFails > 30) return { ok: false, error: "탈락 기준은 0~30" };
   const { config, error } = parseConfig(fd);
   if (!config) return { ok: false, error };
   const ch = await getRepo().createChallenge({
@@ -216,7 +245,8 @@ export async function createChallenge(_prev: ActionResult | null, fd: FormData):
     title,
     description,
     emoji,
-    prize,
+    penalty,
+    max_fails: maxFails,
     config,
     created_by: user.id,
     is_default: false,
@@ -235,11 +265,13 @@ export async function updateChallenge(_prev: ActionResult | null, fd: FormData):
   const title = str(fd, "title");
   const description = str(fd, "description");
   const emoji = str(fd, "emoji") || ch.emoji;
-  const prize = str(fd, "prize");
+  const penalty = str(fd, "penalty");
+  const maxFails = parseInt(str(fd, "max_fails") || "0", 10);
   if (title.length < 2 || title.length > 30) return { ok: false, error: "이름은 2~30자" };
   if (description.length > 200) return { ok: false, error: "설명은 200자까지" };
-  if (prize.length < 1 || prize.length > 60) return { ok: false, error: "상품은 1~60자" };
-  const patch: Partial<typeof ch> = { title, description, emoji, prize, is_active: fd.get("is_active") !== null };
+  if (penalty.length < 1 || penalty.length > 80) return { ok: false, error: "벌칙은 1~80자" };
+  if (!Number.isInteger(maxFails) || maxFails < 0 || maxFails > 30) return { ok: false, error: "탈락 기준은 0~30" };
+  const patch: Partial<typeof ch> = { title, description, emoji, penalty, max_fails: maxFails, is_active: fd.get("is_active") !== null };
   if (str(fd, "kind")) {
     const { config, error } = parseConfig(fd);
     if (!config) return { ok: false, error };
@@ -307,7 +339,7 @@ export async function deleteCheckin(_prev: ActionResult | null, fd: FormData): P
   if (!c) return { ok: false, error: "없는 인증" };
   if (!isAdmin(me) && c.user_id !== me.id) return { ok: false, error: "권한이 없어요" };
   await repo.deleteCheckin(c.id);
-  await repo.deletePhoto(c.photo_path);
+  if (c.photo_path) await repo.deletePhoto(c.photo_path);
   if (c.xp > 0) await repo.addXp(c.user_id, -c.xp, "인증 삭제 회수");
   revalidatePath("/", "layout");
   return { ok: true, message: "인증을 지웠어요" };

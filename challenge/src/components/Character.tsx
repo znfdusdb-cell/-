@@ -1,130 +1,146 @@
 /**
- * 레벨별로 화려해지는 거너 캐릭터 (순수 SVG, 외부 이미지 없음).
- *  L1 흰 티셔츠 · L2 빨간 셔츠 · L3 홈 킷(흰 소매·대포 엠블럼·흰 반바지) · L4 머플러 · L5 주장 완장·금 축구화
- *  L6 거너사우르스 · L7 트로피 · L8 황금 오라 · L9 왕관 · L10 불꽃
+ * 레벨별로 꾸며지는 거너 캐릭터. 동글동글한 흰 몸, 점 눈, 볼터치의 귀여운 그림체 (순수 SVG).
+ *  L1 기본 · L2 빨간 셔츠 · L3 홈 킷(흰 소매·대포 엠블럼) · L4 머플러 · L5 주장 완장 · L6 거너사우르스 친구
+ *  L7 트로피 · L8 황금 오라 · L9 왕관 · L10 불꽃
  */
-export function Character({ level, size = 160, className = "" }: { level: number; size?: number; className?: string }) {
+export function Character({ level, size = 160, className = "", mood = "happy" }: { level: number; size?: number; className?: string; mood?: "happy" | "sad" }) {
   const L = Math.max(1, level);
-  const shirt = L >= 2 ? "#ef0107" : "#f3f4f8";
-  const shirtStroke = L >= 2 ? "#a80005" : "#c5c9d6";
-  const sleeves = L >= 3 ? "#ffffff" : shirt;
-  const shorts = L >= 3 ? "#ffffff" : "#3b4a6b";
-  const socks = L >= 3 ? "#ef0107" : "#dfe3ee";
-  const boots = L >= 5 ? "#e3b341" : "#1b2235";
+  const line = "#2a2522";
+  const skin = "#fffdf9";
+  const red = "#e4002b";
+  const shirtOn = L >= 2;
+  const sleeves = L >= 3 ? "#ffffff" : red;
   return (
     <svg viewBox="0 0 200 200" width={size} height={size} className={className} aria-label={`레벨 ${L} 캐릭터`}>
       <defs>
-        <radialGradient id="aura" cx="50%" cy="55%" r="50%">
-          <stop offset="0%" stopColor="#ffe08a" stopOpacity=".9" />
-          <stop offset="70%" stopColor="#e3b341" stopOpacity=".25" />
-          <stop offset="100%" stopColor="#e3b341" stopOpacity="0" />
+        <radialGradient id="ch-aura" cx="50%" cy="55%" r="50%">
+          <stop offset="0%" stopColor="#ffe9a3" stopOpacity=".95" />
+          <stop offset="70%" stopColor="#f3c84b" stopOpacity=".25" />
+          <stop offset="100%" stopColor="#f3c84b" stopOpacity="0" />
         </radialGradient>
-        <linearGradient id="flame" x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0%" stopColor="#ef0107" />
+        <linearGradient id="ch-flame" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stopColor={red} />
           <stop offset="60%" stopColor="#ff8a00" />
           <stop offset="100%" stopColor="#ffe08a" />
         </linearGradient>
+        <clipPath id="ch-body"><ellipse cx="100" cy="112" rx="58" ry="60" /></clipPath>
       </defs>
 
-      {/* L8 황금 오라 */}
-      {L >= 8 && <circle cx="100" cy="110" r="88" fill="url(#aura)" />}
-
-      {/* L10 불꽃 */}
+      {L >= 8 && <circle cx="100" cy="112" r="92" fill="url(#ch-aura)" />}
       {L >= 10 && (
         <g className="animate-flame" opacity=".9">
-          <path d="M60 150 C 50 120, 70 110, 68 85 C 85 100, 80 120, 78 130 C 90 120, 88 100, 95 90 C 100 110, 92 135, 85 150 Z" fill="url(#flame)" />
-          <path d="M140 150 C 150 120, 130 110, 132 85 C 115 100, 120 120, 122 130 C 110 120, 112 100, 105 90 C 100 110, 108 135, 115 150 Z" fill="url(#flame)" />
+          <path d="M52 160 C 40 128, 62 118, 58 92 C 76 108, 70 130, 70 140 C 82 128, 80 108, 88 98 C 92 122, 84 142, 78 160 Z" fill="url(#ch-flame)" />
+          <path d="M148 160 C 160 128, 138 118, 142 92 C 124 108, 130 130, 130 140 C 118 128, 120 108, 112 98 C 108 122, 116 142, 122 160 Z" fill="url(#ch-flame)" />
         </g>
       )}
 
-      {/* L6 거너사우르스 */}
+      {/* 거너사우르스 친구 (작은 초록 친구) */}
       {L >= 6 && (
-        <g className="animate-float" style={{ animationDelay: ".6s" }}>
-          <ellipse cx="160" cy="165" rx="18" ry="6" fill="#000" opacity=".25" />
-          <path d="M150 160 C 140 150, 142 125, 160 122 C 178 125, 180 150, 170 160 Z" fill="#2fb857" stroke="#1e8a40" strokeWidth="2" />
-          <path d="M172 150 C 185 150, 192 142, 194 134" stroke="#2fb857" strokeWidth="7" fill="none" strokeLinecap="round" />
-          <circle cx="160" cy="118" r="12" fill="#2fb857" stroke="#1e8a40" strokeWidth="2" />
-          <path d="M170 118 l 10 3 l -10 4 Z" fill="#2fb857" stroke="#1e8a40" strokeWidth="1.5" />
-          <circle cx="163" cy="115" r="2.2" fill="#0b0f1c" />
-          <path d="M152 108 l 4 -7 l 4 7 M160 106 l 4 -7 l 4 7" fill="#ef0107" stroke="#a80005" strokeWidth="1" />
-          <rect x="150" y="124" width="20" height="12" rx="4" fill="#ef0107" />
-          <rect x="150" y="124" width="5" height="12" fill="#fff" />
-          <rect x="165" y="124" width="5" height="12" fill="#fff" />
+        <g className="animate-float" style={{ animationDelay: ".7s" }}>
+          <ellipse cx="166" cy="178" rx="16" ry="4" fill="#000" opacity=".12" />
+          <ellipse cx="166" cy="152" rx="22" ry="24" fill="#5fcf7a" stroke={line} strokeWidth="3" />
+          <path d="M150 134 l 5 -9 l 5 9 M161 130 l 5 -9 l 5 9 M172 134 l 5 -9 l 5 9" fill={red} stroke={line} strokeWidth="2" strokeLinejoin="round" />
+          <circle cx="159" cy="150" r="2.6" fill={line} />
+          <circle cx="173" cy="150" r="2.6" fill={line} />
+          <path d="M162 158 q 4 4 8 0" stroke={line} strokeWidth="2" fill="none" strokeLinecap="round" />
+          <ellipse cx="155" cy="156" rx="3.5" ry="2" fill="#ff9aa8" opacity=".8" />
+          <ellipse cx="177" cy="156" rx="3.5" ry="2" fill="#ff9aa8" opacity=".8" />
+          <path d="M146 162 q 20 10 40 0 v 12 q -20 8 -40 0 Z" fill={red} stroke={line} strokeWidth="2.5" />
+          <circle cx="148" cy="162" r="5" fill="#5fcf7a" stroke={line} strokeWidth="2.5" />
+          <circle cx="184" cy="162" r="5" fill="#5fcf7a" stroke={line} strokeWidth="2.5" />
         </g>
       )}
 
       {/* 그림자 */}
-      <ellipse cx="100" cy="186" rx="34" ry="6" fill="#000" opacity=".3" />
+      <ellipse cx="100" cy="184" rx="40" ry="6" fill="#000" opacity=".12" />
 
-      {/* 다리·양말·축구화 */}
-      <rect x="84" y="140" width="12" height="26" rx="4" fill="#f1c9a5" />
-      <rect x="104" y="140" width="12" height="26" rx="4" fill="#f1c9a5" />
-      <rect x="83" y="152" width="14" height="18" rx="3" fill={socks} />
-      <rect x="103" y="152" width="14" height="18" rx="3" fill={socks} />
-      <path d="M80 170 h 18 v 10 h -22 a 4 4 0 0 1 -4 -4 v -3 a 3 3 0 0 1 3 -3 Z" fill={boots} />
-      <path d="M102 170 h 18 a 3 3 0 0 1 3 3 v 3 a 4 4 0 0 1 -4 4 h -17 Z" fill={boots} />
+      {/* 귀 */}
+      <circle cx="62" cy="62" r="14" fill={skin} stroke={line} strokeWidth="3" />
+      <circle cx="138" cy="62" r="14" fill={skin} stroke={line} strokeWidth="3" />
+      <circle cx="62" cy="62" r="6" fill="#ffd1d8" />
+      <circle cx="138" cy="62" r="6" fill="#ffd1d8" />
 
-      {/* 반바지 */}
-      <path d="M78 118 h 44 v 16 l -6 10 h -13 l -3 -8 l -3 8 h -13 l -6 -10 Z" fill={shorts} stroke="#c5c9d6" strokeWidth="1" />
+      {/* 몸 (머리와 한 덩어리) */}
+      <ellipse cx="100" cy="112" rx="58" ry="60" fill={skin} stroke={line} strokeWidth="3" />
 
-      {/* 몸통 (셔츠) */}
-      <path d="M74 72 C 74 60, 84 56, 92 56 h 16 C 116 56, 126 60, 126 72 v 48 h -52 Z" fill={shirt} stroke={shirtStroke} strokeWidth="2" />
-      {/* 소매 */}
-      <path d="M74 72 l -14 10 l 8 18 l 10 -6 Z" fill={sleeves} stroke={shirtStroke} strokeWidth="2" />
-      <path d="M126 72 l 14 10 l -8 18 l -10 -6 Z" fill={sleeves} stroke={shirtStroke} strokeWidth="2" />
-      {/* 팔 */}
-      <rect x="56" y="98" width="11" height="22" rx="5" fill="#f1c9a5" />
-      <rect x="133" y="98" width="11" height="22" rx="5" fill="#f1c9a5" />
-      {/* L5 주장 완장 */}
-      {L >= 5 && <rect x="131" y="86" width="12" height="7" rx="2" fill="#e3b341" stroke="#9c824a" strokeWidth="1" />}
-
-      {/* L3 대포 엠블럼 */}
+      {/* 셔츠 */}
+      {shirtOn && (
+        <g clipPath="url(#ch-body)">
+          <rect x="30" y="126" width="140" height="60" fill={red} />
+          <path d="M42 126 h 116" stroke={line} strokeWidth="3" />
+          {L >= 3 && (
+            <>
+              <rect x="30" y="126" width="18" height="60" fill={sleeves} />
+              <rect x="152" y="126" width="18" height="60" fill={sleeves} />
+              <path d="M48 126 v 60 M152 126 v 60" stroke={line} strokeWidth="2.5" />
+            </>
+          )}
+        </g>
+      )}
+      {/* 대포 엠블럼 */}
       {L >= 3 && (
-        <g transform="translate(86 78) scale(0.9)">
-          <path d="M0 10 h 24 v 12 a 12 12 0 0 1 -24 0 Z" fill="#fff" stroke="#9c824a" strokeWidth="1.5" />
-          <rect x="4" y="14" width="16" height="3" rx="1.5" fill="#ef0107" />
-          <circle cx="7" cy="19" r="2" fill="#063672" />
+        <g transform="translate(88 136)">
+          <path d="M0 0 h 24 v 10 a 12 12 0 0 1 -24 0 Z" fill="#fff" stroke={line} strokeWidth="2" />
+          <rect x="5" y="5" width="14" height="3" rx="1.5" fill={red} />
+          <circle cx="8" cy="11" r="2" fill="#063672" />
         </g>
       )}
 
-      {/* L4 머플러 */}
+      {/* 팔 */}
+      <circle cx="44" cy="134" r="11" fill={skin} stroke={line} strokeWidth="3" />
+      <circle cx="156" cy="134" r="11" fill={skin} stroke={line} strokeWidth="3" />
+      {L >= 5 && <rect x="146" y="124" width="20" height="7" rx="3" fill="#f3c84b" stroke={line} strokeWidth="2" />}
+
+      {/* 발 */}
+      <ellipse cx="82" cy="170" rx="13" ry="9" fill={skin} stroke={line} strokeWidth="3" />
+      <ellipse cx="118" cy="170" rx="13" ry="9" fill={skin} stroke={line} strokeWidth="3" />
+      {L >= 5 && (
+        <>
+          <ellipse cx="82" cy="172" rx="13" ry="7" fill="#f3c84b" stroke={line} strokeWidth="2.5" />
+          <ellipse cx="118" cy="172" rx="13" ry="7" fill="#f3c84b" stroke={line} strokeWidth="2.5" />
+        </>
+      )}
+
+      {/* 머플러 */}
       {L >= 4 && (
         <g>
-          <path d="M78 60 q 22 12 44 0 v 9 q -22 12 -44 0 Z" fill="#ef0107" />
-          <path d="M78 63 q 22 12 44 0 v 3 q -22 12 -44 0 Z" fill="#fff" />
-          <path d="M116 66 l 12 26 l -9 2 l -9 -24 Z" fill="#ef0107" stroke="#a80005" strokeWidth="1" />
-          <path d="M119 74 l 2 5 l -5 1 l -2 -5 Z M122 82 l 2 5 l -5 1 l -2 -5 Z" fill="#fff" />
+          <path d="M50 118 q 50 16 100 0 v 12 q -50 16 -100 0 Z" fill={red} stroke={line} strokeWidth="2.5" />
+          <path d="M50 124 q 50 16 100 0" stroke="#fff" strokeWidth="4" fill="none" />
+          <path d="M140 128 l 10 30 l -12 3 l -8 -28 Z" fill={red} stroke={line} strokeWidth="2.5" strokeLinejoin="round" />
+          <path d="M136 140 l 11 -3 M139 150 l 11 -3" stroke="#fff" strokeWidth="3" />
         </g>
       )}
 
-      {/* 머리 */}
-      <circle cx="100" cy="40" r="22" fill="#f1c9a5" stroke="#d9a983" strokeWidth="1.5" />
-      {/* 머리카락 */}
-      <path d="M78 36 C 80 20, 92 14, 100 16 C 110 14, 122 22, 122 36 C 116 30, 108 28, 100 29 C 92 28, 84 30, 78 36 Z" fill="#2b2118" />
-      {/* 눈·입 */}
-      <circle cx="92" cy="40" r="2.4" fill="#0b0f1c" />
-      <circle cx="108" cy="40" r="2.4" fill="#0b0f1c" />
-      <path d="M93 49 q 7 6 14 0" stroke="#a0542d" strokeWidth="2" fill="none" strokeLinecap="round" />
-      {L >= 2 && <circle cx="86" cy="46" r="3" fill="#ff8a8a" opacity=".6" />}
-      {L >= 2 && <circle cx="114" cy="46" r="3" fill="#ff8a8a" opacity=".6" />}
+      {/* 얼굴 */}
+      <circle cx="84" cy="98" r="4.2" fill={line} />
+      <circle cx="116" cy="98" r="4.2" fill={line} />
+      <circle cx="85.5" cy="96.5" r="1.3" fill="#fff" />
+      <circle cx="117.5" cy="96.5" r="1.3" fill="#fff" />
+      <ellipse cx="72" cy="108" rx="7" ry="4" fill="#ffb3bd" opacity=".85" />
+      <ellipse cx="128" cy="108" rx="7" ry="4" fill="#ffb3bd" opacity=".85" />
+      {mood === "happy" ? (
+        <path d="M94 109 q 3 4 6 0 q 3 4 6 0" stroke={line} strokeWidth="2.4" fill="none" strokeLinecap="round" />
+      ) : (
+        <path d="M94 113 q 6 -5 12 0" stroke={line} strokeWidth="2.4" fill="none" strokeLinecap="round" />
+      )}
 
-      {/* L9 왕관 */}
+      {/* 왕관 */}
       {L >= 9 && (
-        <g>
-          <path d="M82 20 l 6 -12 l 7 8 l 5 -12 l 5 12 l 7 -8 l 6 12 Z" fill="#e3b341" stroke="#9c824a" strokeWidth="1.5" />
-          <circle cx="88" cy="8" r="2" fill="#ef0107" />
-          <circle cx="100" cy="4" r="2.2" fill="#ef0107" />
-          <circle cx="112" cy="8" r="2" fill="#ef0107" />
+        <g transform="translate(0 -4)">
+          <path d="M80 50 l 6 -14 l 8 9 l 6 -14 l 6 14 l 8 -9 l 6 14 Z" fill="#f3c84b" stroke={line} strokeWidth="2.5" strokeLinejoin="round" />
+          <circle cx="86" cy="36" r="2.5" fill={red} />
+          <circle cx="100" cy="31" r="2.8" fill={red} />
+          <circle cx="114" cy="36" r="2.5" fill={red} />
         </g>
       )}
 
-      {/* L7 트로피 (왼손) */}
+      {/* 트로피 */}
       {L >= 7 && (
-        <g transform="translate(40 92)">
-          <path d="M8 0 h 16 v 8 a 8 8 0 0 1 -16 0 Z" fill="#e3b341" stroke="#9c824a" strokeWidth="1.5" />
-          <path d="M8 2 h -5 a 4 4 0 0 0 4 6 h 1 M24 2 h 5 a 4 4 0 0 1 -4 6 h -1" stroke="#e3b341" strokeWidth="2" fill="none" />
-          <rect x="14" y="15" width="4" height="7" fill="#e3b341" />
-          <rect x="9" y="22" width="14" height="4" rx="1" fill="#9c824a" />
+        <g transform="translate(26 108)">
+          <path d="M6 0 h 20 v 10 a 10 10 0 0 1 -20 0 Z" fill="#f3c84b" stroke={line} strokeWidth="2" />
+          <path d="M6 3 h -4 a 4 4 0 0 0 4 6 M26 3 h 4 a 4 4 0 0 1 -4 6" stroke={line} strokeWidth="2" fill="none" />
+          <rect x="13" y="19" width="6" height="6" fill="#f3c84b" stroke={line} strokeWidth="1.5" />
+          <rect x="8" y="25" width="16" height="4" rx="1.5" fill="#f3c84b" stroke={line} strokeWidth="1.5" />
         </g>
       )}
     </svg>

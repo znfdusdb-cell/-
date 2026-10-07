@@ -63,24 +63,24 @@ export async function uploadCheckin(fd: FormData): Promise<CheckinResult> {
 /** 인증 결과 모달. 닫으면 화면을 새로고침한다. */
 export function ResultModal({ result, onClose }: { result: CheckinResult; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6" onClick={onClose}>
       <div className="card w-full max-w-sm p-6 text-center animate-pop" onClick={(e) => e.stopPropagation()}>
         {result.leveledUp ? (
           <>
-            <div className="font-display text-3xl text-gold">LEVEL UP!</div>
-            <div className="flex justify-center my-2"><Character level={result.level} size={150} /></div>
-            <div className="font-display text-2xl">Lv.{result.level}</div>
+            <div className="text-xs font-extrabold tracking-widest text-red">LEVEL UP</div>
+            <div className="flex justify-center my-1"><Character level={result.level} size={150} /></div>
+            <div className="text-2xl font-extrabold">Lv.{result.level}</div>
           </>
         ) : (
-          <div className="text-5xl mb-2">{result.replaced ? "🔄" : result.completed ? "🎉" : "✅"}</div>
+          <div className="flex justify-center my-1"><Character level={result.level} size={110} /></div>
         )}
-        <div className="font-display text-2xl mt-1">{result.replaced ? "사진을 바꿨어요" : result.completed ? "완료!" : "인증 완료"}</div>
-        {result.xp > 0 && <div className="font-display text-4xl text-red-2 mt-1">+{result.xp} XP</div>}
+        <div className="text-xl font-extrabold mt-1">{result.replaced ? "사진을 바꿨어요" : result.completed ? "완료!" : "인증 완료"}</div>
+        {result.xp > 0 && <div className="text-3xl font-extrabold text-red mt-1 num">+{result.xp} XP</div>}
         <ul className="text-sm text-fg-2 mt-3 space-y-0.5">
           {result.reasons.map((r) => <li key={r}>{r}</li>)}
         </ul>
-        {result.streak > 1 && <div className="chip bg-bg-3 text-gold mt-3">🔥 {result.streak} 연속</div>}
-        <button className="btn btn-ghost w-full mt-5" onClick={onClose}>닫기</button>
+        {result.streak > 1 && <div className="chip bg-gold-soft text-gold mt-3">{result.streak} 연속</div>}
+        <button className="btn btn-dark w-full mt-5" onClick={onClose}>닫기</button>
       </div>
     </div>
   );
@@ -146,7 +146,7 @@ export function CheckinButton({
     <>
       <input ref={input} type="file" accept="image/*" {...(mode === "camera" ? { capture: "environment" } : {})} className="hidden" onChange={onFile} />
       <button type="button" className={className} disabled={disabled || busy} onClick={() => input.current?.click()}>
-        {busy ? "올리는 중…" : <>{mode === "camera" ? "📷" : "🖼️"} {label}</>}
+        {busy ? "올리는 중…" : label}
       </button>
       {error && <p className="text-sm text-bad mt-2">{error}</p>}
       {result && <ResultModal result={result} onClose={close} />}
@@ -231,7 +231,7 @@ export function AudioRecordButton({ challengeId, label, className = "btn btn-gho
     router.refresh();
   }
 
-  if (!supported) return <button type="button" className={className} disabled>🎙️ 이 브라우저는 녹음 미지원</button>;
+  if (!supported) return <button type="button" className={className} disabled>녹음 미지원</button>;
   return (
     <>
       {state === "recording" ? (
@@ -240,11 +240,57 @@ export function AudioRecordButton({ challengeId, label, className = "btn btn-gho
         </button>
       ) : (
         <button type="button" className={className} disabled={state === "uploading"} onClick={start}>
-          {state === "uploading" ? "올리는 중…" : <>🎙️ {label}</>}
+          {state === "uploading" ? "올리는 중…" : label}
         </button>
       )}
       {error && <p className="text-sm text-bad mt-2">{error}</p>}
       {result && <ResultModal result={result} onClose={close} />}
+    </>
+  );
+}
+
+/** 링크 인증 버튼: 누르면 주소 입력칸이 열리고, 올리면 끝. */
+export function LinkCheckinButton({ challengeId, label, className = "btn btn-ghost w-full" }: { challengeId: string; label: string; className?: string }) {
+  const [open, setOpen] = useState(false);
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<CheckinResult | null>(null);
+  const router = useRouter();
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.set("challenge_id", challengeId);
+      fd.set("media", "link");
+      fd.set("link_url", url.trim());
+      fd.set("taken_at", String(Date.now()));
+      const data = await uploadCheckin(fd);
+      if (!data.ok) return setError(data.error ?? "실패했어요");
+      setResult(data);
+      setOpen(false);
+      setUrl("");
+    } catch {
+      setError("네트워크 오류. 다시 시도해 주세요");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button type="button" className={className} onClick={() => setOpen((o) => !o)}>{label}</button>
+      {open && (
+        <form onSubmit={submit} className="col-span-full flex gap-2 mt-1">
+          <input className="input py-2" type="url" inputMode="url" placeholder="https://… (블로그, 유튜브, 스트라바 등)" value={url} onChange={(e) => setUrl(e.target.value)} required autoFocus />
+          <button type="submit" className="btn btn-dark text-sm py-2 px-4 shrink-0" disabled={busy}>{busy ? "…" : "올리기"}</button>
+        </form>
+      )}
+      {error && <p className="col-span-full text-sm text-bad mt-1">{error}</p>}
+      {result && <ResultModal result={result} onClose={() => { setResult(null); router.refresh(); }} />}
     </>
   );
 }
