@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Challenge, Checkin, Gift, Participation, PushSubscriptionRow, User, WeightLog } from "../types";
+import type { Challenge, Checkin, Gift, Participation, PushSubscriptionRow, Ticket, TicketMessage, User, WeightLog } from "../types";
 import type { CheckinQuery, ParticipantRow, Repo } from "./types";
 
 type Store = {
@@ -11,6 +11,8 @@ type Store = {
   pushSubs: PushSubscriptionRow[];
   weights: WeightLog[];
   gifts: Gift[];
+  tickets: Ticket[];
+  ticketMessages: TicketMessage[];
   notices: Set<string>;
   xpLog: { user_id: string; delta: number; reason: string; created_at: string }[];
 };
@@ -28,6 +30,8 @@ function store(): Store {
       pushSubs: [],
       weights: [],
       gifts: [],
+      tickets: [],
+      ticketMessages: [],
       notices: new Set(),
       xpLog: [],
     };
@@ -202,6 +206,40 @@ export class MemoryRepo implements Repo {
     return store().gifts.filter((g) => g.to_user_id === userId && !g.opened_at).length;
   }
 
+  async getOpenTicket(userId: string) {
+    return clone(store().tickets.find((t) => t.user_id === userId && t.status === "open") ?? null);
+  }
+  async getLatestTicket(userId: string) {
+    return clone([...store().tickets].filter((t) => t.user_id === userId).sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? null);
+  }
+  async getTicket(id: string) {
+    return clone(store().tickets.find((t) => t.id === id) ?? null);
+  }
+  async createTicket(userId: string) {
+    const t: Ticket = { id: randomUUID(), user_id: userId, status: "open", created_at: now(), updated_at: now(), resolved_at: null, user_read_at: null, admin_read_at: null };
+    store().tickets.push(t);
+    return clone(t);
+  }
+  async listOpenTickets() {
+    return clone(store().tickets.filter((t) => t.status === "open").sort((a, b) => b.updated_at.localeCompare(a.updated_at)));
+  }
+  async updateTicket(id: string, patch: Partial<Omit<Ticket, "id">>) {
+    const t = store().tickets.find((x) => x.id === id);
+    if (!t) throw new Error("ticket not found");
+    Object.assign(t, patch);
+    return clone(t);
+  }
+  async listTicketMessages(ticketId: string) {
+    return clone(store().ticketMessages.filter((m) => m.ticket_id === ticketId).sort((a, b) => a.created_at.localeCompare(b.created_at)));
+  }
+  async addTicketMessage(data: Omit<TicketMessage, "id" | "created_at">) {
+    const m: TicketMessage = { id: randomUUID(), created_at: now(), ...data };
+    store().ticketMessages.push(m);
+    const t = store().tickets.find((x) => x.id === data.ticket_id);
+    if (t) t.updated_at = m.created_at;
+    return clone(m);
+  }
+
   async putPhoto(path: string, bytes: Uint8Array, contentType: string) {
     store().photos.set(path, { bytes, contentType });
   }
@@ -230,6 +268,9 @@ export class MemoryRepo implements Repo {
   async listPushSubscriptions(userIds?: string[]) {
     const set = userIds ? new Set(userIds) : null;
     return clone(store().pushSubs.filter((x) => !set || set.has(x.user_id)));
+  }
+  async hasNotice(key: string) {
+    return store().notices.has(key);
   }
   async claimNotice(key: string) {
     const s = store();
