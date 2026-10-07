@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { currentUser, isAdmin, toPublic } from "@/lib/current-user";
 import { getRepo } from "@/lib/repo";
 import { describeConfig, levelFromXp } from "@/lib/game";
-import { pushEnabled } from "@/lib/push";
+import { pushEnabled, vapidProblem } from "@/lib/push";
 import { fmtDateTimeKo } from "@/lib/time";
 import { Shell } from "@/components/Shell";
 import { AdminUserRow } from "@/components/AdminUserRow";
@@ -23,7 +23,7 @@ export default async function AdminPage() {
     <Shell user={toPublic(user)} title="관리">
       <section className="card p-4 text-xs text-fg-2 space-y-1">
         <div>저장소: <b className="text-fg">{repo.mode === "supabase" ? "Supabase" : "메모리(임시 · 재시작하면 사라짐)"}</b></div>
-        <div>알림(웹 푸시): <b className="text-fg">{pushEnabled() ? "켜짐" : "VAPID 키 없음"}</b> · 구독 {subs.length}건</div>
+        <div>알림(웹 푸시): <b className={vapidProblem() ? "text-bad" : "text-fg"}>{vapidProblem() ?? "키 정상"}</b> · 구독 {subs.length}건{pushEnabled() ? "" : ""}</div>
         <div>크론: <code>/api/cron/remind?key=CRON_SECRET</code> 를 30분마다 호출 (README 참고)</div>
       </section>
 

@@ -106,11 +106,11 @@ export async function GET(req: Request) {
 
   if (dry) return Response.json({ ok: true, dry: true, push: pushEnabled(), now: now.toISOString(), planned });
 
-  const results: { key: string; users: number; sent: number }[] = [];
+  const results: { key: string; users: number; sent: number; reason?: string }[] = [];
   for (const item of planned) {
     if (!(await repo.claimNotice(item.key))) continue;
-    const sent = await sendPushToUsers(item.userIds, item.payload);
-    results.push({ key: item.key, users: item.userIds.length, sent });
+    const r = await sendPushToUsers(item.userIds, item.payload);
+    results.push({ key: item.key, users: item.userIds.length, sent: r.sent, ...(r.reason ? { reason: r.reason } : {}) });
   }
   return Response.json({ ok: true, push: pushEnabled(), now: now.toISOString(), results });
 }
