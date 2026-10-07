@@ -53,7 +53,7 @@ export class MemoryRepo implements Repo {
   async listUsers() {
     return clone([...store().users].sort((a, b) => b.xp - a.xp));
   }
-  async createUser(data: Pick<User, "username" | "display_name" | "password_hash" | "role">) {
+  async createUser(data: Pick<User, "username" | "display_name" | "password_hash" | "role" | "gender">) {
     const u: User = { id: randomUUID(), xp: 0, created_at: now(), last_login_at: null, ...data };
     store().users.push(u);
     return clone(u);

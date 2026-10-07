@@ -3,11 +3,13 @@
 import { useActionState, useState } from "react";
 import { login, signup } from "@/app/actions";
 import { FormMessage, SubmitButton } from "./Form";
+import { Character } from "./Character";
 
 export function LoginForm({ next, inviteRequired }: { next: string; inviteRequired: boolean }) {
   const [tab, setTab] = useState<"login" | "signup">("login");
   const [loginState, loginAction] = useActionState(login, null);
   const [signupState, signupAction] = useActionState(signup, null);
+  const [gender, setGender] = useState<"m" | "f">("f");
 
   return (
     <div className="card p-5">
@@ -46,6 +48,18 @@ export function LoginForm({ next, inviteRequired }: { next: string; inviteRequir
           <div>
             <label className="label" htmlFor="s-password2">비밀번호 확인</label>
             <input id="s-password2" name="password2" type="password" className="input" autoComplete="new-password" required />
+          </div>
+          <div>
+            <label className="label">내 캐릭터</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(["f", "m"] as const).map((g) => (
+                <button key={g} type="button" onClick={() => setGender(g)} className={`rounded-2xl border-2 p-2 flex flex-col items-center gap-1 ${gender === g ? "border-fg bg-bg-3" : "border-line"}`}>
+                  <Character level={1} gender={g} size={72} />
+                  <span className="text-xs font-bold">{g === "f" ? "여" : "남"}</span>
+                </button>
+              ))}
+            </div>
+            <input type="hidden" name="gender" value={gender} />
           </div>
           {inviteRequired && (
             <div>

@@ -68,7 +68,9 @@ export async function signup(_prev: ActionResult | null, fd: FormData): Promise<
   if (required && invite !== required) return { ok: false, error: "초대 코드가 맞지 않아요 (톡방에서 확인)" };
   const repo = getRepo();
   if (await repo.getUserByUsername(username)) return { ok: false, error: "이미 있는 아이디예요" };
-  const user = await repo.createUser({ username, display_name: username, password_hash: await hashPassword(password), role: "member" });
+  const gender = str(fd, "gender") === "f" ? "f" : str(fd, "gender") === "m" ? "m" : null;
+  if (!gender) return { ok: false, error: "캐릭터 성별을 골라 주세요" };
+  const user = await repo.createUser({ username, display_name: username, password_hash: await hashPassword(password), role: "member", gender });
   await repo.updateUser(user.id, { last_login_at: new Date().toISOString() });
   await setSessionCookie(user.id);
   redirect("/onboarding");
@@ -97,6 +99,14 @@ export async function updateDisplayName(_prev: ActionResult | null, fd: FormData
   await getRepo().updateUser(user.id, { display_name: name });
   revalidatePath("/", "layout");
   return { ok: true, message: "닉네임을 바꿨어요" };
+}
+
+export async function updateGender(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const user = await requireUser();
+  const gender = str(fd, "gender") === "f" ? "f" : "m";
+  await getRepo().updateUser(user.id, { gender });
+  revalidatePath("/", "layout");
+  return { ok: true, message: "캐릭터를 바꿨어요" };
 }
 
 /* ───────── 참여 ───────── */

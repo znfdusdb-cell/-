@@ -24,7 +24,7 @@ export default async function MePage() {
   return (
     <Shell user={toPublic(user)} title="내 정보">
       <section className="card p-5 text-center">
-        <div className="flex justify-center"><Character level={level} size={180} className="animate-float" /></div>
+        <div className="flex justify-center"><Character level={level} gender={user.gender} size={180} className="animate-float" /></div>
         <div className="text-2xl font-extrabold mt-1">{user.display_name}</div>
         <div className="text-xs text-fg-3">@{user.username}{user.role === "admin" ? " · 관리자" : ""}</div>
         <div className="mt-3 text-left"><XpBar xp={user.xp} /></div>
@@ -45,7 +45,7 @@ export default async function MePage() {
         <ol className="space-y-1.5">
           {LEVEL_PERKS.map((p) => (
             <li key={p.level} className={`flex items-center gap-3 text-sm ${p.level <= level ? "" : "opacity-60"}`}>
-              <Character level={p.level} size={36} />
+              <Character level={p.level} gender={user.gender} size={36} />
               <div className="flex-1">
                 <div className="flex items-center gap-2"><span className="text-red font-bold">Lv.{p.level}</span><span className="font-semibold">{p.title}</span>{p.level <= level && <span className="text-ok text-xs font-bold">달성</span>}</div>
                 <div className="text-xs text-fg-2">{p.look} · {xpForLevel(p.level)} XP</div>
@@ -55,7 +55,7 @@ export default async function MePage() {
         </ol>
       </section>
 
-      <ProfileForms displayName={user.display_name} />
+      <ProfileForms displayName={user.display_name} gender={user.gender} />
 
       <form action={logout} className="mt-4">
         <button className="btn btn-ghost w-full text-sm">로그아웃</button>

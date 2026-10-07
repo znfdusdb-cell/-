@@ -66,7 +66,7 @@ export class SupabaseRepo implements Repo {
   listUsers() {
     return this.many<User>(this.sb.from("ch_users").select("*").order("xp", { ascending: false }), "listUsers");
   }
-  createUser(data: Pick<User, "username" | "display_name" | "password_hash" | "role">) {
+  createUser(data: Pick<User, "username" | "display_name" | "password_hash" | "role" | "gender">) {
     return this.one<User>(this.sb.from("ch_users").insert(data).select("*").single(), "createUser");
   }
   updateUser(id: string, patch: Partial<Omit<User, "id">>) {

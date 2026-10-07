@@ -19,7 +19,7 @@ export default async function OnboardingPage() {
   return (
     <div className="mx-auto w-full max-w-md min-h-dvh px-4 pt-[max(env(safe-area-inset-top),1.5rem)] pb-10">
       <div className="flex items-center gap-3">
-        <Character level={1} size={76} />
+        <Character level={1} gender={user.gender} size={76} />
         <div>
           <h1 className="text-2xl font-extrabold">반가워요, {pub.display_name}</h1>
           <p className="text-fg-2 text-sm">참여할 챌린지를 고르세요. 매주 월요일에 시작해요.</p>

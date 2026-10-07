@@ -39,6 +39,7 @@ async function bootstrap() {
       display_name: ADMIN_USERNAME,
       password_hash: await hashPassword(process.env.ADMIN_PASSWORD?.trim() || "4581"),
       role: "admin",
+      gender: "m",
     });
   } else if (admin.role !== "admin") {
     admin = await repo.updateUser(admin.id, { role: "admin" });

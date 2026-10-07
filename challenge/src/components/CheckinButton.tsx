@@ -12,6 +12,7 @@ export type CheckinResult = {
   reasons: string[];
   totalXp: number;
   level: number;
+  gender?: "m" | "f";
   leveledUp: boolean;
   completed: boolean;
   streak: number;
@@ -68,11 +69,11 @@ export function ResultModal({ result, onClose }: { result: CheckinResult; onClos
         {result.leveledUp ? (
           <>
             <div className="text-xs font-extrabold tracking-widest text-red">LEVEL UP</div>
-            <div className="flex justify-center my-1"><Character level={result.level} size={150} /></div>
+            <div className="flex justify-center my-1"><Character level={result.level} gender={result.gender} size={150} /></div>
             <div className="text-2xl font-extrabold">Lv.{result.level}</div>
           </>
         ) : (
-          <div className="flex justify-center my-1"><Character level={result.level} size={110} /></div>
+          <div className="flex justify-center my-1"><Character level={result.level} gender={result.gender} size={110} /></div>
         )}
         <div className="text-xl font-extrabold mt-1">{result.replaced ? "사진을 바꿨어요" : result.completed ? "완료!" : "인증 완료"}</div>
         {result.xp > 0 && <div className="text-3xl font-extrabold text-red mt-1 num">+{result.xp} XP</div>}

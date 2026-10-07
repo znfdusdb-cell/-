@@ -36,7 +36,7 @@ export default async function HomePage() {
   return (
     <Shell user={pub} title="거너스 챌린지" right={<span className="num">{fmtDateKo(today)}</span>}>
       <section className="card p-4 flex items-center gap-3">
-        <Link href="/me" className="shrink-0"><Character level={level} size={112} className="animate-float" mood={anyEliminated ? "sad" : "happy"} /></Link>
+        <Link href="/me" className="shrink-0"><Character level={level} gender={user.gender} size={112} className="animate-float" mood={anyEliminated ? "sad" : "happy"} /></Link>
         <div className="flex-1 min-w-0">
           <div className="text-lg font-extrabold truncate">{pub.display_name}</div>
           <XpBar xp={user.xp} />

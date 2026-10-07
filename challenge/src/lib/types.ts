@@ -6,6 +6,8 @@ export type User = {
   display_name: string;
   password_hash: string;
   role: Role;
+  /** 캐릭터 성별 */
+  gender: "m" | "f";
   xp: number;
   created_at: string;
   last_login_at: string | null;
