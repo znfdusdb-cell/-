@@ -20,7 +20,6 @@ export default async function HomePage() {
   const user = await currentUser();
   if (!user) redirect("/login");
   const mine = await loadMyChallenges(user);
-  if (mine.length === 0) redirect("/onboarding");
   const pub = toPublic(user);
   const level = levelFromXp(user.xp);
   const nextPerk = LEVEL_PERKS.find((p) => p.level > level);
@@ -45,6 +44,15 @@ export default async function HomePage() {
       </section>
 
       <div className="mt-3"><InstallHint /></div>
+
+      {mine.length === 0 && (
+        <section className="card p-5 mt-3 text-center">
+          <div className="font-extrabold">아직 참여 중인 챌린지가 없어요</div>
+          <p className="text-sm text-fg-2 mt-1">챌린지는 매주 월요일에 시작해요. 지금 참여해 두면 월요일 아침에 알려 드려요.</p>
+          <Link href="/onboarding" className="btn btn-red w-full mt-3">챌린지 고르기</Link>
+          <p className="text-[11px] text-fg-3 mt-2">원하는 게 없으면 Lv.{CREATE_CHALLENGE_LEVEL}부터 직접 만들 수 있어요. 내 정보 탭에서 로그아웃할 수 있어요.</p>
+        </section>
+      )}
 
       <div className="space-y-3 mt-3">
         {mine.map(({ challenge: ch, participation: p, summary: s }) => {
