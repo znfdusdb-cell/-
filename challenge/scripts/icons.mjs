@@ -1,42 +1,44 @@
-// PNG 아이콘 재생성: npm run icons
-// Playwright(Chromium)가 있으면 그걸로, 없으면 ImageMagick(rsvg 델리게이트 필요)로 그린다.
-import { execSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+// 앱 아이콘·OG 이미지 재생성: npm run icons  (Playwright Chromium 사용)
 import { createRequire } from "node:module";
+import { execSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
+const req = createRequire(process.env.NODE_PATH ? process.env.NODE_PATH + "/" : import.meta.url);
+const pw = req("playwright");
+const char = (lv) => execSync(`npx tsx scripts/render-character.tsx ${lv}`, { encoding: "utf8" });
+const c3 = char(3);
+const c6 = char(6);
 
-const jobs = [
-  ["scripts/icon.svg", 512, "public/icons/icon-512.png"],
-  ["scripts/icon.svg", 192, "public/icons/icon-192.png"],
-  ["scripts/icon.svg", 180, "public/icons/apple-touch-icon.png"],
-  ["scripts/icon-maskable.svg", 512, "public/icons/icon-512-maskable.png"],
-  ["scripts/badge.svg", 96, "public/icons/badge-96.png"],
-  ["scripts/icon.svg", 48, "public/favicon.png"],
+const iconHtml = (size, rounded) => `<!doctype html><html><body style="margin:0;width:${size}px;height:${size}px;overflow:hidden">
+<div style="width:${size}px;height:${size}px;background:linear-gradient(160deg,#ff3b4e,#c80021);border-radius:${rounded ? Math.round(size * 0.22) : 0}px;display:flex;align-items:center;justify-content:center">
+<div style="width:${Math.round(size * 0.86)}px;height:${Math.round(size * 0.86)}px;transform:translateY(${Math.round(size * 0.03)}px)">${c3.replace('width="200" height="200"', 'width="100%" height="100%"')}</div></div></body></html>`;
+
+const ogHtml = `<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;width:1200px;height:630px;background:#fff7f1;font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;display:flex;align-items:center;gap:40px;padding:0 90px;box-sizing:border-box;overflow:hidden;position:relative}
+.blob{position:absolute;right:-120px;top:-140px;width:520px;height:520px;border-radius:50%;background:#ffe3e6}
+.char{width:380px;height:380px;flex:none;position:relative}
+h1{font-size:92px;margin:0;line-height:1.05;font-weight:800;color:#1a1614;letter-spacing:-.02em;position:relative}
+p{font-size:34px;margin:16px 0 0;color:#5c5651;line-height:1.35;position:relative}
+.tag{display:inline-block;margin-top:26px;background:#e4002b;color:#fff;font-size:28px;font-weight:700;padding:10px 24px;border-radius:999px;position:relative}
+</style></head><body><div class="blob"></div>
+<div class="char">${c6.replace('width="200" height="200"', 'width="100%" height="100%"')}</div>
+<div><h1>거너스 챌린지</h1><p>아스날 인사이드 톡방<br>다이어트 · 취미 인증하고 레벨업</p><div class="tag">실패하면 메가커피 쏘기</div></div>
+</body></html>`;
+
+const browser = await pw.chromium.launch();
+const page = await browser.newPage({ deviceScaleFactor: 1 });
+const shots = [
+  [512, true, "public/icons/icon-512.png"], [192, true, "public/icons/icon-192.png"], [180, true, "public/icons/apple-touch-icon.png"],
+  [512, false, "public/icons/icon-512-maskable.png"], [96, true, "public/icons/badge-96.png"], [48, true, "public/favicon.png"],
 ];
-
-async function withPlaywright() {
-  let pw;
-  try {
-    pw = createRequire(import.meta.url)("playwright");
-  } catch {
-    try { pw = createRequire(process.env.NODE_PATH ? process.env.NODE_PATH + "/" : "/usr/lib/node_modules/")("playwright"); } catch { return false; }
-  }
-  const browser = await pw.chromium.launch();
-  const page = await browser.newPage({ deviceScaleFactor: 1 });
-  for (const [src, size, out] of jobs) {
-    const svg = readFileSync(src, "utf8");
-    await page.setViewportSize({ width: size, height: size });
-    await page.setContent(`<html><body style="margin:0;background:transparent"><img src="data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}" width="${size}" height="${size}" style="display:block"></body></html>`);
-    const buf = await page.screenshot({ omitBackground: true, clip: { x: 0, y: 0, width: size, height: size } });
-    writeFileSync(out, buf);
-    console.log("wrote", out);
-  }
-  await browser.close();
-  return true;
+for (const [size, rounded, out] of shots) {
+  await page.setViewportSize({ width: size, height: size });
+  await page.setContent(iconHtml(size, rounded));
+  writeFileSync(out, await page.screenshot({ omitBackground: true, clip: { x: 0, y: 0, width: size, height: size } }));
+  console.log("wrote", out);
 }
-
-if (!(await withPlaywright())) {
-  for (const [src, size, out] of jobs) {
-    execSync(`convert -background none -density 384 ${src} -resize ${size}x${size} ${out}`, { stdio: "inherit" });
-    console.log("wrote", out);
-  }
-}
+await page.setViewportSize({ width: 1200, height: 630 });
+await page.setContent(ogHtml);
+await page.waitForTimeout(300);
+writeFileSync("public/og.png", await page.screenshot({ clip: { x: 0, y: 0, width: 1200, height: 630 } }));
+console.log("wrote public/og.png");
+await browser.close();

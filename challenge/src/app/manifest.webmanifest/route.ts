@@ -8,8 +8,8 @@ export function GET() {
       scope: "/",
       display: "standalone",
       orientation: "portrait",
-      background_color: "#0b0f1c",
-      theme_color: "#0b0f1c",
+      background_color: "#f6f5f2",
+      theme_color: "#f6f5f2",
       lang: "ko",
       icons: [
         { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },

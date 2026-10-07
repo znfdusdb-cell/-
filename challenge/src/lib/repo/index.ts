@@ -3,7 +3,7 @@ import { MemoryRepo } from "./memory";
 import { hasSupabase, SupabaseRepo } from "./supabase";
 import type { Repo } from "./types";
 import { hashPassword } from "../password";
-import { DEFAULT_DIET_CONFIG, DEFAULT_HOBBY_CONFIG, DEFAULT_PRIZE } from "../game";
+import { DEFAULT_DIET_CONFIG, DEFAULT_HOBBY_CONFIG, DEFAULT_PENALTY } from "../game";
 
 export type { Repo, ParticipantRow, CheckinQuery } from "./types";
 
@@ -49,9 +49,10 @@ async function bootstrap() {
     await repo.createChallenge({
       type: "diet",
       title: "다이어트 챌린지",
-      description: "매일 점심(11~14시)과 저녁(17~20시)에 먹은 걸 앱 카메라로 찍어 올려요. 시간 안에 못 올리면 그날은 실패.",
+      description: "매일 점심(11~14시)과 저녁(17~20시)에 먹은 걸 앱 카메라로 찍어 올려요.",
       emoji: "🥗",
-      prize: DEFAULT_PRIZE,
+      penalty: DEFAULT_PENALTY,
+      max_fails: 3,
       config: DEFAULT_DIET_CONFIG,
       created_by: admin.id,
       is_default: true,
@@ -62,9 +63,10 @@ async function bootstrap() {
     await repo.createChallenge({
       type: "hobby",
       title: "취미 챌린지",
-      description: "하고 싶은 취미를 정하고, 1주일에 1번 사진으로 인증해요. 기간 안에 인증 못 하면 그 주는 실패.",
+      description: "하고 싶은 취미를 정하고, 1주일에 1번 인증해요. 촬영·앨범·녹음·링크 중 취미에 맞는 방법으로.",
       emoji: "🎨",
-      prize: DEFAULT_PRIZE,
+      penalty: DEFAULT_PENALTY,
+      max_fails: 3,
       config: DEFAULT_HOBBY_CONFIG,
       created_by: admin.id,
       is_default: true,

@@ -243,11 +243,36 @@ export function countSummary(cfg: CountConfig, p: Participation, checkins: Check
   return { kind: "count", current, streak, failPeriods, completePeriods, totalCounted, startDate: start };
 }
 
-export type Summary = SlotsSummary | CountSummary;
+export type Summary = (SlotsSummary | CountSummary) & {
+  /** 지금까지 실패 횟수 (시간대형: 실패한 날, 횟수형: 실패한 기간) */
+  fails: number;
+  maxFails: number;
+  /** 실패가 한도에 닿아 탈락 */
+  eliminated: boolean;
+};
 
 export function summarize(ch: Challenge, p: Participation, checkins: Checkin[], now: Date = new Date()): Summary {
   const mine = checkins.filter((c) => c.participation_id === p.id);
-  return ch.config.kind === "slots" ? slotsSummary(ch.config, p, mine, now) : countSummary(ch.config, p, mine, now);
+  const base = ch.config.kind === "slots" ? slotsSummary(ch.config, p, mine, now) : countSummary(ch.config, p, mine, now);
+  const fails = base.kind === "slots" ? base.failDays : base.failPeriods;
+  const maxFails = ch.max_fails ?? 0;
+  return { ...base, fails, maxFails, eliminated: maxFails > 0 && fails >= maxFails };
+}
+
+/** 체중 목표 계산. remainingKg 는 아직 더 빼야 하는 양, ratio 는 0~1 진행도 */
+export function weightProgress(startKg: number, targetLossKg: number, currentKg: number | null) {
+  const goalKg = Math.round((startKg - targetLossKg) * 10) / 10;
+  const cur = currentKg ?? startKg;
+  const lost = Math.max(0, startKg - cur);
+  const ratio = targetLossKg > 0 ? Math.min(1, lost / targetLossKg) : 0;
+  const remainingKg = Math.max(0, Math.round((cur - goalKg) * 10) / 10);
+  return { goalKg, lost: Math.round(lost * 10) / 10, ratio, remainingKg, reached: cur <= goalKg };
+}
+
+/** 남은 기간 동안 매일 줄여야 하는 칼로리 (지방 1kg ≈ 7,700kcal) */
+export function dailyCalorieDeficit(remainingKg: number, remainingDays: number): number {
+  if (remainingDays <= 0 || remainingKg <= 0) return 0;
+  return Math.round((remainingKg * 7700) / remainingDays / 10) * 10;
 }
 
 /* ───────── 인증 시 경험치 계산 ───────── */
@@ -322,7 +347,7 @@ export const DEFAULT_HOBBY_CONFIG: CountConfig = {
   goal: "hobby",
 };
 
-export const DEFAULT_PRIZE = "메가커피 아메리카노 쿠폰";
+export const DEFAULT_PENALTY = "톡방에 메가커피 아메리카노 쿠폰 쏘기";
 
 /** 설정 한 줄 설명 */
 export function describeConfig(cfg: ChallengeConfig): string {

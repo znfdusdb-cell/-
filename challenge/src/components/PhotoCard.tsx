@@ -1,33 +1,45 @@
 import { fmtTimeKo } from "@/lib/time";
 import { levelFromXp } from "@/lib/game";
+import { linkDomain, youtubeEmbed } from "@/lib/methods";
 import type { Checkin, User } from "@/lib/types";
+import { ProtectedImage } from "./ProtectedMedia";
+import { DeleteCheckinButton } from "./DeleteCheckinButton";
 
-/** 갤러리 사진 1장: 사진 + 촬영 시각 + 사용자 */
-export function PhotoCard({ checkin, user, url, caption }: { checkin: Checkin; user: Pick<User, "display_name" | "xp">; url: string | undefined; caption?: string }) {
+/** 갤러리 카드 1장: 사진·녹음·링크 + 시각 + 사용자. 사진은 저장 못 하게 막는다. */
+export function PhotoCard({ checkin, user, url, caption, canDelete }: { checkin: Checkin; user: Pick<User, "display_name" | "xp">; url: string | undefined; caption?: string; canDelete: boolean }) {
+  const kind = checkin.media_type;
+  const embed = kind === "link" ? youtubeEmbed(checkin.link_url) : null;
   return (
     <figure className="card overflow-hidden">
       <div className="relative aspect-square bg-bg-3">
-        {checkin.media_type === "audio" ? (
+        {kind === "audio" ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-3">
-            <div className="text-5xl">🎙️</div>
-            {url ? <audio controls preload="none" src={url} className="w-full max-w-full" /> : <div className="text-fg-3 text-sm">녹음 없음</div>}
+            <div className="text-xs font-bold text-fg-2">녹음</div>
+            {url ? <audio controls controlsList="nodownload" preload="none" src={url} className="w-full" /> : <div className="text-fg-3 text-sm">없음</div>}
           </div>
+        ) : kind === "link" ? (
+          embed ? (
+            <iframe src={embed} title="유튜브" className="absolute inset-0 w-full h-full" allow="accelerometer; encrypted-media; picture-in-picture" allowFullScreen />
+          ) : (
+            <a href={checkin.link_url} target="_blank" rel="noreferrer noopener" className="absolute inset-0 flex flex-col items-center justify-center gap-1 p-3 text-center">
+              <div className="text-xs font-bold text-fg-2">링크</div>
+              <div className="font-extrabold break-all line-clamp-2">{linkDomain(checkin.link_url)}</div>
+              <div className="text-[11px] text-fg-3 break-all line-clamp-2">{checkin.link_url.replace(/^https?:\/\//, "")}</div>
+            </a>
+          )
         ) : url ? (
-          <a href={url} target="_blank" rel="noreferrer" aria-label="원본 크게 보기">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={url} alt={`${user.display_name} ${caption ?? ""}`} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
-          </a>
+          <ProtectedImage url={url} alt={`${user.display_name} ${caption ?? ""}`} />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-fg-3 text-sm">사진 없음</div>
         )}
-        <div className="absolute bottom-1 right-1 chip bg-black/60 text-white num">
-          {checkin.media_type === "camera" ? "📷" : checkin.media_type === "album" ? "🖼️" : "🎙️"} {fmtTimeKo(checkin.taken_at)}
+        <div className="absolute bottom-1.5 right-1.5 chip bg-black/60 text-white num pointer-events-none">
+          {kind === "camera" ? "촬영" : kind === "album" ? "앨범" : kind === "audio" ? "녹음" : "링크"} {fmtTimeKo(checkin.taken_at)}
         </div>
-        {caption && <div className="absolute top-1 left-1 chip bg-red text-white">{caption}</div>}
+        {caption && <div className="absolute top-1.5 left-1.5 chip bg-white/90 text-fg pointer-events-none">{caption}</div>}
       </div>
       <figcaption className="px-2.5 py-1.5 flex items-center justify-between text-xs">
-        <span className="font-semibold truncate">{user.display_name}</span>
-        <span className="text-gold">Lv.{levelFromXp(user.xp)}</span>
+        <span className="font-bold truncate">{user.display_name} <span className="text-red font-bold">Lv.{levelFromXp(user.xp)}</span></span>
+        {canDelete && <DeleteCheckinButton checkinId={checkin.id} />}
       </figcaption>
     </figure>
   );

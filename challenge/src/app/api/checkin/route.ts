@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { currentUser } from "@/lib/current-user";
 import { getRepo } from "@/lib/repo";
-import { dayStatus, effectiveStartDate, levelFromXp, rewardFor } from "@/lib/game";
+import { dayStatus, effectiveStartDate, levelFromXp, rewardFor, summarize } from "@/lib/game";
+import { normalizeMethods } from "@/lib/methods";
 import { fmtDateKo, fmtHmKo, kstDate } from "@/lib/time";
 import type { Checkin } from "@/lib/types";
 
@@ -29,14 +30,29 @@ export async function POST(req: Request) {
   const challengeId = String(fd.get("challenge_id") ?? "");
   const slotKey = String(fd.get("slot") ?? "");
   const mediaRaw = String(fd.get("media") ?? "camera");
-  const media: Checkin["media_type"] = mediaRaw === "album" ? "album" : mediaRaw === "audio" ? "audio" : "camera";
+  const media: Checkin["media_type"] = mediaRaw === "album" ? "album" : mediaRaw === "audio" ? "audio" : mediaRaw === "link" ? "link" : "camera";
   const takenAtMs = Number(fd.get("taken_at") ?? NaN);
-  const file = fd.get("file") ?? fd.get("photo");
-  if (!(file instanceof File)) return bad("파일이 없어요");
-  if (file.size > MAX_BYTES) return bad("파일이 너무 커요 (12MB 이하)");
-  const baseType = file.type.split(";")[0].trim();
-  const ext = media === "audio" ? AUDIO_EXT[baseType] : IMAGE_EXT[baseType];
-  if (!ext) return bad(media === "audio" ? "지원하지 않는 오디오 형식이에요" : "이미지 파일만 올릴 수 있어요");
+  let linkUrl = "";
+  let file: File | null = null;
+  let baseType = "";
+  let ext = "";
+  if (media === "link") {
+    linkUrl = String(fd.get("link_url") ?? "").trim();
+    try {
+      const u = new URL(linkUrl);
+      if (!/^https?:$/.test(u.protocol) || linkUrl.length > 500) throw new Error();
+    } catch {
+      return bad("http(s)로 시작하는 링크를 넣어 주세요");
+    }
+  } else {
+    const f = fd.get("file") ?? fd.get("photo");
+    if (!(f instanceof File)) return bad("파일이 없어요");
+    if (f.size > MAX_BYTES) return bad("파일이 너무 커요 (12MB 이하)");
+    file = f;
+    baseType = f.type.split(";")[0].trim();
+    ext = (media === "audio" ? AUDIO_EXT[baseType] : IMAGE_EXT[baseType]) ?? "";
+    if (!ext) return bad(media === "audio" ? "지원하지 않는 오디오 형식이에요" : "이미지 파일만 올릴 수 있어요");
+  }
 
   const ch = await repo.getChallenge(challengeId);
   if (!ch || !ch.is_active) return bad("없는 챌린지예요");
@@ -47,6 +63,12 @@ export async function POST(req: Request) {
   const today = kstDate(now);
   const start = effectiveStartDate(p, ch.config);
   if (today < start) return bad(`이 챌린지는 ${fmtDateKo(start)}부터 시작해요. 그날 아침에 알려 드릴게요!`);
+  const allMine = await repo.listCheckins({ participationId: p.id });
+  if (summarize(ch, p, allMine, now).eliminated) return bad(`실패 ${ch.max_fails}번으로 탈락했어요. 벌칙(${ch.penalty})을 하고 '다시 도전'을 눌러 주세요`);
+  if (ch.config.kind === "count" && ch.config.goal === "hobby") {
+    const allowed = normalizeMethods(p.goal.methods);
+    if (allowed.length && !allowed.includes(media)) return bad("이 취미에 설정한 인증 방식이 아니에요. 목표 수정에서 바꿀 수 있어요");
+  }
   const takenAt = Number.isFinite(takenAtMs) && Math.abs(takenAtMs - now.getTime()) <= 10 * 60 * 1000 ? new Date(takenAtMs) : now;
 
   let slot = "count";
@@ -64,8 +86,11 @@ export async function POST(req: Request) {
     if (st.checkin) replacing = st.checkin.id;
   }
 
-  const path = `${ch.id}/${user.id}/${today}/${slot}-${randomUUID()}.${ext}`;
-  await repo.putPhoto(path, new Uint8Array(await file.arrayBuffer()), baseType);
+  let path = "";
+  if (file) {
+    path = `${ch.id}/${user.id}/${today}/${slot}-${randomUUID()}.${ext}`;
+    await repo.putPhoto(path, new Uint8Array(await file.arrayBuffer()), baseType);
+  }
 
   const base = {
     participation_id: p.id,
@@ -74,6 +99,7 @@ export async function POST(req: Request) {
     slot,
     media_type: media,
     photo_path: path,
+    link_url: linkUrl,
     taken_at: takenAt.toISOString(),
     local_date: today,
     note: String(fd.get("note") ?? "").slice(0, 100),
@@ -82,7 +108,7 @@ export async function POST(req: Request) {
   if (replacing) {
     const old = existing.find((c) => c.id === replacing)!;
     const updated = await repo.updateCheckin(replacing, { ...base, xp: old.xp });
-    await repo.deletePhoto(old.photo_path);
+    if (old.photo_path) await repo.deletePhoto(old.photo_path);
     return Response.json({
       ok: true,
       replaced: true,
@@ -98,7 +124,7 @@ export async function POST(req: Request) {
   }
 
   const created = await repo.createCheckin({ ...base, xp: 0 });
-  const after = await repo.listCheckins({ participationId: p.id });
+  const after = [...allMine, created];
   const reward = rewardFor(ch, p, after, created, now);
   let totalXp = user.xp;
   if (reward.xp > 0) {

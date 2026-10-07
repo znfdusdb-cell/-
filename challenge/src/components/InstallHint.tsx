@@ -31,10 +31,10 @@ export function InstallHint({ always = false }: { always?: boolean }) {
   }
 
   return (
-    <div className="card p-4 border-gold/50">
+    <div className="card p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="font-semibold">📱 홈 화면에 아이콘 추가</div>
+          <div className="font-bold">홈 화면에 아이콘 추가</div>
           <div className="text-xs text-fg-2 mt-1 leading-relaxed">
             {mode === "ios" && <>Safari 아래 <b>공유(⬆︎)</b> 버튼 → <b>홈 화면에 추가</b>. 그 아이콘으로 열어야 알림도 켤 수 있어요.</>}
             {mode === "android" && (bip ? <>아래 버튼 한 번이면 앱처럼 설치돼요.</> : <>Chrome 오른쪽 위 <b>⋮</b> → <b>홈 화면에 추가</b> (또는 앱 설치).</>)}

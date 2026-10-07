@@ -33,10 +33,17 @@ export function ChallengeForm({ challenge }: { challenge?: Challenge }) {
         <label className="label">설명</label>
         <textarea name="description" className="input" rows={2} defaultValue={challenge?.description ?? ""} maxLength={200} placeholder="어떻게 인증하는지 한두 줄" />
       </div>
-      <div>
-        <label className="label">상품 (기본: 메가커피 아메리카노 쿠폰)</label>
-        <input name="prize" className="input" defaultValue={challenge?.prize ?? "메가커피 아메리카노 쿠폰"} maxLength={60} required />
+      <div className="grid grid-cols-[1fr_6rem] gap-2">
+        <div>
+          <label className="label">실패하면 잃는 것 (벌칙)</label>
+          <input name="penalty" className="input" defaultValue={challenge?.penalty ?? "톡방에 메가커피 아메리카노 쿠폰 쏘기"} maxLength={80} required />
+        </div>
+        <div>
+          <label className="label">탈락 기준(회)</label>
+          <input name="max_fails" type="number" min="0" max="30" inputMode="numeric" className="input" defaultValue={challenge?.max_fails ?? 3} required />
+        </div>
       </div>
+      <p className="text-[11px] text-fg-3 -mt-2">실패가 탈락 기준에 닿으면 탈락하고 벌칙을 해요. 0이면 탈락 없음.</p>
       {editing && (
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="is_active" defaultChecked={challenge!.is_active} /> 참여 가능(비활성화하면 목록에서 숨김)
@@ -49,7 +56,7 @@ export function ChallengeForm({ challenge }: { challenge?: Challenge }) {
         <div className="card p-3 space-y-3">
           <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-bg-3">
             {(["count", "slots"] as const).map((k) => (
-              <button key={k} type="button" onClick={() => setKind(k)} className={`py-2 rounded-lg text-sm font-semibold ${kind === k ? "bg-red text-white" : "text-fg-2"}`}>
+              <button key={k} type="button" onClick={() => setKind(k)} className={`py-2 rounded-lg text-sm font-semibold ${kind === k ? "bg-fg text-white" : "text-fg-2"}`}>
                 {k === "count" ? "횟수형 (취미처럼)" : "시간대형 (식사처럼)"}
               </button>
             ))}
@@ -99,7 +106,7 @@ export function ChallengeForm({ challenge }: { challenge?: Challenge }) {
         </div>
       )}
       <FormMessage state={state} />
-      <SubmitButton>{editing ? "저장" : "챌린지 만들기"}</SubmitButton>
+      <SubmitButton className="btn btn-red w-full">{editing ? "저장" : "챌린지 만들기"}</SubmitButton>
     </form>
   );
 }

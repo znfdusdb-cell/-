@@ -63,7 +63,7 @@ export function PushToggle({ vapidKey }: { vapidKey: string | null }) {
     <div className="card p-4">
       <div className="flex items-center justify-between">
         <div>
-          <div className="font-semibold">🔔 인증 알림</div>
+          <div className="font-bold">인증 알림</div>
           <div className="text-xs text-fg-2 mt-0.5">
             {state === "loading" && "확인 중…"}
             {state === "no-key" && "서버에 알림 키가 아직 없어요 (관리자가 VAPID 키를 넣으면 켜져요)"}

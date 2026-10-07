@@ -13,7 +13,7 @@ export function LoginForm({ next, inviteRequired }: { next: string; inviteRequir
     <div className="card p-5">
       <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-bg-3 mb-4">
         {(["login", "signup"] as const).map((t) => (
-          <button key={t} type="button" onClick={() => setTab(t)} className={`py-2 rounded-lg text-sm font-semibold ${tab === t ? "bg-red text-white" : "text-fg-2"}`}>
+          <button key={t} type="button" onClick={() => setTab(t)} className={`py-2 rounded-lg text-sm font-semibold ${tab === t ? "bg-fg text-white" : "text-fg-2"}`}>
             {t === "login" ? "로그인" : "처음이에요"}
           </button>
         ))}
@@ -31,7 +31,7 @@ export function LoginForm({ next, inviteRequired }: { next: string; inviteRequir
             <input id="l-password" name="password" type="password" className="input" autoComplete="current-password" required />
           </div>
           <FormMessage state={loginState} />
-          <SubmitButton>들어가기</SubmitButton>
+          <SubmitButton className="btn btn-red w-full">들어가기</SubmitButton>
         </form>
       ) : (
         <form action={signupAction} className="space-y-3">
@@ -54,7 +54,7 @@ export function LoginForm({ next, inviteRequired }: { next: string; inviteRequir
             </div>
           )}
           <FormMessage state={signupState} />
-          <SubmitButton>가입하고 시작</SubmitButton>
+          <SubmitButton className="btn btn-red w-full">가입하고 시작</SubmitButton>
         </form>
       )}
     </div>

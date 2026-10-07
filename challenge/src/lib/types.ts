@@ -48,7 +48,10 @@ export type Challenge = {
   title: string;
   description: string;
   emoji: string;
-  prize: string;
+  /** 실패하면 잃는 것 (손실 프레이밍) */
+  penalty: string;
+  /** 실패 n번이면 탈락. 0 = 탈락 없음 */
+  max_fails: number;
   config: ChallengeConfig;
   created_by: string | null;
   is_default: boolean;
@@ -58,9 +61,21 @@ export type Challenge = {
 
 export type ParticipationGoal = {
   start_kg?: number;
+  /** 감량 목표 kg */
   target_kg?: number;
   days?: number;
   hobby?: string;
+  /** 취미 인증 방식 (camera/album/audio/link) */
+  methods?: string[];
+};
+
+export type WeightLog = {
+  id: string;
+  participation_id: string;
+  user_id: string;
+  local_date: string;
+  kg: number;
+  created_at: string;
 };
 
 export type Participation = {
@@ -81,10 +96,12 @@ export type Checkin = {
   challenge_id: string;
   /** 시간대형이면 slot key, 횟수형이면 "count" */
   slot: string;
-  /** camera: 앱에서 바로 촬영 / album: 앨범 사진 / audio: 녹음 */
-  media_type: "camera" | "album" | "audio";
-  /** 스토리지 경로 (사진·오디오 공통) */
+  /** camera: 앱에서 바로 촬영 / album: 앨범 사진 / audio: 녹음 / link: 링크 */
+  media_type: "camera" | "album" | "audio" | "link";
+  /** 스토리지 경로 (사진·오디오). 링크면 빈 문자열 */
   photo_path: string;
+  /** 링크 인증 주소 */
+  link_url: string;
   /** 촬영 시각 (클라이언트 보고, 서버 시각과 10분 이상 어긋나면 서버 시각) */
   taken_at: string;
   /** 서버 수신 시각 */
