@@ -21,7 +21,7 @@ export interface Repo {
   getUserById(id: string): Promise<User | null>;
   getUsersByIds(ids: string[]): Promise<User[]>;
   listUsers(): Promise<User[]>;
-  createUser(data: Pick<User, "username" | "display_name" | "password_hash" | "role">): Promise<User>;
+  createUser(data: Pick<User, "username" | "display_name" | "password_hash" | "role" | "gender">): Promise<User>;
   updateUser(id: string, patch: Partial<Omit<User, "id">>): Promise<User>;
   /** 경험치 가감 + 로그. 새 xp 반환 */
   addXp(userId: string, delta: number, reason: string): Promise<number>;
