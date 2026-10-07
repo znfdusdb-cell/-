@@ -23,3 +23,7 @@
 - `src/lib/constants.ts` 규칙 카탈로그·체크리스트·용어, `src/lib/verify.ts` 주문 검증, `src/lib/setup-calc.ts` 52주·베이스 정의, `src/lib/krx-calendar.ts` 거래일 달력(매년 12월 갱신).
 - 마이그레이션은 `supabase/migrations/` 추가만. 시드는 `src/lib/seed-data.ts` 단일 출처 → `npx tsx scripts/seed.ts --sql`로 `supabase/seed.sql` 재생성.
 - 로컬 Postgres 16으로 마이그레이션·시드·트리거를 돌려본 뒤 push한다.
+
+## challenge/ — 거너스 챌린지 앱 (별도 앱, 2026-10-07)
+아스날 인사이드 톡방용 챌린지 PWA. 스윙봇과 무관한 독립 Next.js 앱이며 Vercel Root Directory 를 `challenge` 로 배포한다.
+규칙·구조는 `challenge/README.md`. 테이블 접두사 `ch_`, 마이그레이션은 `challenge/supabase/migrations/`. 세션 저장 session_id 는 `claude_code_cloud:challenge-<YYYY-MM-DD>`, topics `claude_code`, `cloud`, `challenge`.
