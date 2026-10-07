@@ -23,11 +23,20 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
   const ordered = [...challenges].sort((a, b) => Number(myIds.has(b.id)) - Number(myIds.has(a.id)));
   const current = ordered.find((c) => c.id === sp.c) ?? ordered[0];
 
+  // 기간 단위: 매일 챌린지는 하루, 주 단위 취미는 월~일, 그 외는 period_days 일
+  const mondayOf = (d: string) => addDays(d, -((kstWeekday(d) + 6) % 7));
+  const step = !current || current.config.kind === "slots" ? 1 : current.config.period_days;
+  const weekly = Boolean(current && current.config.kind === "count" && current.config.period_days === 7);
+  const from = step === 1 ? date : weekly ? mondayOf(date) : addDays(date, -(step - 1));
+  const to = weekly ? (addDays(from, 6) < today ? addDays(from, 6) : today) : date;
+  const prevDate = addDays(from, -1);
+  const nextDate = addDays(to, 1);
+  const title =
+    step === 1 ? (date === today ? "오늘" : fmtDateKo(date)) : weekly ? (from === mondayOf(today) ? "이번 주" : from === mondayOf(addDays(today, -7)) ? "지난주" : `${fmtDateKo(from)} ~ ${fmtDateKo(to)}`) : from <= today && to >= today ? "이번 기간" : `${fmtDateKo(from)} ~ ${fmtDateKo(to)}`;
+
   let content: React.ReactNode = null;
   if (current) {
-    const mondayOf = (d: string) => addDays(d, -((kstWeekday(d) + 6) % 7));
-    const from = current.config.kind === "slots" ? date : current.config.period_days === 7 ? mondayOf(date) : addDays(date, -(current.config.period_days - 1));
-    const [checkins, participants] = await Promise.all([repo.listCheckins({ challengeId: current.id, from, to: date }), repo.listParticipants(current.id)]);
+    const [checkins, participants] = await Promise.all([repo.listCheckins({ challengeId: current.id, from, to }), repo.listParticipants(current.id)]);
     const users = new Map(participants.map((p) => [p.user_id, p]));
     // 다이어트: 사람별 감량 진행률 (몸무게 숫자는 비공개)
     const progress = new Map<string, { targetLoss: number; lost: number; ratio: number; reached: boolean }>();
@@ -47,7 +56,7 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
     content = (
       <>
         <p className="text-xs text-fg-3 mb-2">
-          {current.config.kind === "slots" ? fmtDateKo(date) : `${fmtDateKo(from)} ~ ${fmtDateKo(date)}`} · 참가자 {participants.length}명 · 인증 {checkins.length}건
+          {step === 1 ? fmtDateKo(date) : `${fmtDateKo(from)} ~ ${fmtDateKo(to)}`} · 참가자 {participants.length}명 · 인증 {checkins.length}건
         </p>
         {checkins.length === 0 ? (
           <div className="card p-8 text-center text-fg-2 text-sm">아직 올라온 인증이 없어요</div>
@@ -68,16 +77,16 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
     <Shell user={toPublic(user)} title="갤러리">
       <div className="scroll-x flex gap-2 pb-2">
         {ordered.map((c) => (
-          <Link key={c.id} href={`/gallery?c=${c.id}&d=${date}`} className={`chip whitespace-nowrap py-1.5 px-3 text-sm border ${current?.id === c.id ? "bg-fg text-white border-fg" : "bg-bg-2 text-fg-2 border-line"}`}>
+          <Link key={c.id} href={`/gallery?c=${c.id}&d=${today}`} className={`chip whitespace-nowrap py-1.5 px-3 text-sm border ${current?.id === c.id ? "bg-fg text-white border-fg" : "bg-bg-2 text-fg-2 border-line"}`}>
             {c.emoji} {c.title}
           </Link>
         ))}
       </div>
       {current && (
         <div className="flex items-center justify-between my-2">
-          <Link href={`/gallery?c=${current.id}&d=${addDays(date, -1)}`} className="btn btn-ghost text-xs py-1.5">전날</Link>
-          <span className="font-extrabold">{date === today ? "오늘" : fmtDateKo(date)}</span>
-          {date < today ? <Link href={`/gallery?c=${current.id}&d=${addDays(date, 1)}`} className="btn btn-ghost text-xs py-1.5">다음날</Link> : <span className="w-14" />}
+          <Link href={`/gallery?c=${current.id}&d=${prevDate}`} className="btn btn-ghost text-xs py-1.5">{step === 1 ? "전날" : weekly ? "지난주" : "이전 기간"}</Link>
+          <span className="font-extrabold">{title}</span>
+          {nextDate <= today ? <Link href={`/gallery?c=${current.id}&d=${nextDate > today ? today : nextDate}`} className="btn btn-ghost text-xs py-1.5">{step === 1 ? "다음날" : weekly ? "다음주" : "다음 기간"}</Link> : <span className="w-14" />}
         </div>
       )}
       {content ?? <div className="card p-8 text-center text-fg-2 text-sm">챌린지가 없어요</div>}
