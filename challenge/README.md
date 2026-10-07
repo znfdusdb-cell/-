@@ -75,7 +75,7 @@ xxxx...          ← 이 줄이 VAPID_PRIVATE_KEY
 
 GitHub 저장소 페이지 → **Settings → Secrets and variables → Actions → New repository secret** 으로 2개 추가:
 
-- `CHALLENGE_URL` : 4단계에서 받은 주소 (끝에 `/` 없이)
+- `CHALLENGE_URL` : 앱 주소. 4단계 6번의 Vercel Settings → Domains 에 있는 짧은 주소 (예: `https://challenge-xxxx.vercel.app`, 끝에 `/` 없이). 톡방에 올리는 그 주소와 같음
 - `CHALLENGE_CRON_SECRET` : 4단계에 넣은 `CRON_SECRET` 과 똑같은 값
 
 이러면 30분마다 자동으로 "점심 인증 시간이에요", "마감 30분 전" 알림이 나갑니다.
