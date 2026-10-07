@@ -4,7 +4,8 @@ import { currentUser, isAdmin, toPublic } from "@/lib/current-user";
 import { getRepo } from "@/lib/repo";
 import { loadBoard } from "@/lib/data";
 import { describeConfig, levelFromXp } from "@/lib/game";
-import { fmtDateKo } from "@/lib/time";
+import { fmtDateKo, kstDate } from "@/lib/time";
+import { StartNowButton } from "@/components/StartNowButton";
 import { Shell } from "@/components/Shell";
 import { JoinForm } from "@/components/JoinForm";
 import { LeaveButton } from "@/components/LeaveButton";
@@ -72,8 +73,9 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
                   <div className="text-xs text-fg-2 mt-0.5">
                     {ch.config.goal === "hobby" && p.goal.hobby && <>도전: {p.goal.hobby} · </>}
                     {ch.config.goal === "weight" && p.goal.target_kg && <>−{p.goal.target_kg}kg/{p.goal.days}일 · </>}
-                    {fmtDateKo(s.startDate)} 시작
+                    {s.startDate > kstDate() ? <span className="text-gold">{fmtDateKo(s.startDate)} 시작 예정</span> : <>{fmtDateKo(s.startDate)} 시작</>}
                   </div>
+                  {isAdmin(user) && s.startDate > kstDate() && <StartNowButton userId={p.user_id} challengeId={ch.id} />}
                 </div>
                 <div className="text-right text-xs">
                   <div className="text-gold font-semibold">🔥 {s.streak}</div>

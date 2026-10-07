@@ -1,5 +1,5 @@
 import type { Challenge, ChallengeConfig, Checkin, CountConfig, Participation, SlotDef, SlotsConfig } from "./types";
-import { addDays, daysBetween, hmToMinutes, kstDate, kstMinutes } from "./time";
+import { addDays, daysBetween, hmToMinutes, kstDate, kstMinutes, kstWeekday } from "./time";
 
 /* ───────── 경험치 · 레벨 ───────── */
 
@@ -79,15 +79,24 @@ export type DayStatus = {
   pending: boolean;
 };
 
-/** 참여일이 첫 슬롯 시작 이후면 다음 날부터 집계한다. */
+/**
+ * 집계 시작일은 항상 월요일 (관리자가 start_date 를 지정하면 그 날).
+ * 월요일에 참여했고(시간대형이면 첫 슬롯 시작 전) 그날부터, 아니면 다음 월요일부터.
+ */
 export function effectiveStartDate(p: Participation, cfg: ChallengeConfig): string {
+  if (p.start_date) return p.start_date;
   const joined = new Date(p.joined_at);
   const d = kstDate(joined);
-  if (cfg.kind === "slots") {
+  const isMonday = kstWeekday(d) === 1;
+  if (isMonday) {
+    if (cfg.kind !== "slots") return d;
     const first = Math.min(...cfg.slots.map((s) => hmToMinutes(s.start)));
-    if (kstMinutes(joined) > first) return addDays(d, 1);
+    if (kstMinutes(joined) <= first) return d;
   }
-  return d;
+  // 다음 월요일
+  const wd = kstWeekday(d); // 0=일
+  const until = wd === 0 ? 1 : 8 - wd;
+  return addDays(d, until);
 }
 
 export function dayStatus(cfg: SlotsConfig, checkins: Checkin[], date: string, now: Date = new Date()): DayStatus {

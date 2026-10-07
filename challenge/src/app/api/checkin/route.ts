@@ -1,20 +1,24 @@
 import { randomUUID } from "node:crypto";
 import { currentUser } from "@/lib/current-user";
 import { getRepo } from "@/lib/repo";
-import { dayStatus, levelFromXp, rewardFor } from "@/lib/game";
-import { fmtHmKo, kstDate } from "@/lib/time";
+import { dayStatus, effectiveStartDate, levelFromXp, rewardFor } from "@/lib/game";
+import { fmtDateKo, fmtHmKo, kstDate } from "@/lib/time";
+import type { Checkin } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-const MAX_BYTES = 8 * 1024 * 1024;
+const MAX_BYTES = 12 * 1024 * 1024;
+const IMAGE_EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+const AUDIO_EXT: Record<string, string> = { "audio/webm": "webm", "audio/mp4": "m4a", "audio/mpeg": "mp3", "audio/ogg": "ogg", "audio/wav": "wav", "audio/aac": "aac", "audio/x-m4a": "m4a" };
 
 function bad(error: string, status = 400) {
   return Response.json({ ok: false, error }, { status });
 }
 
 /**
- * 사진 인증. FormData: challenge_id, slot(시간대형만), taken_at(ms), photo(File)
- * 시간대 판정은 서버 시각(KST) 기준. 클라이언트 시각은 표시용이며 서버와 10분 넘게 어긋나면 버린다.
+ * 인증 업로드. FormData: challenge_id, slot(시간대형만), media(camera|album|audio), taken_at(ms), file(File)
+ * 시간대 판정은 서버 시각(KST). 클라이언트 시각은 표시용이며 서버와 10분 넘게 어긋나면 버린다.
+ * 시간대형(다이어트)은 camera 만 허용. 집계 시작일(월요일) 전에는 인증 불가.
  */
 export async function POST(req: Request) {
   const user = await currentUser();
@@ -24,11 +28,15 @@ export async function POST(req: Request) {
   const fd = await req.formData();
   const challengeId = String(fd.get("challenge_id") ?? "");
   const slotKey = String(fd.get("slot") ?? "");
+  const mediaRaw = String(fd.get("media") ?? "camera");
+  const media: Checkin["media_type"] = mediaRaw === "album" ? "album" : mediaRaw === "audio" ? "audio" : "camera";
   const takenAtMs = Number(fd.get("taken_at") ?? NaN);
-  const photo = fd.get("photo");
-  if (!(photo instanceof File)) return bad("사진이 없어요");
-  if (!photo.type.startsWith("image/")) return bad("이미지 파일만 올릴 수 있어요");
-  if (photo.size > MAX_BYTES) return bad("사진이 너무 커요 (8MB 이하)");
+  const file = fd.get("file") ?? fd.get("photo");
+  if (!(file instanceof File)) return bad("파일이 없어요");
+  if (file.size > MAX_BYTES) return bad("파일이 너무 커요 (12MB 이하)");
+  const baseType = file.type.split(";")[0].trim();
+  const ext = media === "audio" ? AUDIO_EXT[baseType] : IMAGE_EXT[baseType];
+  if (!ext) return bad(media === "audio" ? "지원하지 않는 오디오 형식이에요" : "이미지 파일만 올릴 수 있어요");
 
   const ch = await repo.getChallenge(challengeId);
   if (!ch || !ch.is_active) return bad("없는 챌린지예요");
@@ -37,6 +45,8 @@ export async function POST(req: Request) {
 
   const now = new Date();
   const today = kstDate(now);
+  const start = effectiveStartDate(p, ch.config);
+  if (today < start) return bad(`이 챌린지는 ${fmtDateKo(start)}부터 시작해요. 그날 아침에 알려 드릴게요!`);
   const takenAt = Number.isFinite(takenAtMs) && Math.abs(takenAtMs - now.getTime()) <= 10 * 60 * 1000 ? new Date(takenAtMs) : now;
 
   let slot = "count";
@@ -44,6 +54,7 @@ export async function POST(req: Request) {
   const existing = await repo.listCheckins({ participationId: p.id, from: today, to: today });
 
   if (ch.config.kind === "slots") {
+    if (media !== "camera") return bad("식사 인증은 앱에서 바로 촬영한 사진만 돼요");
     const def = ch.config.slots.find((s) => s.key === slotKey);
     if (!def) return bad("어느 시간대인지 골라 주세요");
     const st = dayStatus(ch.config, existing, today, now).slots.find((s) => s.slot.key === def.key)!;
@@ -53,15 +64,15 @@ export async function POST(req: Request) {
     if (st.checkin) replacing = st.checkin.id;
   }
 
-  const ext = photo.type === "image/png" ? "png" : photo.type === "image/webp" ? "webp" : "jpg";
   const path = `${ch.id}/${user.id}/${today}/${slot}-${randomUUID()}.${ext}`;
-  await repo.putPhoto(path, new Uint8Array(await photo.arrayBuffer()), photo.type);
+  await repo.putPhoto(path, new Uint8Array(await file.arrayBuffer()), baseType);
 
   const base = {
     participation_id: p.id,
     user_id: user.id,
     challenge_id: ch.id,
     slot,
+    media_type: media,
     photo_path: path,
     taken_at: takenAt.toISOString(),
     local_date: today,
