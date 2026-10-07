@@ -24,12 +24,13 @@ export default async function ChallengesPage() {
           <Link key={ch.id} href={`/challenges/${ch.id}`} className="card p-4 flex items-start gap-3 block">
             <div className="text-2xl leading-none mt-0.5">{ch.emoji}</div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base font-extrabold truncate">{ch.title}</h2>
-                {joined.has(ch.id) && <span className="chip bg-ok-soft text-ok">참여 중</span>}
+                <span className="chip bg-bg-3 text-fg num">{countMap.get(ch.id) ?? 0}명 참여 중</span>
+                {joined.has(ch.id) && <span className="chip bg-ok-soft text-ok">나도 참여 중</span>}
               </div>
               <p className="text-sm text-fg-2 mt-0.5 line-clamp-2">{ch.description}</p>
-              <p className="text-xs text-fg-3 mt-1">{describeConfig(ch.config)} · {countMap.get(ch.id) ?? 0}명</p>
+              <p className="text-xs text-fg-3 mt-1">{describeConfig(ch.config)}</p>
               <p className="text-xs mt-1"><span className="text-red font-bold">실패 시</span> {ch.penalty}{ch.max_fails > 0 ? ` (${ch.max_fails}번이면 탈락)` : ""}</p>
             </div>
           </Link>
