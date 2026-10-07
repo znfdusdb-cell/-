@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { currentUser, isAdmin, toPublic } from "@/lib/current-user";
 import { getRepo } from "@/lib/repo";
 import { addDays, fmtDateKo, kstDate, kstWeekday } from "@/lib/time";
+import { weightProgress } from "@/lib/game";
 import { Shell } from "@/components/Shell";
 import { PhotoCard } from "@/components/PhotoCard";
 
@@ -28,6 +29,18 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
     const from = current.config.kind === "slots" ? date : current.config.period_days === 7 ? mondayOf(date) : addDays(date, -(current.config.period_days - 1));
     const [checkins, participants] = await Promise.all([repo.listCheckins({ challengeId: current.id, from, to: date }), repo.listParticipants(current.id)]);
     const users = new Map(participants.map((p) => [p.user_id, p]));
+    // 다이어트: 사람별 감량 진행률 (몸무게 숫자는 비공개)
+    const progress = new Map<string, { targetLoss: number; lost: number; ratio: number; reached: boolean }>();
+    if (current.config.goal === "weight") {
+      const logs = await repo.listWeightLogsMany(participants.map((p) => p.id));
+      for (const p of participants) {
+        if (!p.goal.start_kg || !p.goal.target_kg) continue;
+        const mine = logs.filter((l) => l.participation_id === p.id);
+        const latest = mine.length ? Number(mine[mine.length - 1].kg) : null;
+        const wp = weightProgress(p.goal.start_kg, p.goal.target_kg, latest);
+        progress.set(p.user_id, { targetLoss: p.goal.target_kg, lost: wp.lost, ratio: wp.ratio, reached: wp.reached });
+      }
+    }
     const urls = await repo.photoUrls(checkins.filter((c) => c.photo_path).map((c) => c.photo_path));
     const slotLabel = (key: string) => (current.config.kind === "slots" ? current.config.slots.find((s) => s.key === key)?.label : undefined);
 
@@ -43,7 +56,7 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
             {checkins.map((c) => {
               const p = users.get(c.user_id);
               const caption = current.config.kind === "slots" ? slotLabel(c.slot) : p?.goal.hobby;
-              return <PhotoCard key={c.id} checkin={c} user={p?.user ?? { display_name: "탈퇴", xp: 0 }} url={urls[c.photo_path]} caption={caption} canDelete={isAdmin(user) || c.user_id === user.id} />;
+              return <PhotoCard key={c.id} checkin={c} user={p?.user ?? { display_name: "탈퇴", xp: 0 }} url={urls[c.photo_path]} caption={caption} canDelete={isAdmin(user) || c.user_id === user.id} progress={progress.get(c.user_id) ?? null} />;
             })}
           </div>
         )}
