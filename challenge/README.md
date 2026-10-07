@@ -59,7 +59,7 @@ xxxx...          ← 이 줄이 VAPID_PRIVATE_KEY
 | `SUPABASE_SERVICE_ROLE_KEY` | 2단계에서 복사한 service_role 키 |
 | `SESSION_SECRET` | 아무 긴 문장 (예: 비밀번호 만들듯 30자 이상 아무렇게나) |
 | `ADMIN_PASSWORD` | `4581` (비움 계정 첫 비밀번호. 나중에 앱 안에서 바꿀 수 있음) |
-| `INVITE_CODE` | 톡방 사람만 가입하게 할 암호 (예: `arsenal2026`). 비워 두면 링크 아는 사람은 누구나 가입 |
+| `INVITE_CODE` | (안 넣어도 됨) 넣으면 가입할 때 이 단어를 알아야 가입됨. 누구나 가입하게 하려면 이 줄은 건너뜀 |
 | `CRON_SECRET` | 아무 긴 문장 (알림 보내기용. SESSION_SECRET과 다르게) |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | 3단계의 Public Key |
 | `VAPID_PRIVATE_KEY` | 3단계의 Private Key |
@@ -82,7 +82,7 @@ GitHub 저장소 페이지 → **Settings → Secrets and variables → Actions 
 ## 톡방에 공지할 내용 (복사해서 쓰세요)
 
 > 📱 챌린지 앱: (주소)
-> 1. 들어가서 "처음이에요" → 아이디·비밀번호 만들기 (초대 코드: ○○○)
+> 1. 들어가서 "처음이에요" → 아이디·비밀번호 만들기
 > 2. 다이어트 / 취미 중 하고 싶은 거 참여
 > 3. 아이폰: Safari 아래 공유 버튼 → "홈 화면에 추가". 안드로이드: 설치 버튼
 > 4. 홈 화면 아이콘으로 열고 → 내 정보 → 알림 켜기
