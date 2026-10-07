@@ -24,7 +24,8 @@ export default async function MePage() {
   const mine = await loadMyChallenges(user);
   const totalCheckins = mine.reduce((n, m) => n + m.checkins.length, 0);
   const repo = getRepo();
-  const gifts = await repo.listGiftsReceived(user.id);
+  // 마이그레이션 05 전이면 표가 없어 실패 → 선물함만 비우고 화면은 살린다
+  const gifts = await repo.listGiftsReceived(user.id).catch(() => []);
   const [senders, challenges, urls] = await Promise.all([
     repo.getUsersByIds([...new Set(gifts.map((g) => g.from_user_id))]),
     repo.listChallenges({ includeInactive: true }),
@@ -54,6 +55,9 @@ export default async function MePage() {
         </div>
       </section>
 
+      {gifts.length === 0 && user.role === "admin" && !(await repo.listGiftsReceived(user.id).then(() => true).catch(() => false)) && (
+        <div className="card p-3 mt-3 text-xs text-bad">관리자 안내: Supabase에 마이그레이션 05(ch_gifts)가 아직 없어요. `challenge/supabase/migrations/20261007_05_gifts.sql` 실행 후 선물함이 켜져요.</div>
+      )}
       <GiftBox gifts={giftViews} />
 
       <div className="mt-3 space-y-3">

@@ -13,7 +13,7 @@ export default async function AdminSupportPage() {
   if (!user) redirect("/login");
   if (!isAdmin(user)) redirect("/");
   const repo = getRepo();
-  const tickets = await repo.listOpenTickets();
+  const tickets = await repo.listOpenTickets().catch(() => []);
   const users = await repo.getUsersByIds(tickets.map((t) => t.user_id));
   const rows = await Promise.all(
     tickets.map(async (t) => {

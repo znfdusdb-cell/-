@@ -22,7 +22,12 @@ export async function GET(req: Request) {
   if (!me) return bad("로그인이 필요해요", 401);
   const repo = getRepo();
   const id = new URL(req.url).searchParams.get("ticket");
-  let ticket = id ? await repo.getTicket(id) : (await repo.getOpenTicket(me.id)) ?? (await repo.getLatestTicket(me.id));
+  let ticket;
+  try {
+    ticket = id ? await repo.getTicket(id) : (await repo.getOpenTicket(me.id)) ?? (await repo.getLatestTicket(me.id));
+  } catch {
+    return Response.json({ ok: false, error: "문의 기능이 아직 준비 중이에요 (관리자가 마이그레이션 06을 실행하면 켜져요)" }, { status: 503 });
+  }
   if (ticket && !isAdmin(me) && ticket.user_id !== me.id) ticket = null;
   if (!ticket) return Response.json({ ok: true, ticket: null, messages: [] });
   const msgs = await repo.listTicketMessages(ticket.id);

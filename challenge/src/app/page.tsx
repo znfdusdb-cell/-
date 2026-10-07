@@ -32,7 +32,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const repo = getRepo();
   // 탈락자가 이번 탈락 벌칙(기프티콘)을 올렸는지
   const giftSent = Object.fromEntries(
-    await Promise.all(mine.filter((m) => m.summary.eliminated).map(async (m) => [m.participation.id, (await repo.listGiftsSentSince(user.id, m.challenge.id, m.participation.joined_at)).length > 0] as const)),
+    await Promise.all(mine.filter((m) => m.summary.eliminated).map(async (m) => [m.participation.id, (await repo.listGiftsSentSince(user.id, m.challenge.id, m.participation.joined_at).catch(() => [])).length > 0] as const)),
   );
   const weightLogs = Object.fromEntries(
     await Promise.all(
