@@ -4,19 +4,21 @@ import { execSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 const req = createRequire(process.env.NODE_PATH ? process.env.NODE_PATH + "/" : import.meta.url);
 const pw = req("playwright");
-const char = (lv, g) => execSync(`npx tsx scripts/render-character.tsx ${lv} ${g}`, { encoding: "utf8" });
+const char = (lv, g, crop = "") => execSync(`npx tsx scripts/render-character.tsx ${lv} ${g} ${crop ? `"${crop}"` : ""}`, { encoding: "utf8" });
 const sized = (svg, w, h) => svg.replace(/width="\d+"/, `width="${w}"`).replace(/height="\d+"/, `height="${h}"`);
-const f3 = char(3, "f");
+// 아이콘: 만렙 여자 상반신 (왕관 ~ 가슴 엠블럼, 머플러·완장 포함)
+const ICON_VB = { x: 7, y: 0, w: 30, h: 30 };
+const f10top = char(10, "f", `${ICON_VB.x} ${ICON_VB.y} ${ICON_VB.w} ${ICON_VB.h}`);
 const f6 = char(6, "f");
 const m4 = char(4, "m");
 
 // 44×48 스프라이트. 아이콘 안에서 픽셀 1칸 = k px (정수)
 const iconHtml = (size, rounded) => {
-  const k = Math.max(1, Math.floor((size * 0.9) / 48));
-  const w = 44 * k, h = 48 * k;
+  const k = Math.max(1, Math.floor((size * 0.96) / ICON_VB.h));
+  const w = ICON_VB.w * k, h = ICON_VB.h * k;
   return `<!doctype html><html><body style="margin:0;width:${size}px;height:${size}px;overflow:hidden">
-<div style="width:${size}px;height:${size}px;background:linear-gradient(160deg,#ff3b4e,#c80021);border-radius:${rounded ? Math.round(size * 0.22) : 0}px;display:flex;align-items:center;justify-content:center">
-${sized(f3, w, h)}</div></body></html>`;
+<div style="width:${size}px;height:${size}px;background:linear-gradient(160deg,#ff3b4e,#c80021);border-radius:${rounded ? Math.round(size * 0.22) : 0}px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden">
+<div style="margin-bottom:${-Math.round(k * 2)}px">${sized(f10top, w, h)}</div></div></body></html>`;
 };
 
 const ogHtml = `<!doctype html><html><head><meta charset="utf-8"><style>

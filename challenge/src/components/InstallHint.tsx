@@ -38,10 +38,10 @@ export function InstallHint({ always = false }: { always?: boolean }) {
           <div className="text-xs text-fg-2 mt-1 leading-relaxed">
             {mode === "ios" && <>Safari 아래 <b>공유(⬆︎)</b> 버튼 → <b>홈 화면에 추가</b>. 그 아이콘으로 열어야 알림도 켤 수 있어요.</>}
             {mode === "android" && (bip ? <>아래 버튼 한 번이면 앱처럼 설치돼요.</> : <>Chrome 오른쪽 위 <b>⋮</b> → <b>홈 화면에 추가</b> (또는 앱 설치).</>)}
-            {mode === "other" && <>폰에서 열면 앱처럼 설치할 수 있어요. Chrome 주소창의 설치 아이콘도 돼요.</>}
+            {mode === "other" && (bip ? <>아래 버튼으로 PC에도 앱처럼 설치돼요. 바탕화면·시작 메뉴에 아이콘이 생겨요.</> : <>PC: Chrome·Edge 주소창 오른쪽 끝 <b>설치 아이콘(⊕ 또는 모니터 모양)</b> → 설치. 바탕화면에 아이콘이 생기고 창으로 열려요. (Safari는 파일 → Dock에 추가)</>)}
           </div>
-          {mode === "android" && bip && (
-            <button className="btn btn-gold text-sm py-2 mt-2" onClick={async () => { await bip.prompt(); setBip(null); }}>앱 설치</button>
+          {(mode === "android" || mode === "other") && bip && (
+            <button className="btn btn-dark text-sm py-2 mt-2" onClick={async () => { await bip.prompt(); setBip(null); }}>앱 설치</button>
           )}
         </div>
         {!always && <button className="text-fg-3 text-lg leading-none" onClick={dismiss} aria-label="닫기">×</button>}

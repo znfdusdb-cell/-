@@ -341,6 +341,37 @@ export async function adminStartNow(_prev: ActionResult | null, fd: FormData): P
   return { ok: true, message: `${target.display_name} 바로 시작` };
 }
 
+/** 관리자: 멤버 퇴출 (계정과 기록 전부 삭제) */
+export async function adminDeleteUser(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const me = await currentUser();
+  if (!isAdmin(me)) return { ok: false, error: "관리자만" };
+  const repo = getRepo();
+  const target = await repo.getUserById(str(fd, "user_id"));
+  if (!target) return { ok: false, error: "없는 사용자" };
+  if (target.id === me!.id) return { ok: false, error: "자기 자신은 퇴출할 수 없어요" };
+  if (target.username === "비움") return { ok: false, error: "총관리자는 퇴출할 수 없어요" };
+  await repo.deleteUser(target.id);
+  revalidatePath("/", "layout");
+  return { ok: true, message: `${target.display_name} 퇴출 완료` };
+}
+
+/** 개설자·관리자: 챌린지에서 참가자 내보내기 (계정은 남고 참여만 끝남) */
+export async function kickParticipant(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const me = await requireUser();
+  const repo = getRepo();
+  const ch = await repo.getChallenge(str(fd, "challenge_id"));
+  if (!ch) return { ok: false, error: "없는 챌린지" };
+  if (!isAdmin(me) && ch.created_by !== me.id) return { ok: false, error: "개설자나 관리자만" };
+  const target = await repo.getUserById(str(fd, "user_id"));
+  if (!target) return { ok: false, error: "없는 사용자" };
+  if (target.id === me.id) return { ok: false, error: "자기 자신은 내보낼 수 없어요" };
+  const p = await repo.getParticipation(target.id, ch.id);
+  if (!p || p.status !== "active") return { ok: false, error: "참여 중이 아니에요" };
+  await repo.updateParticipation(p.id, { status: "left" });
+  revalidatePath("/", "layout");
+  return { ok: true, message: `${target.display_name} 내보냄` };
+}
+
 export async function deleteCheckin(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   const me = await requireUser();
   const repo = getRepo();

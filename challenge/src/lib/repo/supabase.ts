@@ -72,6 +72,13 @@ export class SupabaseRepo implements Repo {
   updateUser(id: string, patch: Partial<Omit<User, "id">>) {
     return this.one<User>(this.sb.from("ch_users").update(patch).eq("id", id).select("*").single(), "updateUser");
   }
+  async deleteUser(id: string) {
+    const checkins = await this.listCheckins({ userId: id });
+    const paths = checkins.map((c) => c.photo_path).filter(Boolean);
+    if (paths.length) await this.sb.storage.from(BUCKET).remove(paths);
+    const { error } = await this.sb.from("ch_users").delete().eq("id", id);
+    if (error) fail("deleteUser", error);
+  }
   async addXp(userId: string, delta: number, reason: string) {
     const { data, error } = await this.sb.rpc("ch_add_xp", { p_user_id: userId, p_delta: delta, p_reason: reason });
     if (error) fail("addXp", error);
@@ -152,6 +159,10 @@ export class SupabaseRepo implements Repo {
   // weight
   listWeightLogs(participationId: string) {
     return this.many<WeightLog>(this.sb.from("ch_weight_logs").select("*").eq("participation_id", participationId).order("local_date", { ascending: true }), "listWeightLogs");
+  }
+  listWeightLogsMany(ids: string[]) {
+    if (ids.length === 0) return Promise.resolve([]);
+    return this.many<WeightLog>(this.sb.from("ch_weight_logs").select("*").in("participation_id", ids).order("local_date", { ascending: true }), "listWeightLogsMany");
   }
   async upsertWeightLog(data: Omit<WeightLog, "id" | "created_at">) {
     const row = await this.one<WeightLog>(this.sb.from("ch_weight_logs").upsert(data, { onConflict: "participation_id,local_date" }).select("*").single(), "upsertWeightLog");

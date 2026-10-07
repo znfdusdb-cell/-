@@ -42,6 +42,11 @@
   --color-bad-soft: var(--bad-soft);
 }
 
+@media (min-width: 560px) {
+  body { background: #ebe9e4; }
+  body > div.mx-auto { background: var(--bg); min-height: 100dvh; box-shadow: 0 0 0 1px var(--line); }
+}
+
 html, body {
   background: var(--bg);
   color: var(--fg);

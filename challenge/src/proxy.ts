@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/session";
 
-const PUBLIC_PREFIXES = ["/login", "/_next", "/sw.js", "/manifest.webmanifest", "/icons/", "/favicon.ico", "/api/cron/", "/api/health", "/offline"];
+const PUBLIC_PREFIXES = ["/login", "/_next", "/sw.js", "/manifest.webmanifest", "/icons/", "/favicon.ico", "/favicon.png", "/og.png", "/robots.txt", "/api/cron/", "/api/health"];
 
 /** 로그인 안 된 요청은 /login 으로. API 는 401. */
 export async function proxy(req: NextRequest) {
