@@ -29,7 +29,7 @@ npm run dev        # 환경변수 없으면 내장 시드 데이터로 뜬다 (�
 ## Supabase 연결 (비움 승인 후)
 
 1. `docs/SCHEMA.md` 읽고 승인.
-2. Supabase SQL Editor에서 `supabase/migrations/20261006_swingbot_init.sql` → `20261006_02_accounts_rules_calendar.sql` 순서로 실행.
+2. Supabase SQL Editor에서 `supabase/migrations/` 파일을 번호 순서대로 실행 (01 init → 02 → 03 → 04 → 05 → 06). 전부 추가만이라 다시 실행해도 안전.
 3. 같은 곳에서 `supabase/seed.sql` 실행 (또는 `.env.local` 채우고 `npx tsx scripts/seed.ts`).
 4. `.env.example`을 `.env.local`로 복사해 값 채움. 배지가 'DB'로 바뀐다.
 
@@ -51,6 +51,10 @@ vercel --prod
 
 `sb_stocks`(레이더 투입·보유 진입), `sb_theses`(가설·무효화 감시), `sb_setups`·`sb_candles`·`sb_market_regime`(매일 계산),
 `sb_positions`·`sb_orders_log`(체결, 근거 `rule_id` 필수), `sb_events`(달력). 자세한 분담은 `docs/SCHEMA.md` 3장.
+
+## MCP 도구 (VPS 쪽)
+
+`docs/MCP_TOOLS.md`. DB 함수는 6차 마이그레이션에 있고, bium-brain `server.py`에 RPC 호출만 붙이면 된다.
 
 ## 2차 범위 (아직 없음)
 
