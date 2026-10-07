@@ -70,6 +70,8 @@ export type Participation = {
   joined_at: string;
   status: "active" | "left";
   goal: ParticipationGoal;
+  /** 관리자가 지정한 집계 시작일 (없으면 월요일 규칙) */
+  start_date?: string | null;
 };
 
 export type Checkin = {
@@ -79,6 +81,9 @@ export type Checkin = {
   challenge_id: string;
   /** 시간대형이면 slot key, 횟수형이면 "count" */
   slot: string;
+  /** camera: 앱에서 바로 촬영 / album: 앨범 사진 / audio: 녹음 */
+  media_type: "camera" | "album" | "audio";
+  /** 스토리지 경로 (사진·오디오 공통) */
   photo_path: string;
   /** 촬영 시각 (클라이언트 보고, 서버 시각과 10분 이상 어긋나면 서버 시각) */
   taken_at: string;

@@ -1,7 +1,7 @@
 import { ensureBootstrap, getRepo } from "@/lib/repo";
 import { pushEnabled, sendPushToUsers, type PushPayload } from "@/lib/push";
 import { dayStatus, effectiveStartDate, periodStatus } from "@/lib/game";
-import { hmToMinutes, kstDate, kstMinutes } from "@/lib/time";
+import { addDays, fmtDateKo, hmToMinutes, kstDate, kstMinutes } from "@/lib/time";
 import type { Challenge, Participation } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
  *   GET /api/cron/remind?key=<CRON_SECRET>   (또는 헤더 x-cron-secret)
  * 시간대형: 시작 시각(±15분 창)에 "시작" 알림, 끝 30분 전(±15분 창)에 "마감 임박" 알림 — 아직 안 올린 사람만.
  * 횟수형: 기간 시작일·마지막 날 오전 10시(10:00~10:29) — 아직 미달인 사람만.
+ * 시작 전 참가자: 시작 전날 20:00~20:29 "내일 시작" 예고, 시작일 08:00~08:29 "오늘부터 시작".
  * 같은 알림은 ch_notice_log 로 하루 1번만.
  */
 export async function GET(req: Request) {
@@ -39,6 +40,18 @@ export async function GET(req: Request) {
 
   for (const [cid, ps] of byChallenge) {
     const ch = challenges.get(cid)!;
+
+    // 시작 전 참가자 알림 (월요일 시작)
+    const tomorrow = addDays(today, 1);
+    if (nowMin >= 20 * 60 && nowMin < 20 * 60 + 30) {
+      const ids = ps.filter((p) => effectiveStartDate(p, ch.config) === tomorrow).map((p) => p.user_id);
+      if (ids.length) planned.push({ key: `${today}:${cid}:start-eve`, userIds: ids, payload: { title: `${ch.emoji} ${ch.title} 내일 시작!`, body: `${fmtDateKo(tomorrow)}부터 인증이 시작돼요. 준비됐나요?`, url: "/", tag: `${cid}-start` } });
+    }
+    if (nowMin >= 8 * 60 && nowMin < 8 * 60 + 30) {
+      const ids = ps.filter((p) => effectiveStartDate(p, ch.config) === today).map((p) => p.user_id);
+      if (ids.length) planned.push({ key: `${today}:${cid}:start-day`, userIds: ids, payload: { title: `${ch.emoji} ${ch.title} 오늘부터 시작!`, body: ch.config.kind === "slots" ? `${ch.config.slots.map((x) => `${x.label} ${x.start}~${x.end}`).join(", ")} 안에 인증해 주세요.` : `이번 주 ${ch.config.times}회 인증, 가볍게 시작해요.`, url: "/", tag: `${cid}-start` } });
+    }
+
     const checkins = await repo.listCheckins({ challengeId: cid, from: ch.config.kind === "slots" ? today : undefined });
 
     if (ch.config.kind === "slots") {

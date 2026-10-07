@@ -21,7 +21,7 @@ export default async function OnboardingPage() {
         <Character level={1} size={72} />
         <div>
           <h1 className="font-display text-2xl">환영해요, {pub.display_name}!</h1>
-          <p className="text-fg-2 text-sm">참여할 챌린지를 골라 주세요. 여러 개도 돼요.</p>
+          <p className="text-fg-2 text-sm">참여할 챌린지를 골라 주세요. 여러 개도 돼요. 챌린지는 매주 월요일에 시작해요.</p>
         </div>
       </div>
 

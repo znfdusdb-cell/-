@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentUser, toPublic } from "@/lib/current-user";
 import { getRepo } from "@/lib/repo";
-import { addDays, fmtDateKo, kstDate } from "@/lib/time";
+import { addDays, fmtDateKo, kstDate, kstWeekday } from "@/lib/time";
 import { Shell } from "@/components/Shell";
 import { PhotoCard } from "@/components/PhotoCard";
 
@@ -24,8 +24,9 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
 
   let content: React.ReactNode = null;
   if (current) {
-    // 시간대형은 그날, 횟수형은 그날까지 period_days 동안
-    const from = current.config.kind === "slots" ? date : addDays(date, -(current.config.period_days - 1));
+    // 시간대형은 그날. 횟수형은 주 단위면 그 주 월요일부터, 아니면 그날까지 period_days 동안
+    const mondayOf = (d: string) => addDays(d, -((kstWeekday(d) + 6) % 7));
+    const from = current.config.kind === "slots" ? date : current.config.period_days === 7 ? mondayOf(date) : addDays(date, -(current.config.period_days - 1));
     const [checkins, participants] = await Promise.all([repo.listCheckins({ challengeId: current.id, from, to: date }), repo.listParticipants(current.id)]);
     const users = new Map(participants.map((p) => [p.user_id, p]));
     const urls = await repo.photoUrls(checkins.map((c) => c.photo_path));

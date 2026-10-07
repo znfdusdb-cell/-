@@ -8,6 +8,7 @@ import { hashPassword, verifyPassword } from "@/lib/password";
 import { SESSION_COOKIE, SESSION_DAYS, signSession } from "@/lib/session";
 import { currentUser, isAdmin, requireUser } from "@/lib/current-user";
 import { CREATE_CHALLENGE_LEVEL, DEFAULT_PRIZE, levelFromXp, validateConfig } from "@/lib/game";
+import { addDays, kstDate, kstWeekday } from "@/lib/time";
 import type { ChallengeConfig, ParticipationGoal, SlotDef } from "@/lib/types";
 
 export type ActionResult = { ok: boolean; error?: string; message?: string };
@@ -131,7 +132,7 @@ export async function joinChallenge(_prev: ActionResult | null, fd: FormData): P
   const existing = await repo.getParticipation(user.id, ch.id);
   if (existing?.status === "active") return { ok: false, error: "이미 참여 중이에요" };
   if (existing) {
-    await repo.updateParticipation(existing.id, { status: "active", joined_at: new Date().toISOString(), goal });
+    await repo.updateParticipation(existing.id, { status: "active", joined_at: new Date().toISOString(), goal, start_date: null });
   } else {
     await repo.createParticipation({ user_id: user.id, challenge_id: ch.id, joined_at: new Date().toISOString(), status: "active", goal });
   }
@@ -279,6 +280,23 @@ export async function adminUpdateUser(_prev: ActionResult | null, fd: FormData):
     return { ok: true, message: `${target.display_name} → ${role === "admin" ? "관리자" : "멤버"}` };
   }
   return { ok: false, error: "모르는 작업" };
+}
+
+/** 관리자: 대기 중인 참가자를 오늘부터 바로 시작시킨다 */
+export async function adminStartNow(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const me = await currentUser();
+  if (!isAdmin(me)) return { ok: false, error: "관리자만" };
+  const repo = getRepo();
+  const target = await repo.getUserById(str(fd, "user_id"));
+  const ch = await repo.getChallenge(str(fd, "challenge_id"));
+  if (!target || !ch) return { ok: false, error: "없는 참가자" };
+  const p = await repo.getParticipation(target.id, ch.id);
+  if (!p || p.status !== "active") return { ok: false, error: "참여 중이 아니에요" };
+  const today = kstDate();
+  const monday = addDays(today, -((kstWeekday(today) + 6) % 7));
+  await repo.updateParticipation(p.id, { start_date: ch.config.kind === "count" ? monday : today });
+  revalidatePath("/", "layout");
+  return { ok: true, message: `${target.display_name} 바로 시작` };
 }
 
 export async function deleteCheckin(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
