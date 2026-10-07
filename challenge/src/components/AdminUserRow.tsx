@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { adminDeleteUser, adminUpdateUser } from "@/app/actions";
+import { adminDeleteUser, adminSendTestPush, adminUpdateUser } from "@/app/actions";
 import { FormMessage, SubmitButton } from "./Form";
 
 type Row = { id: string; username: string; display_name: string; role: string; xp: number; level: number; pushCount: number; lastLogin: string };
@@ -10,6 +10,7 @@ export function AdminUserRow({ user }: { user: Row }) {
   const [open, setOpen] = useState(false);
   const [state, action] = useActionState(adminUpdateUser, null);
   const [delState, delAction] = useActionState(adminDeleteUser, null);
+  const [pushState, pushAction] = useActionState(adminSendTestPush, null);
   const [confirmDel, setConfirmDel] = useState(false);
   return (
     <div className="card p-3">
@@ -22,6 +23,11 @@ export function AdminUserRow({ user }: { user: Row }) {
       </button>
       {open && (
         <div className="mt-3 pt-3 border-t border-line space-y-3">
+          <form action={pushAction} className="flex gap-2 items-center">
+            <input type="hidden" name="user_id" value={user.id} />
+            <SubmitButton className="btn btn-ghost text-sm w-full" pendingText="보내는 중…">테스트 알림 보내기 (알림 {user.pushCount}대)</SubmitButton>
+          </form>
+          <FormMessage state={pushState} />
           <form action={action} className="flex gap-2 items-center">
             <input type="hidden" name="user_id" value={user.id} />
             <input type="hidden" name="op" value="xp" />
