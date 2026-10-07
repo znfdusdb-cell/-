@@ -134,3 +134,24 @@ export type Gift = {
   created_at: string;
   opened_at: string | null;
 };
+
+/** 개발자 문의 스레드 */
+export type Ticket = {
+  id: string;
+  user_id: string;
+  status: "open" | "resolved";
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+  user_read_at: string | null;
+  admin_read_at: string | null;
+};
+
+export type TicketMessage = {
+  id: string;
+  ticket_id: string;
+  sender_id: string;
+  body: string;
+  photo_path: string;
+  created_at: string;
+};

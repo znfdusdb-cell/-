@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentUser, toPublic } from "@/lib/current-user";
-import { loadMyChallenges } from "@/lib/data";
+import { loadMyChallenges, loadPendingMonthlyReports } from "@/lib/data";
+import { MonthlyReportModal } from "@/components/MonthlyReportModal";
 import { getRepo } from "@/lib/repo";
 import { CREATE_CHALLENGE_LEVEL, LEVEL_PERKS, levelFromXp } from "@/lib/game";
 import { inferMethods, METHOD_LABEL, normalizeMethods, type Method } from "@/lib/methods";
@@ -39,9 +40,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     ),
   );
   const anyEliminated = mine.some((m) => m.summary.eliminated);
+  const monthly = await loadPendingMonthlyReports(mineAll);
 
   return (
     <Shell user={pub} title="거너스 챌린지" right={<span className="num">{fmtDateKo(today)}</span>}>
+      {monthly.length > 0 && <MonthlyReportModal reports={monthly} level={level} gender={user.gender} />}
       <section className="card p-4 flex items-center gap-3">
         <Link href="/me" className="shrink-0"><Character level={level} gender={user.gender} size={112} className="animate-float" mood={anyEliminated ? "sad" : "happy"} /></Link>
         <div className="flex-1 min-w-0">

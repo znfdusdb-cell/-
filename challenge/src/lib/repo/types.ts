@@ -1,4 +1,4 @@
-import type { Challenge, Checkin, Gift, Participation, PushSubscriptionRow, User, WeightLog } from "../types";
+import type { Challenge, Checkin, Gift, Participation, PushSubscriptionRow, Ticket, TicketMessage, User, WeightLog } from "../types";
 
 export type CheckinQuery = {
   challengeId?: string;
@@ -61,6 +61,17 @@ export interface Repo {
   markGiftOpened(id: string, userId: string): Promise<void>;
   countUnreadGifts(userId: string): Promise<number>;
 
+  // support (개발자 문의)
+  getOpenTicket(userId: string): Promise<Ticket | null>;
+  /** 가장 최근 문의 (해결된 것 포함) */
+  getLatestTicket(userId: string): Promise<Ticket | null>;
+  getTicket(id: string): Promise<Ticket | null>;
+  createTicket(userId: string): Promise<Ticket>;
+  listOpenTickets(): Promise<Ticket[]>;
+  updateTicket(id: string, patch: Partial<Omit<Ticket, "id">>): Promise<Ticket>;
+  listTicketMessages(ticketId: string): Promise<TicketMessage[]>;
+  addTicketMessage(data: Omit<TicketMessage, "id" | "created_at">): Promise<TicketMessage>;
+
   // photos
   putPhoto(path: string, bytes: Uint8Array, contentType: string): Promise<void>;
   deletePhoto(path: string): Promise<void>;
@@ -73,4 +84,6 @@ export interface Repo {
   listPushSubscriptions(userIds?: string[]): Promise<PushSubscriptionRow[]>;
   /** 같은 key 로 한 번만 보내기. 처음이면 true */
   claimNotice(key: string): Promise<boolean>;
+  /** 이미 보냈는지(주장했는지)만 확인 */
+  hasNotice(key: string): Promise<boolean>;
 }

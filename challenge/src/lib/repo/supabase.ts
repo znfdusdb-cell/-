@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Challenge, Checkin, Gift, Participation, PushSubscriptionRow, User, WeightLog } from "../types";
+import type { Challenge, Checkin, Gift, Participation, PushSubscriptionRow, Ticket, TicketMessage, User, WeightLog } from "../types";
 import type { CheckinQuery, ParticipantRow, Repo } from "./types";
 
 export const BUCKET = "ch-photos";
@@ -189,6 +189,34 @@ export class SupabaseRepo implements Repo {
     return count ?? 0;
   }
 
+  // support
+  getOpenTicket(userId: string) {
+    return this.maybe<Ticket>(this.sb.from("ch_tickets").select("*").eq("user_id", userId).eq("status", "open").order("created_at", { ascending: false }).limit(1).maybeSingle(), "getOpenTicket");
+  }
+  getLatestTicket(userId: string) {
+    return this.maybe<Ticket>(this.sb.from("ch_tickets").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(1).maybeSingle(), "getLatestTicket");
+  }
+  getTicket(id: string) {
+    return this.maybe<Ticket>(this.sb.from("ch_tickets").select("*").eq("id", id).maybeSingle(), "getTicket");
+  }
+  createTicket(userId: string) {
+    return this.one<Ticket>(this.sb.from("ch_tickets").insert({ user_id: userId }).select("*").single(), "createTicket");
+  }
+  listOpenTickets() {
+    return this.many<Ticket>(this.sb.from("ch_tickets").select("*").eq("status", "open").order("updated_at", { ascending: false }), "listOpenTickets");
+  }
+  updateTicket(id: string, patch: Partial<Omit<Ticket, "id">>) {
+    return this.one<Ticket>(this.sb.from("ch_tickets").update(patch).eq("id", id).select("*").single(), "updateTicket");
+  }
+  listTicketMessages(ticketId: string) {
+    return this.many<TicketMessage>(this.sb.from("ch_ticket_messages").select("*").eq("ticket_id", ticketId).order("created_at", { ascending: true }), "listTicketMessages");
+  }
+  async addTicketMessage(data: Omit<TicketMessage, "id" | "created_at">) {
+    const m = await this.one<TicketMessage>(this.sb.from("ch_ticket_messages").insert(data).select("*").single(), "addTicketMessage");
+    await this.sb.from("ch_tickets").update({ updated_at: m.created_at }).eq("id", data.ticket_id);
+    return m;
+  }
+
   // photos
   async putPhoto(path: string, bytes: Uint8Array, contentType: string) {
     const { error } = await this.sb.storage.from(BUCKET).upload(path, bytes, { contentType, upsert: true });
@@ -222,6 +250,11 @@ export class SupabaseRepo implements Repo {
       q = q.in("user_id", userIds);
     }
     return this.many<PushSubscriptionRow>(q, "listPushSubscriptions");
+  }
+  async hasNotice(key: string) {
+    const { count, error } = await this.sb.from("ch_notice_log").select("key", { count: "exact", head: true }).eq("key", key);
+    if (error) fail("hasNotice", error);
+    return (count ?? 0) > 0;
   }
   async claimNotice(key: string) {
     const { error } = await this.sb.from("ch_notice_log").insert({ key });

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentUser, toPublic } from "@/lib/current-user";
 import { loadMyChallenges } from "@/lib/data";
@@ -76,6 +77,14 @@ export default async function MePage() {
       </section>
 
       <ProfileForms displayName={user.display_name} gender={user.gender} />
+
+      <Link href="/support" className="card p-4 mt-3 flex items-center justify-between">
+        <div>
+          <div className="font-bold">개발자에게 문의 · 오류 신고</div>
+          <div className="text-xs text-fg-2 mt-0.5">안 되는 게 있으면 화면 사진과 함께 보내 주세요. 채팅으로 바로 답해요.</div>
+        </div>
+        <span className="text-fg-3">›</span>
+      </Link>
 
       <form action={logout} className="mt-4">
         <button className="btn btn-ghost w-full text-sm">로그아웃</button>

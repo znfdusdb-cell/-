@@ -1,6 +1,6 @@
 import "server-only";
 import { getRepo, type ParticipantRow } from "./repo";
-import { failedUnits, summarize, weightProgress, type Summary } from "./game";
+import { failedUnits, monthReport, summarize, weightProgress, type MonthReport, type Summary } from "./game";
 import { kstDate } from "./time";
 import type { Challenge, Checkin, Participation, User } from "./types";
 
@@ -104,4 +104,22 @@ export async function loadBoard(challenge: Challenge, now = new Date()): Promise
   const group = (r: BoardRow) => (r.summary.eliminated ? 3 : r.waiting ? 2 : r.pending ? 0 : 1);
   const completes = (s: Summary) => (s.kind === "slots" ? s.completeDays : s.completePeriods);
   return rows.sort((a, b) => group(a) - group(b) || b.summary.streak - a.summary.streak || completes(b.summary) - completes(a.summary) || b.participant.user.xp - a.participant.user.xp);
+}
+
+export type MonthlyReportView = { participationId: string; challengeId: string; challengeTitle: string; emoji: string; report: MonthReport };
+
+/** 지난달 리포트 중 아직 안 본 것 (월 첫 접속 때 팝업) */
+export async function loadPendingMonthlyReports(mine: MyChallenge[], now = new Date()): Promise<MonthlyReportView[]> {
+  const repo = getRepo();
+  const today = kstDate(now);
+  const y = parseInt(today.slice(0, 4), 10), m = parseInt(today.slice(5, 7), 10);
+  const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+  const out: MonthlyReportView[] = [];
+  for (const mc of mine) {
+    if (await repo.hasNotice(`monthly:${mc.participation.id}:${prev}`)) continue;
+    const report = monthReport(mc.challenge, mc.participation, mc.checkins, prev, now);
+    if (!report) continue;
+    out.push({ participationId: mc.participation.id, challengeId: mc.challenge.id, challengeTitle: mc.challenge.title, emoji: mc.challenge.emoji, report });
+  }
+  return out;
 }

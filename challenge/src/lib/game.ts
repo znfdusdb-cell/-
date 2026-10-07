@@ -415,3 +415,65 @@ export function validateConfig(cfg: unknown): string | null {
   }
   return "종류는 시간대형 또는 횟수형";
 }
+
+/* ───────── 월 마감 리포트 ───────── */
+
+export type MonthReport = {
+  /** "YYYY-MM" */
+  month: string;
+  total: number;
+  complete: number;
+  fails: number;
+  /** 0~100 */
+  rate: number;
+  /** 그 달 실패가 한도에 닿지 않음 */
+  survived: boolean;
+};
+
+/** 지난달(또는 지정한 달) 성적. 집계할 단위가 없으면 null */
+export function monthReport(ch: Challenge, p: Participation, checkins: Checkin[], month: string, now: Date = new Date()): MonthReport | null {
+  const mine = checkins.filter((c) => c.participation_id === p.id);
+  const start = effectiveStartDate(p, ch.config);
+  const mStart = `${month}-01`;
+  const nextMonth = month.endsWith("-12") ? `${parseInt(month.slice(0, 4), 10) + 1}-01` : `${month.slice(0, 4)}-${String(parseInt(month.slice(5, 7), 10) + 1).padStart(2, "0")}`;
+  const lastDay = addDays(`${nextMonth}-01`, -1);
+  const today = kstDate(now);
+  const from = start > mStart ? start : mStart;
+  const to = lastDay < today ? lastDay : addDays(today, -1);
+  if (from > to) return null;
+  let total = 0, complete = 0, fails = 0;
+  if (ch.config.kind === "slots") {
+    for (let d = from; d <= to; d = addDays(d, 1)) {
+      const st = dayStatus(ch.config, mine, d, now);
+      total++;
+      if (st.complete) complete++;
+      if (st.failed) fails++;
+    }
+  } else {
+    const cfg = ch.config;
+    const first = periodOf(cfg, start, from).index;
+    const last = periodOf(cfg, start, to).index;
+    for (let i = first; i <= last; i++) {
+      const st = periodStatus(cfg, start, mine, addDays(start, i * cfg.period_days), now);
+      if (st.start < mStart || st.start > lastDay) continue;
+      if (!st.complete && !st.failed) continue; // 아직 진행 중
+      total++;
+      if (st.complete) complete++;
+      if (st.failed) fails++;
+    }
+  }
+  if (total === 0) return null;
+  const maxFails = ch.max_fails ?? 0;
+  return { month, total, complete, fails, rate: Math.round((complete / total) * 100), survived: maxFails === 0 || fails < maxFails };
+}
+
+/** 한 달 완주 보너스 경험치 */
+export const MONTH_BONUS_XP = 100;
+
+export function praiseFor(rate: number, survived: boolean): { title: string; body: string } {
+  if (!survived) return { title: "이번 달은 아쉬웠어요", body: "그래도 다시 돌아온 게 진짜예요. 새 달, 새 기록 시작!" };
+  if (rate >= 100) return { title: "완벽한 한 달!", body: "단 하루도 놓치지 않았어요. 이게 챔피언의 루틴이에요." };
+  if (rate >= 90) return { title: "거의 완벽했어요", body: "흔들려도 돌아온 사람이 끝까지 가요. 멋져요." };
+  if (rate >= 70) return { title: "꾸준함이 보여요", body: "한 달을 버틴 사람은 많지 않아요. 당신이 그중 하나예요." };
+  return { title: "살아남았어요!", body: "탈락 없이 한 달을 넘겼어요. 다음 달은 더 가볍게 가요." };
+}

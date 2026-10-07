@@ -15,7 +15,7 @@ export default async function AdminPage() {
   if (!user) redirect("/login");
   if (!isAdmin(user)) redirect("/");
   const repo = getRepo();
-  const [users, challenges, subs] = await Promise.all([repo.listUsers(), repo.listChallenges({ includeInactive: true }), repo.listPushSubscriptions()]);
+  const [users, challenges, subs, openTickets] = await Promise.all([repo.listUsers(), repo.listChallenges({ includeInactive: true }), repo.listPushSubscriptions(), repo.listOpenTickets()]);
   const subCount = new Map<string, number>();
   for (const s of subs) subCount.set(s.user_id, (subCount.get(s.user_id) ?? 0) + 1);
 
@@ -26,6 +26,14 @@ export default async function AdminPage() {
         <div>알림(웹 푸시): <b className={vapidProblem() ? "text-bad" : "text-fg"}>{vapidProblem() ?? "키 정상"}</b> · 구독 {subs.length}건{pushEnabled() ? "" : ""}</div>
         <div>크론: <code>/api/cron/remind?key=CRON_SECRET</code> 를 30분마다 호출 (README 참고)</div>
       </section>
+
+      <Link href="/admin/support" className={`card p-4 mt-3 flex items-center justify-between ${openTickets.length > 0 ? "border-red/40 bg-red-soft" : ""}`}>
+        <div>
+          <div className="font-bold">문의 · 오류 신고 {openTickets.length > 0 && <span className="chip bg-red text-white ml-1 num">{openTickets.length}</span>}</div>
+          <div className="text-xs text-fg-2 mt-0.5">멤버가 보낸 문의에 채팅으로 답하고, 해결되면 완료 처리</div>
+        </div>
+        <span className="text-fg-3">›</span>
+      </Link>
 
       <section className="mt-4">
         <h2 className="text-lg font-extrabold mb-2">챌린지 {challenges.length}</h2>

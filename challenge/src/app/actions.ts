@@ -7,7 +7,7 @@ import { ensureBootstrap, getRepo } from "@/lib/repo";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { SESSION_COOKIE, SESSION_DAYS, signSession } from "@/lib/session";
 import { currentUser, isAdmin, requireUser } from "@/lib/current-user";
-import { CREATE_CHALLENGE_LEVEL, DEFAULT_PENALTY, levelFromXp, validateConfig } from "@/lib/game";
+import { CREATE_CHALLENGE_LEVEL, DEFAULT_PENALTY, levelFromXp, MONTH_BONUS_XP, validateConfig } from "@/lib/game";
 import { inferMethods, normalizeMethods } from "@/lib/methods";
 import { addDays, kstDate, kstWeekday } from "@/lib/time";
 import type { ChallengeConfig, ParticipationGoal, SlotDef } from "@/lib/types";
@@ -341,6 +341,37 @@ export async function adminStartNow(_prev: ActionResult | null, fd: FormData): P
   await repo.updateParticipation(p.id, { start_date: ch.config.kind === "count" ? monday : today });
   revalidatePath("/", "layout");
   return { ok: true, message: `${target.display_name} 바로 시작` };
+}
+
+/** 월 마감 팝업 확인. 살아남은 달이면 완주 보너스 경험치 1회 */
+export async function ackMonthly(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const me = await requireUser();
+  const repo = getRepo();
+  const pid = str(fd, "participation_id");
+  const month = str(fd, "month");
+  const survived = str(fd, "survived") === "1";
+  if (!/^\d{4}-\d{2}$/.test(month)) return { ok: false, error: "잘못된 달" };
+  const parts = await repo.listParticipationsByUser(me.id);
+  if (!parts.some((p) => p.id === pid)) return { ok: false, error: "내 참여가 아니에요" };
+  if (await repo.claimNotice(`monthly:${pid}:${month}`)) {
+    if (survived) await repo.addXp(me.id, MONTH_BONUS_XP, `${month} 한 달 완주 보너스`);
+  }
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** 관리자: 문의 해결 완료 → 목록에서 사라짐 */
+export async function resolveTicket(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const me = await currentUser();
+  if (!isAdmin(me)) return { ok: false, error: "관리자만" };
+  const repo = getRepo();
+  const t = await repo.getTicket(str(fd, "ticket_id"));
+  if (!t) return { ok: false, error: "없는 문의" };
+  await repo.updateTicket(t.id, { status: "resolved", resolved_at: new Date().toISOString() });
+  const { sendPushToUsers } = await import("@/lib/push");
+  await sendPushToUsers([t.user_id], { title: "문의가 해결됐어요 ✅", body: "개발자가 해결 완료로 표시했어요. 또 문제가 있으면 언제든 보내 주세요.", url: "/support", tag: "support" });
+  revalidatePath("/admin/support");
+  redirect("/admin/support");
 }
 
 /** 선물함에서 열기 (읽음 처리) */
