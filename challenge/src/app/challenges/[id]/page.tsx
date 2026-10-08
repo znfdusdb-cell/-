@@ -26,6 +26,7 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
   const joined = mine?.status === "active";
   const canEdit = isAdmin(user) || ch.created_by === user.id;
   const today = kstDate();
+  const cheers = await repo.countCheersReceivedMany(board.map((r) => r.participant.user_id)).catch(() => ({} as Record<string, number>));
 
   return (
     <Shell user={toPublic(user)} title={`${ch.emoji} ${ch.title}`} right={<Link href="/challenges">목록</Link>}>
@@ -77,6 +78,7 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold truncate">{p.user.display_name}</span>
+                          {(cheers[p.user_id] ?? 0) > 0 && <span className="text-[11px] text-red num">🔥{cheers[p.user_id]}</span>}
                           <span className="text-[11px] text-red font-bold">Lv.{levelFromXp(p.user.xp)}</span>
                           {s.eliminated ? <span className="chip bg-bad text-white">탈락</span> : waiting ? <span className="chip bg-bg-2 text-fg-2">{fmtDateKo(s.startDate)} 시작</span> : pending ? <span className="chip bg-red text-white">인증 전</span> : <span className="chip bg-ok text-white">완료</span>}
                         </div>

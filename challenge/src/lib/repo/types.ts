@@ -61,6 +61,14 @@ export interface Repo {
   markGiftOpened(id: string, userId: string): Promise<void>;
   countUnreadGifts(userId: string): Promise<number>;
 
+  // cheers (응원)
+  toggleCheer(checkinId: string, userId: string): Promise<{ cheered: boolean; count: number }>;
+  /** 인증별 응원 수와 내가 눌렀는지 */
+  cheerStats(checkinIds: string[], userId: string): Promise<Record<string, { count: number; mine: boolean }>>;
+  /** 내 인증들이 받은 응원 합 */
+  countCheersReceived(userId: string): Promise<number>;
+  countCheersReceivedMany(userIds: string[]): Promise<Record<string, number>>;
+
   // support (개발자 문의)
   getOpenTicket(userId: string): Promise<Ticket | null>;
   /** 가장 최근 문의 (해결된 것 포함) */
