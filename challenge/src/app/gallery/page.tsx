@@ -36,7 +36,8 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
 
   let content: React.ReactNode = null;
   if (current) {
-    const [checkins, participants] = await Promise.all([repo.listCheckins({ challengeId: current.id, from, to }), repo.listParticipants(current.id)]);
+    const [checkins, participants] = await Promise.all([repo.listCheckins({ challengeId: current.id, from, to, includeRejected: true }), repo.listParticipants(current.id)]);
+    const myReports = new Set((await repo.listReportsFor(checkins.map((c) => c.id)).catch(() => [])).filter((r) => r.reporter_id === user.id).map((r) => r.checkin_id));
     const users = new Map(participants.map((p) => [p.user_id, p]));
     // 다이어트: 사람별 감량 진행률 (몸무게 숫자는 비공개)
     const progress = new Map<string, { targetLoss: number; lost: number; ratio: number; reached: boolean }>();
@@ -68,7 +69,7 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
               const p = users.get(c.user_id);
               const caption = current.config.kind === "slots" ? slotLabel(c.slot) : p?.goal.hobby;
               const cs = cheers[c.id] ?? { count: 0, mine: false };
-              return <PhotoCard key={c.id} checkin={c} user={p?.user ?? { display_name: "탈퇴", xp: 0 }} url={urls[c.photo_path]} caption={caption} canDelete={isAdmin(user) || c.user_id === user.id} progress={progress.get(c.user_id) ?? null} cheer={{ ...cs, own: c.user_id === user.id }} />;
+              return <PhotoCard key={c.id} checkin={c} user={p?.user ?? { display_name: "탈퇴", xp: 0 }} url={urls[c.photo_path]} caption={caption} canDelete={isAdmin(user) || c.user_id === user.id} progress={progress.get(c.user_id) ?? null} cheer={{ ...cs, own: c.user_id === user.id }} report={{ own: c.user_id === user.id, reported: myReports.has(c.id) }} />;
             })}
           </div>
         )}

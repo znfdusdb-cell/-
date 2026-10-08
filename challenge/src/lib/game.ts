@@ -251,7 +251,8 @@ export function countSummary(cfg: CountConfig, p: Participation, checkins: Check
 export type FailedUnit = { key: string; date: string; xp: number };
 
 /** 참여 시작 이후 실패한 단위 전부 (오늘 포함, 확정된 것만) */
-export function failedUnits(cfg: ChallengeConfig, p: Participation, checkins: Checkin[], now: Date = new Date()): FailedUnit[] {
+export function failedUnits(cfg: ChallengeConfig, p: Participation, checkinsIn: Checkin[], now: Date = new Date()): FailedUnit[] {
+  const checkins = checkinsIn.filter((c) => !c.rejected_at);
   const start = effectiveStartDate(p, cfg);
   const today = kstDate(now);
   const out: FailedUnit[] = [];
@@ -281,7 +282,7 @@ export type Summary = (SlotsSummary | CountSummary) & {
 };
 
 export function summarize(ch: Challenge, p: Participation, checkins: Checkin[], now: Date = new Date()): Summary {
-  const mine = checkins.filter((c) => c.participation_id === p.id);
+  const mine = checkins.filter((c) => c.participation_id === p.id && !c.rejected_at);
   const base = ch.config.kind === "slots" ? slotsSummary(ch.config, p, mine, now) : countSummary(ch.config, p, mine, now);
   const units = failedUnits(ch.config, p, mine, now);
   const monthStart = kstDate(now).slice(0, 7) + "-01";

@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Challenge, Checkin, Gift, Participation, PushSubscriptionRow, Ticket, TicketMessage, User, WeightLog } from "../types";
+import type { Challenge, Checkin, Gift, Participation, PushSubscriptionRow, Report, Ticket, TicketMessage, User, WeightLog } from "../types";
 import type { CheckinQuery, ParticipantRow, Repo } from "./types";
 
 export const BUCKET = "ch-photos";
@@ -140,6 +140,7 @@ export class SupabaseRepo implements Repo {
     }
     if (q.from) s = s.gte("local_date", q.from);
     if (q.to) s = s.lte("local_date", q.to);
+    if (!q.includeRejected) s = s.is("rejected_at", null);
     return this.many<Checkin>(s, "listCheckins");
   }
   getCheckin(id: string) {
@@ -215,6 +216,25 @@ export class SupabaseRepo implements Repo {
     const m = await this.one<TicketMessage>(this.sb.from("ch_ticket_messages").insert(data).select("*").single(), "addTicketMessage");
     await this.sb.from("ch_tickets").update({ updated_at: m.created_at }).eq("id", data.ticket_id);
     return m;
+  }
+
+  // reports
+  async createReport(data: Omit<Report, "id" | "created_at" | "resolved_at" | "status">) {
+    const { data: row, error } = await this.sb.from("ch_reports").upsert(data, { onConflict: "checkin_id,reporter_id", ignoreDuplicates: true }).select("*").maybeSingle();
+    if (error) fail("createReport", error);
+    if (row) return row as Report;
+    return this.one<Report>(this.sb.from("ch_reports").select("*").eq("checkin_id", data.checkin_id).eq("reporter_id", data.reporter_id).single(), "createReport:get");
+  }
+  listOpenReports() {
+    return this.many<Report>(this.sb.from("ch_reports").select("*").eq("status", "open").order("created_at", { ascending: false }), "listOpenReports");
+  }
+  listReportsFor(checkinIds: string[]) {
+    if (checkinIds.length === 0) return Promise.resolve([]);
+    return this.many<Report>(this.sb.from("ch_reports").select("*").in("checkin_id", checkinIds), "listReportsFor");
+  }
+  async resolveReports(checkinId: string, status: "accepted" | "dismissed") {
+    const { error } = await this.sb.from("ch_reports").update({ status, resolved_at: new Date().toISOString() }).eq("checkin_id", checkinId).eq("status", "open");
+    if (error) fail("resolveReports", error);
   }
 
   // cheers

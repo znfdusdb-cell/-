@@ -1,4 +1,4 @@
-import type { Challenge, Checkin, Gift, Participation, PushSubscriptionRow, Ticket, TicketMessage, User, WeightLog } from "../types";
+import type { Challenge, Checkin, Gift, Participation, PushSubscriptionRow, Report, Ticket, TicketMessage, User, WeightLog } from "../types";
 
 export type CheckinQuery = {
   challengeId?: string;
@@ -9,6 +9,8 @@ export type CheckinQuery = {
   from?: string;
   /** local_date <= to */
   to?: string;
+  /** 불인정된 인증도 포함 (기본은 제외 — 집계용) */
+  includeRejected?: boolean;
 };
 
 export type ParticipantRow = Participation & { user: User };
@@ -60,6 +62,12 @@ export interface Repo {
   listGiftsSentSince(userId: string, challengeId: string, sinceIso: string): Promise<Gift[]>;
   markGiftOpened(id: string, userId: string): Promise<void>;
   countUnreadGifts(userId: string): Promise<number>;
+
+  // reports (신고)
+  createReport(data: Omit<Report, "id" | "created_at" | "resolved_at" | "status">): Promise<Report>;
+  listOpenReports(): Promise<Report[]>;
+  listReportsFor(checkinIds: string[]): Promise<Report[]>;
+  resolveReports(checkinId: string, status: "accepted" | "dismissed"): Promise<void>;
 
   // cheers (응원)
   toggleCheer(checkinId: string, userId: string): Promise<{ cheered: boolean; count: number }>;

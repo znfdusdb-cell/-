@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Challenge, Cheer, Checkin, Gift, Participation, PushSubscriptionRow, Ticket, TicketMessage, User, WeightLog } from "../types";
+import type { Challenge, Cheer, Checkin, Gift, Participation, PushSubscriptionRow, Report, Ticket, TicketMessage, User, WeightLog } from "../types";
 import type { CheckinQuery, ParticipantRow, Repo } from "./types";
 
 type Store = {
@@ -14,6 +14,7 @@ type Store = {
   tickets: Ticket[];
   ticketMessages: TicketMessage[];
   cheers: Cheer[];
+  reports: Report[];
   notices: Set<string>;
   xpLog: { user_id: string; delta: number; reason: string; created_at: string }[];
 };
@@ -34,6 +35,7 @@ function store(): Store {
       tickets: [],
       ticketMessages: [],
       cheers: [],
+      reports: [],
       notices: new Set(),
       xpLog: [],
     };
@@ -149,7 +151,8 @@ export class MemoryRepo implements Repo {
             (!q.participationId || c.participation_id === q.participationId) &&
             (!ids || ids.has(c.participation_id)) &&
             (!q.from || c.local_date >= q.from) &&
-            (!q.to || c.local_date <= q.to),
+            (!q.to || c.local_date <= q.to) &&
+            (q.includeRejected || !c.rejected_at),
         )
         .sort((a, b) => b.created_at.localeCompare(a.created_at)),
     );
@@ -242,6 +245,24 @@ export class MemoryRepo implements Repo {
     return clone(m);
   }
 
+  async createReport(data: Omit<Report, "id" | "created_at" | "resolved_at" | "status">) {
+    const s = store();
+    const dup = s.reports.find((r) => r.checkin_id === data.checkin_id && r.reporter_id === data.reporter_id);
+    if (dup) return clone(dup);
+    const r: Report = { id: randomUUID(), created_at: now(), resolved_at: null, status: "open", ...data };
+    s.reports.push(r);
+    return clone(r);
+  }
+  async listOpenReports() {
+    return clone(store().reports.filter((r) => r.status === "open").sort((a, b) => b.created_at.localeCompare(a.created_at)));
+  }
+  async listReportsFor(checkinIds: string[]) {
+    const set = new Set(checkinIds);
+    return clone(store().reports.filter((r) => set.has(r.checkin_id)));
+  }
+  async resolveReports(checkinId: string, status: "accepted" | "dismissed") {
+    for (const r of store().reports) if (r.checkin_id === checkinId && r.status === "open") { r.status = status; r.resolved_at = now(); }
+  }
   async toggleCheer(checkinId: string, userId: string) {
     const s = store();
     const i = s.cheers.findIndex((c) => c.checkin_id === checkinId && c.user_id === userId);

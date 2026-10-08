@@ -374,6 +374,57 @@ export async function resolveTicket(_prev: ActionResult | null, fd: FormData): P
   redirect("/admin/support");
 }
 
+/** 인증 신고: 같은 챌린지 멤버 누구나. 관리자에게 알림 */
+export async function reportCheckin(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const me = await requireUser();
+  const repo = getRepo();
+  const c = await repo.getCheckin(str(fd, "checkin_id"));
+  if (!c) return { ok: false, error: "없는 인증" };
+  if (c.user_id === me.id) return { ok: false, error: "내 인증은 신고할 수 없어요" };
+  if (c.rejected_at) return { ok: false, error: "이미 불인정된 인증이에요" };
+  if (!isAdmin(me)) {
+    const mine = await repo.getParticipation(me.id, c.challenge_id);
+    if (!mine || mine.status !== "active") return { ok: false, error: "같은 챌린지 참여자만 신고할 수 있어요" };
+  }
+  const reason = str(fd, "reason").slice(0, 80);
+  const detail = str(fd, "detail").slice(0, 200);
+  if (!reason) return { ok: false, error: "사유를 골라 주세요" };
+  await repo.createReport({ checkin_id: c.id, reporter_id: me.id, reason: detail ? `${reason} — ${detail}` : reason });
+  const admins = (await repo.listUsers()).filter((u) => u.role === "admin" && u.id !== me.id).map((u) => u.id);
+  const { sendPushToUsers } = await import("@/lib/push");
+  await sendPushToUsers(admins, { title: "🚩 인증 신고가 들어왔어요", body: `${me.display_name}: ${reason}`, url: "/admin/reports", tag: `report-${c.id}` }).catch(() => null);
+  revalidatePath("/gallery");
+  return { ok: true, message: "신고했어요. 관리자가 확인해요" };
+}
+
+/** 관리자 판정. accept = 불인정(인증 실패 처리, 경험치 회수) / dismiss = 인정(신고 기각) */
+export async function judgeReport(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const me = await currentUser();
+  if (!isAdmin(me)) return { ok: false, error: "관리자만" };
+  const repo = getRepo();
+  const c = await repo.getCheckin(str(fd, "checkin_id"));
+  if (!c) return { ok: false, error: "없는 인증" };
+  const verdict = str(fd, "verdict") === "accept" ? "accepted" : "dismissed";
+  const note = str(fd, "note").slice(0, 120);
+  const reports = await repo.listReportsFor([c.id]);
+  const reporters = [...new Set(reports.filter((r) => r.status === "open").map((r) => r.reporter_id))];
+  const { sendPushToUsers } = await import("@/lib/push");
+  if (verdict === "accepted") {
+    if (!c.rejected_at) {
+      await repo.updateCheckin(c.id, { rejected_at: new Date().toISOString(), rejected_reason: note || "관리자 불인정", xp: 0 });
+      if (c.xp > 0) await repo.addXp(c.user_id, -c.xp, "인증 불인정 회수");
+    }
+    await repo.resolveReports(c.id, "accepted");
+    await sendPushToUsers([c.user_id], { title: "인증이 불인정됐어요", body: `${note || "관리자 판정"} · 그 시간대는 실패로 처리돼요. 이의가 있으면 개발자 문의로 보내 주세요.`, url: "/", tag: `judge-${c.id}` }).catch(() => null);
+    await sendPushToUsers(reporters, { title: "신고가 받아들여졌어요", body: "해당 인증은 불인정 처리됐어요.", url: "/gallery", tag: `judge-${c.id}` }).catch(() => null);
+  } else {
+    await repo.resolveReports(c.id, "dismissed");
+    await sendPushToUsers(reporters, { title: "신고를 확인했어요", body: "관리자가 보기엔 정상 인증이라 그대로 인정돼요.", url: "/gallery", tag: `judge-${c.id}` }).catch(() => null);
+  }
+  revalidatePath("/", "layout");
+  return { ok: true, message: verdict === "accepted" ? "불인정 처리했어요" : "인정(기각)했어요" };
+}
+
 /** 인증 응원 켜기/끄기. 같은 챌린지 참여자(또는 관리자)만, 내 인증은 불가. 처음 켤 때 주인에게 알림 1회 */
 export async function toggleCheer(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   const me = await requireUser();
