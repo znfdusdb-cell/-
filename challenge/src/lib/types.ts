@@ -112,6 +112,20 @@ export type Checkin = {
   local_date: string;
   note: string;
   xp: number;
+  /** 관리자가 불인정 처리한 시각 (있으면 집계에서 제외) */
+  rejected_at?: string | null;
+  rejected_reason?: string;
+};
+
+/** 인증 신고 */
+export type Report = {
+  id: string;
+  checkin_id: string;
+  reporter_id: string;
+  reason: string;
+  status: "open" | "accepted" | "dismissed";
+  created_at: string;
+  resolved_at: string | null;
 };
 
 export type PushSubscriptionRow = {

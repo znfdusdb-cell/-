@@ -5,16 +5,19 @@ import type { Checkin, User } from "@/lib/types";
 import { ProtectedImage } from "./ProtectedMedia";
 import { DeleteCheckinButton } from "./DeleteCheckinButton";
 import { CheerButton, type CheerState } from "./CheerButton";
+import { ReportButton } from "./ReportButton";
 
 /** 갤러리 카드 1장: 사진·녹음·링크 + 시각 + 사용자. 사진은 저장 못 하게 막는다. */
 export type WeightBadge = { targetLoss: number; lost: number; ratio: number; reached: boolean };
 
-export function PhotoCard({ checkin, user, url, caption, canDelete, progress = null, cheer = null }: { checkin: Checkin; user: Pick<User, "display_name" | "xp">; url: string | undefined; caption?: string; canDelete: boolean; progress?: WeightBadge | null; cheer?: CheerState | null }) {
+export function PhotoCard({ checkin, user, url, caption, canDelete, progress = null, cheer = null, report = null }: { checkin: Checkin; user: Pick<User, "display_name" | "xp">; url: string | undefined; caption?: string; canDelete: boolean; progress?: WeightBadge | null; cheer?: CheerState | null; report?: { own: boolean; reported: boolean } | null }) {
   const kind = checkin.media_type;
+  const rejected = Boolean(checkin.rejected_at);
   const embed = kind === "link" ? youtubeEmbed(checkin.link_url) : null;
   return (
-    <figure className="card overflow-hidden">
+    <figure className={`card overflow-hidden ${rejected ? "opacity-60" : ""}`}>
       <div className="relative aspect-square bg-bg-3">
+        {rejected && <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 pointer-events-none"><span className="chip bg-bad text-white text-sm">불인정 · 실패 처리</span></div>}
         {kind === "audio" ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-3">
             <div className="text-xs font-bold text-fg-2">녹음</div>
@@ -44,7 +47,8 @@ export function PhotoCard({ checkin, user, url, caption, canDelete, progress = n
         <div className="flex items-center justify-between gap-1">
           <span className="font-bold truncate">{user.display_name} <span className="text-red font-bold">Lv.{levelFromXp(user.xp)}</span></span>
           <span className="flex items-center gap-2 shrink-0">
-            {cheer && <CheerButton checkinId={checkin.id} cheer={cheer} />}
+            {cheer && !rejected && <CheerButton checkinId={checkin.id} cheer={cheer} />}
+            {report && !report.own && !rejected && <ReportButton checkinId={checkin.id} reported={report.reported} />}
             {canDelete && <DeleteCheckinButton checkinId={checkin.id} />}
           </span>
         </div>
