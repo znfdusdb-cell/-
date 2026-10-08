@@ -51,6 +51,8 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
       }
     }
     const urls = await repo.photoUrls(checkins.filter((c) => c.photo_path).map((c) => c.photo_path));
+    // 응원 수·내가 눌렀는지 (마이그레이션 07 전이면 빈 값)
+    const cheers = await repo.cheerStats(checkins.map((c) => c.id), user.id).catch(() => ({} as Record<string, { count: number; mine: boolean }>));
     const slotLabel = (key: string) => (current.config.kind === "slots" ? current.config.slots.find((s) => s.key === key)?.label : undefined);
 
     content = (
@@ -65,7 +67,8 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
             {checkins.map((c) => {
               const p = users.get(c.user_id);
               const caption = current.config.kind === "slots" ? slotLabel(c.slot) : p?.goal.hobby;
-              return <PhotoCard key={c.id} checkin={c} user={p?.user ?? { display_name: "탈퇴", xp: 0 }} url={urls[c.photo_path]} caption={caption} canDelete={isAdmin(user) || c.user_id === user.id} progress={progress.get(c.user_id) ?? null} />;
+              const cs = cheers[c.id] ?? { count: 0, mine: false };
+              return <PhotoCard key={c.id} checkin={c} user={p?.user ?? { display_name: "탈퇴", xp: 0 }} url={urls[c.photo_path]} caption={caption} canDelete={isAdmin(user) || c.user_id === user.id} progress={progress.get(c.user_id) ?? null} cheer={{ ...cs, own: c.user_id === user.id }} />;
             })}
           </div>
         )}

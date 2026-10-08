@@ -18,6 +18,7 @@ export default async function AdminPage() {
   const [users, challenges, subs] = await Promise.all([repo.listUsers(), repo.listChallenges({ includeInactive: true }), repo.listPushSubscriptions()]);
   const ticketsOk = await repo.listOpenTickets().then(() => true).catch(() => false);
   const giftsOk = await repo.countUnreadGifts(user.id).then(() => true).catch(() => false);
+  const cheersOk = await repo.countCheersReceived(user.id).then(() => true).catch(() => false);
   const openTickets = ticketsOk ? await repo.listOpenTickets() : [];
   const subCount = new Map<string, number>();
   for (const s of subs) subCount.set(s.user_id, (subCount.get(s.user_id) ?? 0) + 1);
@@ -28,9 +29,9 @@ export default async function AdminPage() {
         <div>저장소: <b className="text-fg">{repo.mode === "supabase" ? "Supabase" : "메모리(임시 · 재시작하면 사라짐)"}</b></div>
         <div>알림(웹 푸시): <b className={vapidProblem() ? "text-bad" : "text-fg"}>{vapidProblem() ?? "키 정상"}</b> · 구독 {subs.length}건{pushEnabled() ? "" : ""}</div>
         <div>크론: <code>/api/cron/remind?key=CRON_SECRET</code> 를 30분마다 호출 (README 참고)</div>
-        {(!giftsOk || !ticketsOk) && (
+        {(!giftsOk || !ticketsOk || !cheersOk) && (
           <div className="text-bad font-bold">
-            마이그레이션 필요: {!giftsOk && "05 (ch_gifts, 선물함)"}{!giftsOk && !ticketsOk && " · "}{!ticketsOk && "06 (ch_tickets, 문의 채팅)"} — Supabase SQL Editor에서 `challenge/supabase/migrations/` 파일 실행
+            마이그레이션 필요: {[!giftsOk && "05 (ch_gifts, 선물함)", !ticketsOk && "06 (ch_tickets, 문의 채팅)", !cheersOk && "07 (ch_cheers, 응원)"].filter(Boolean).join(" · ")} — Supabase SQL Editor에서 `challenge/supabase/migrations/` 파일 실행
           </div>
         )}
       </section>

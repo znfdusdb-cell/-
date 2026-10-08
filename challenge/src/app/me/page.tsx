@@ -26,6 +26,7 @@ export default async function MePage() {
   const repo = getRepo();
   // 마이그레이션 05 전이면 표가 없어 실패 → 선물함만 비우고 화면은 살린다
   const gifts = await repo.listGiftsReceived(user.id).catch(() => []);
+  const cheers = await repo.countCheersReceived(user.id).catch(() => 0);
   const [senders, challenges, urls] = await Promise.all([
     repo.getUsersByIds([...new Set(gifts.map((g) => g.from_user_id))]),
     repo.listChallenges({ includeInactive: true }),
@@ -47,11 +48,13 @@ export default async function MePage() {
         <div className="flex justify-center"><Character level={level} gender={user.gender} size={180} className="animate-float" /></div>
         <div className="text-2xl font-extrabold mt-1">{user.display_name}</div>
         <div className="text-xs text-fg-3">@{user.username}{user.role === "admin" ? " · 관리자" : ""}</div>
+        <div className="chip bg-red-soft text-red mt-2 num">🔥 받은 응원 {cheers}</div>
         <div className="mt-3 text-left"><XpBar xp={user.xp} /></div>
         <div className="grid grid-cols-3 gap-2 mt-4 text-center">
           <div className="rounded-xl bg-bg-3 p-2"><div className="text-xl font-extrabold num">{user.xp}</div><div className="text-[11px] text-fg-2">총 경험치</div></div>
           <div className="rounded-xl bg-bg-3 p-2"><div className="text-xl font-extrabold num">{totalCheckins}</div><div className="text-[11px] text-fg-2">인증 횟수</div></div>
-          <div className="rounded-xl bg-bg-3 p-2"><div className="text-xl font-extrabold num">{bestStreak}</div><div className="text-[11px] text-fg-2">현재 최고 연속</div></div>
+          <div className="rounded-xl bg-bg-3 p-2"><div className="text-xl font-extrabold num">{bestStreak}</div><div className="text-[11px] text-fg-2">최고 연속</div></div>
+          <div className="rounded-xl bg-bg-3 p-2"><div className="text-xl font-extrabold num">{cheers}</div><div className="text-[11px] text-fg-2">받은 응원</div></div>
         </div>
       </section>
 

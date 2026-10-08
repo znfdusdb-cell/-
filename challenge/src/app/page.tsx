@@ -41,6 +41,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   );
   const anyEliminated = mine.some((m) => m.summary.eliminated);
   const monthly = await loadPendingMonthlyReports(mineAll);
+  const cheers = await repo.countCheersReceived(user.id).catch(() => 0);
 
   return (
     <Shell user={pub} title="거너스 챌린지" right={<span className="num">{fmtDateKo(today)}</span>}>
@@ -48,7 +49,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       <section className="card p-4 flex items-center gap-3">
         <Link href="/me" className="shrink-0"><Character level={level} gender={user.gender} size={112} className="animate-float" mood={anyEliminated ? "sad" : "happy"} /></Link>
         <div className="flex-1 min-w-0">
-          <div className="text-lg font-extrabold truncate">{pub.display_name}</div>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="text-lg font-extrabold truncate">{pub.display_name}</div>
+            {cheers > 0 && <span className="chip bg-red-soft text-red num shrink-0">🔥 {cheers}</span>}
+          </div>
           <XpBar xp={user.xp} />
           {nextPerk && <p className="text-[11px] text-fg-3 mt-1.5">Lv.{nextPerk.level}: {nextPerk.look}</p>}
         </div>

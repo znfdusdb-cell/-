@@ -12,7 +12,7 @@ import { inferMethods, normalizeMethods } from "@/lib/methods";
 import { addDays, kstDate, kstWeekday } from "@/lib/time";
 import type { ChallengeConfig, ParticipationGoal, SlotDef } from "@/lib/types";
 
-export type ActionResult = { ok: boolean; error?: string; message?: string };
+export type ActionResult = { ok: boolean; error?: string; message?: string; cheered?: boolean; count?: number };
 
 const USERNAME_RE = /^[\p{L}\p{N}_.-]{2,16}$/u;
 
@@ -372,6 +372,26 @@ export async function resolveTicket(_prev: ActionResult | null, fd: FormData): P
   await sendPushToUsers([t.user_id], { title: "문의가 해결됐어요 ✅", body: "개발자가 해결 완료로 표시했어요. 또 문제가 있으면 언제든 보내 주세요.", url: "/support", tag: "support" });
   revalidatePath("/admin/support");
   redirect("/admin/support");
+}
+
+/** 인증 응원 켜기/끄기. 같은 챌린지 참여자(또는 관리자)만, 내 인증은 불가. 처음 켤 때 주인에게 알림 1회 */
+export async function toggleCheer(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const me = await requireUser();
+  const repo = getRepo();
+  const c = await repo.getCheckin(str(fd, "checkin_id"));
+  if (!c) return { ok: false, error: "없는 인증" };
+  if (c.user_id === me.id) return { ok: false, error: "내 인증은 응원할 수 없어요" };
+  if (!isAdmin(me)) {
+    const mine = await repo.getParticipation(me.id, c.challenge_id);
+    if (!mine || mine.status !== "active") return { ok: false, error: "같은 챌린지 참여자만 응원할 수 있어요" };
+  }
+  const r = await repo.toggleCheer(c.id, me.id);
+  if (r.cheered && (await repo.claimNotice(`cheer:${c.id}:${me.id}`))) {
+    const { sendPushToUsers } = await import("@/lib/push");
+    await sendPushToUsers([c.user_id], { title: `🔥 ${me.display_name}님이 응원했어요`, body: "오늘 인증에 응원이 도착했어요. 혼자가 아니에요!", url: `/gallery?c=${c.challenge_id}`, tag: `cheer-${c.id}` }).catch(() => null);
+  }
+  revalidatePath("/gallery");
+  return { ok: true, cheered: r.cheered, count: r.count };
 }
 
 /** 선물함에서 열기 (읽음 처리) */

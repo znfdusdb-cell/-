@@ -4,11 +4,12 @@ import { linkDomain, youtubeEmbed } from "@/lib/methods";
 import type { Checkin, User } from "@/lib/types";
 import { ProtectedImage } from "./ProtectedMedia";
 import { DeleteCheckinButton } from "./DeleteCheckinButton";
+import { CheerButton, type CheerState } from "./CheerButton";
 
 /** 갤러리 카드 1장: 사진·녹음·링크 + 시각 + 사용자. 사진은 저장 못 하게 막는다. */
 export type WeightBadge = { targetLoss: number; lost: number; ratio: number; reached: boolean };
 
-export function PhotoCard({ checkin, user, url, caption, canDelete, progress = null }: { checkin: Checkin; user: Pick<User, "display_name" | "xp">; url: string | undefined; caption?: string; canDelete: boolean; progress?: WeightBadge | null }) {
+export function PhotoCard({ checkin, user, url, caption, canDelete, progress = null, cheer = null }: { checkin: Checkin; user: Pick<User, "display_name" | "xp">; url: string | undefined; caption?: string; canDelete: boolean; progress?: WeightBadge | null; cheer?: CheerState | null }) {
   const kind = checkin.media_type;
   const embed = kind === "link" ? youtubeEmbed(checkin.link_url) : null;
   return (
@@ -40,9 +41,12 @@ export function PhotoCard({ checkin, user, url, caption, canDelete, progress = n
         {caption && <div className="absolute top-1.5 left-1.5 chip bg-white/90 text-fg pointer-events-none">{caption}</div>}
       </div>
       <figcaption className="px-2.5 py-1.5 text-xs">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-1">
           <span className="font-bold truncate">{user.display_name} <span className="text-red font-bold">Lv.{levelFromXp(user.xp)}</span></span>
-          {canDelete && <DeleteCheckinButton checkinId={checkin.id} />}
+          <span className="flex items-center gap-2 shrink-0">
+            {cheer && <CheerButton checkinId={checkin.id} cheer={cheer} />}
+            {canDelete && <DeleteCheckinButton checkinId={checkin.id} />}
+          </span>
         </div>
         {progress && (
           <div className="mt-1">

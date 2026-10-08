@@ -135,6 +135,14 @@ export type Gift = {
   opened_at: string | null;
 };
 
+/** 인증 응원(좋아요) */
+export type Cheer = {
+  id: string;
+  checkin_id: string;
+  user_id: string;
+  created_at: string;
+};
+
 /** 개발자 문의 스레드 */
 export type Ticket = {
   id: string;

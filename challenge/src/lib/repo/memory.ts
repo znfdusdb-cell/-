@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Challenge, Checkin, Gift, Participation, PushSubscriptionRow, Ticket, TicketMessage, User, WeightLog } from "../types";
+import type { Challenge, Cheer, Checkin, Gift, Participation, PushSubscriptionRow, Ticket, TicketMessage, User, WeightLog } from "../types";
 import type { CheckinQuery, ParticipantRow, Repo } from "./types";
 
 type Store = {
@@ -13,6 +13,7 @@ type Store = {
   gifts: Gift[];
   tickets: Ticket[];
   ticketMessages: TicketMessage[];
+  cheers: Cheer[];
   notices: Set<string>;
   xpLog: { user_id: string; delta: number; reason: string; created_at: string }[];
 };
@@ -32,6 +33,7 @@ function store(): Store {
       gifts: [],
       tickets: [],
       ticketMessages: [],
+      cheers: [],
       notices: new Set(),
       xpLog: [],
     };
@@ -238,6 +240,31 @@ export class MemoryRepo implements Repo {
     const t = store().tickets.find((x) => x.id === data.ticket_id);
     if (t) t.updated_at = m.created_at;
     return clone(m);
+  }
+
+  async toggleCheer(checkinId: string, userId: string) {
+    const s = store();
+    const i = s.cheers.findIndex((c) => c.checkin_id === checkinId && c.user_id === userId);
+    if (i >= 0) s.cheers.splice(i, 1);
+    else s.cheers.push({ id: randomUUID(), checkin_id: checkinId, user_id: userId, created_at: now() });
+    return { cheered: i < 0, count: s.cheers.filter((c) => c.checkin_id === checkinId).length };
+  }
+  async cheerStats(checkinIds: string[], userId: string) {
+    const out: Record<string, { count: number; mine: boolean }> = {};
+    for (const id of checkinIds) {
+      const list = store().cheers.filter((c) => c.checkin_id === id);
+      out[id] = { count: list.length, mine: list.some((c) => c.user_id === userId) };
+    }
+    return out;
+  }
+  async countCheersReceived(userId: string) {
+    const mine = new Set(store().checkins.filter((c) => c.user_id === userId).map((c) => c.id));
+    return store().cheers.filter((c) => mine.has(c.checkin_id)).length;
+  }
+  async countCheersReceivedMany(userIds: string[]) {
+    const out: Record<string, number> = {};
+    for (const id of userIds) out[id] = await this.countCheersReceived(id);
+    return out;
   }
 
   async putPhoto(path: string, bytes: Uint8Array, contentType: string) {

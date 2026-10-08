@@ -217,6 +217,53 @@ export class SupabaseRepo implements Repo {
     return m;
   }
 
+  // cheers
+  async toggleCheer(checkinId: string, userId: string) {
+    const { data: existing, error: e1 } = await this.sb.from("ch_cheers").select("id").eq("checkin_id", checkinId).eq("user_id", userId).maybeSingle();
+    if (e1) fail("toggleCheer", e1);
+    if (existing) {
+      const { error } = await this.sb.from("ch_cheers").delete().eq("id", existing.id);
+      if (error) fail("toggleCheer:delete", error);
+    } else {
+      const { error } = await this.sb.from("ch_cheers").insert({ checkin_id: checkinId, user_id: userId });
+      if (error && error.code !== "23505") fail("toggleCheer:insert", error);
+    }
+    const { count, error: e2 } = await this.sb.from("ch_cheers").select("id", { count: "exact", head: true }).eq("checkin_id", checkinId);
+    if (e2) fail("toggleCheer:count", e2);
+    return { cheered: !existing, count: count ?? 0 };
+  }
+  async cheerStats(checkinIds: string[], userId: string) {
+    const out: Record<string, { count: number; mine: boolean }> = {};
+    for (const id of checkinIds) out[id] = { count: 0, mine: false };
+    if (checkinIds.length === 0) return out;
+    const rows = await this.many<{ checkin_id: string; user_id: string }>(this.sb.from("ch_cheers").select("checkin_id, user_id").in("checkin_id", checkinIds), "cheerStats");
+    for (const r of rows) {
+      const s = out[r.checkin_id] ?? (out[r.checkin_id] = { count: 0, mine: false });
+      s.count++;
+      if (r.user_id === userId) s.mine = true;
+    }
+    return out;
+  }
+  async countCheersReceived(userId: string) {
+    const r = await this.countCheersReceivedMany([userId]);
+    return r[userId] ?? 0;
+  }
+  async countCheersReceivedMany(userIds: string[]) {
+    const out: Record<string, number> = {};
+    for (const id of userIds) out[id] = 0;
+    if (userIds.length === 0) return out;
+    // 조인 타입이 번거로워 두 단계로: 사용자들의 인증 id → 그 인증들의 응원 수
+    const checkins = await this.many<{ id: string; user_id: string }>(this.sb.from("ch_checkins").select("id, user_id").in("user_id", userIds), "countCheersReceivedMany:checkins");
+    if (checkins.length === 0) return out;
+    const owner = new Map(checkins.map((c) => [c.id, c.user_id]));
+    const cheers = await this.many<{ checkin_id: string }>(this.sb.from("ch_cheers").select("checkin_id").in("checkin_id", checkins.map((c) => c.id)), "countCheersReceivedMany:cheers");
+    for (const c of cheers) {
+      const u = owner.get(c.checkin_id);
+      if (u) out[u] = (out[u] ?? 0) + 1;
+    }
+    return out;
+  }
+
   // photos
   async putPhoto(path: string, bytes: Uint8Array, contentType: string) {
     const { error } = await this.sb.storage.from(BUCKET).upload(path, bytes, { contentType, upsert: true });
