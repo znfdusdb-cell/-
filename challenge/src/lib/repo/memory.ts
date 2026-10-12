@@ -89,9 +89,14 @@ export class MemoryRepo implements Repo {
   async addXp(userId: string, delta: number, reason: string) {
     const u = store().users.find((x) => x.id === userId);
     if (!u) throw new Error("user not found");
+    const before = u.xp;
     u.xp = Math.max(0, u.xp + delta);
-    store().xpLog.push({ user_id: userId, delta, reason, created_at: now() });
+    store().xpLog.push({ user_id: userId, delta: u.xp - before, reason, created_at: now() });
     return u.xp;
+  }
+  async findXpLog(userId: string, reason: string) {
+    const rows = store().xpLog.filter((l) => l.user_id === userId && l.reason === reason);
+    return rows.length ? rows[rows.length - 1].delta : null;
   }
 
   async listChallenges(opts?: { includeInactive?: boolean }) {
@@ -338,6 +343,9 @@ export class MemoryRepo implements Repo {
   }
   async hasNotice(key: string) {
     return store().notices.has(key);
+  }
+  async deleteNotice(key: string) {
+    store().notices.delete(key);
   }
   async claimNotice(key: string) {
     const s = store();

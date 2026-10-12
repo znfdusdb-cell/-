@@ -7,9 +7,9 @@ import { ensureBootstrap, getRepo } from "@/lib/repo";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { SESSION_COOKIE, SESSION_DAYS, signSession } from "@/lib/session";
 import { currentUser, isAdmin, requireUser } from "@/lib/current-user";
-import { CREATE_CHALLENGE_LEVEL, DEFAULT_PENALTY, levelFromXp, MONTH_BONUS_XP, validateConfig } from "@/lib/game";
+import { CREATE_CHALLENGE_LEVEL, DEFAULT_PENALTY, failedUnits, levelFromXp, MONTH_BONUS_XP, validateConfig } from "@/lib/game";
 import { inferMethods, normalizeMethods } from "@/lib/methods";
-import { addDays, kstDate, kstWeekday } from "@/lib/time";
+import { addDays, hmToMinutes, kstDate, kstMinutes, kstWeekday } from "@/lib/time";
 import type { ChallengeConfig, ParticipationGoal, SlotDef } from "@/lib/types";
 
 export type ActionResult = { ok: boolean; error?: string; message?: string; cheered?: boolean; count?: number; comment?: CommentView };
@@ -356,11 +356,84 @@ export async function adminStartNow(_prev: ActionResult | null, fd: FormData): P
   if (!target || !ch) return { ok: false, error: "없는 참가자" };
   const p = await repo.getParticipation(target.id, ch.id);
   if (!p || p.status !== "active") return { ok: false, error: "참여 중이 아니에요" };
-  const today = kstDate();
-  const monday = addDays(today, -((kstWeekday(today) + 6) % 7));
-  await repo.updateParticipation(p.id, { start_date: ch.config.kind === "count" ? monday : today });
+  const now = new Date();
+  const today = kstDate(now);
+  const nowMin = kstMinutes(now);
+  const mine = await repo.listCheckins({ participationId: p.id });
+  const before = failedUnits(ch.config, p, mine, now);
+
+  // '지금부터 시작': 이미 끝난 시간대는 세지 않는다. 오늘 남은 시간대가 없으면 내일부터
+  let patch: { start_date: string; start_time: string | null };
+  let when: string;
+  if (ch.config.kind === "count") {
+    patch = { start_date: addDays(today, -((kstWeekday(today) + 6) % 7)), start_time: null };
+    when = "이번 주부터";
+  } else {
+    const sorted = [...ch.config.slots].sort((a, b) => hmToMinutes(a.start) - hmToMinutes(b.start));
+    const remaining = sorted.filter((x) => hmToMinutes(x.end) > nowMin);
+    if (remaining.length === sorted.length) { patch = { start_date: today, start_time: null }; when = `오늘 ${sorted[0].label}부터`; }
+    else if (remaining.length > 0) { patch = { start_date: today, start_time: `${String(Math.floor(nowMin / 60)).padStart(2, "0")}:${String(nowMin % 60).padStart(2, "0")}` }; when = `오늘 ${remaining[0].label}부터`; }
+    else { patch = { start_date: addDays(today, 1), start_time: null }; when = `내일 ${sorted[0].label}부터`; }
+  }
+  try {
+    await repo.updateParticipation(p.id, patch);
+  } catch {
+    // 마이그레이션 11 전(start_time 컬럼 없음): 남은 시간대가 있어도 내일부터로
+    patch = { start_date: patch.start_time ? addDays(today, 1) : patch.start_date, start_time: null };
+    await repo.updateParticipation(p.id, { start_date: patch.start_date });
+    when = ch.config.kind === "slots" ? `${patch.start_date === today ? "오늘" : "내일"} ${ch.config.slots[0].label}부터` : when;
+  }
+  // 이미 깎인 실패(오늘 지난 시간대 등)는 되돌린다
+  const after = new Set(failedUnits(ch.config, { ...p, ...patch }, mine, now).map((u) => u.key));
+  let refunded = 0;
+  for (const u of before) {
+    if (after.has(u.key)) continue;
+    const key = `xpfail:${p.id}:${u.key}`;
+    if (!(await repo.hasNotice(key))) continue;
+    // 실제로 깎인 만큼만 돌려준다 (0 아래로는 안 깎였을 수 있음). 기록이 없으면 기본 차감량
+    const logged = await repo.findXpLog(p.user_id, `${ch.title} 실패 (${u.date})`).catch(() => null);
+    const give = logged !== null ? Math.max(0, -logged) : -u.xp;
+    if (give > 0) await repo.addXp(p.user_id, give, `${ch.title} 시작 조정 (실패 취소)`);
+    await repo.deleteNotice(key);
+    refunded += give;
+  }
   revalidatePath("/", "layout");
-  return { ok: true, message: `${target.display_name} 바로 시작` };
+  return { ok: true, message: `${target.display_name} ${when} 시작${refunded > 0 ? ` · 실패 취소, 경험치 +${refunded}` : ""}` };
+}
+
+/** 관리자 테스트 참여: 숨김·24시간 업로드·집계 없음. mode=join(한 챌린지) / all(전부) / official(정식 참여로 전환) */
+export async function adminTestJoin(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const me = await currentUser();
+  if (!me || !isAdmin(me)) return { ok: false, error: "관리자만" };
+  const repo = getRepo();
+  const mode = str(fd, "mode") || "join";
+  const targets = mode === "all" ? await repo.listChallenges() : [await repo.getChallenge(str(fd, "challenge_id"))].filter((c): c is NonNullable<typeof c> => Boolean(c));
+  if (targets.length === 0) return { ok: false, error: "없는 챌린지" };
+  const today = kstDate();
+  let n = 0;
+  try {
+    for (const ch of targets) {
+      const existing = await repo.getParticipation(me.id, ch.id);
+      if (mode === "official") {
+        if (!existing) continue;
+        // 테스트로 올린 인증은 정식 기록이 아니므로 지우고 전환
+        for (const c of (await repo.listCheckins({ participationId: existing.id, includeRejected: true })).filter((c) => c.is_test)) {
+          await repo.deleteCheckin(c.id);
+          if (c.photo_path) await repo.deletePhoto(c.photo_path).catch(() => null);
+        }
+        await repo.updateParticipation(existing.id, { is_test: false, start_date: existing.start_date ?? today });
+        continue;
+      }
+      const goal = ch.config.goal === "weight" ? { start_kg: 70, target_kg: 3, days: 30 } : ch.config.goal === "hobby" ? { hobby: "테스트" } : {};
+      if (existing) await repo.updateParticipation(existing.id, { status: "active", is_test: true, start_date: today, start_time: null, ...(existing.status === "active" ? {} : { goal, joined_at: new Date().toISOString() }) });
+      else await repo.createParticipation({ user_id: me.id, challenge_id: ch.id, joined_at: new Date().toISOString(), status: "active", goal, start_date: today, is_test: true });
+      n++;
+    }
+  } catch (e) {
+    return { ok: false, error: `실패 (마이그레이션 11 필요?): ${(e as Error).message.slice(0, 80)}` };
+  }
+  revalidatePath("/", "layout");
+  return { ok: true, message: mode === "official" ? "정식 참여로 바꿨어요" : `${n}개 챌린지에 테스트 참여 중 (홈에서 24시간 업로드)` };
 }
 
 /** 월 마감 팝업 확인. 살아남은 달이면 완주 보너스 경험치 1회 */

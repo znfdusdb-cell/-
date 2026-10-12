@@ -103,10 +103,14 @@ export function effectiveStartDate(p: Participation, cfg: ChallengeConfig): stri
   return addDays(d, until);
 }
 
-export function dayStatus(cfg: SlotsConfig, checkins: Checkin[], date: string, now: Date = new Date()): DayStatus {
+/**
+ * @param skipEndedBefore 시작일에만 쓰는 HH:MM. 이 시각 전에 끝난 시간대는 '지금부터 시작' 규칙으로 집계에서 뺀다.
+ */
+export function dayStatus(cfg: SlotsConfig, checkins: Checkin[], date: string, now: Date = new Date(), skipEndedBefore?: string | null): DayStatus {
   const today = kstDate(now);
   const nowMin = kstMinutes(now);
-  const slots: SlotStatus[] = cfg.slots.map((slot) => {
+  const skipMin = skipEndedBefore ? hmToMinutes(skipEndedBefore) : -1;
+  const slots: SlotStatus[] = cfg.slots.filter((slot) => hmToMinutes(slot.end) > skipMin).map((slot) => {
     const checkin = checkins.find((c) => c.local_date === date && c.slot === slot.key) ?? null;
     let state: SlotState;
     if (checkin) state = "done";
@@ -120,10 +124,16 @@ export function dayStatus(cfg: SlotsConfig, checkins: Checkin[], date: string, n
   return {
     date,
     slots,
-    complete: slots.every((s) => s.state === "done"),
+    complete: slots.length > 0 && slots.every((s) => s.state === "done"),
     failed: slots.some((s) => s.state === "missed"),
     pending: slots.some((s) => s.state === "open" || s.state === "upcoming"),
   };
+}
+
+/** 참가자 기준 하루 상태: 시작일이면 start_time 전에 끝난 시간대를 뺀다 */
+export function dayStatusFor(cfg: SlotsConfig, p: Participation, checkins: Checkin[], date: string, now: Date = new Date()): DayStatus {
+  const skip = p.start_time && date === effectiveStartDate(p, cfg) ? p.start_time : null;
+  return dayStatus(cfg, checkins, date, now, skip);
 }
 
 /**
@@ -152,7 +162,7 @@ export type SlotsSummary = {
 export function slotsSummary(cfg: SlotsConfig, p: Participation, checkins: Checkin[], now: Date = new Date()): SlotsSummary {
   const start = effectiveStartDate(p, cfg);
   const today = kstDate(now);
-  const todayStatus = dayStatus(cfg, checkins, today, now);
+  const todayStatus = dayStatusFor(cfg, p, checkins, today, now);
 
   let streak = 0;
   let failDays = 0;
@@ -165,7 +175,8 @@ export function slotsSummary(cfg: SlotsConfig, p: Participation, checkins: Check
     else {
       let cursor = todayStatus.complete ? today : addDays(today, -1);
       while (cursor >= start) {
-        const st = dayStatus(cfg, checkins, cursor, now);
+        const st = dayStatusFor(cfg, p, checkins, cursor, now);
+        if (st.slots.length === 0) { cursor = addDays(cursor, -1); continue; } // 시작일에 남은 시간대가 없던 날
         if (!st.complete) break;
         streak++;
         cursor = addDays(cursor, -1);
@@ -173,7 +184,8 @@ export function slotsSummary(cfg: SlotsConfig, p: Participation, checkins: Check
     }
     // 집계: 시작일 ~ 어제 (+ 오늘은 확정된 경우만)
     for (let d = start; d <= today; d = addDays(d, 1)) {
-      const st = d === today ? todayStatus : dayStatus(cfg, checkins, d, now);
+      const st = d === today ? todayStatus : dayStatusFor(cfg, p, checkins, d, now);
+      if (st.slots.length === 0) continue;
       if (d === today && st.pending && !st.failed) continue;
       totalDays++;
       if (st.complete) completeDays++;
@@ -272,7 +284,7 @@ export function failedUnits(cfg: ChallengeConfig, p: Participation, checkinsIn: 
   if (today < start) return out;
   if (cfg.kind === "slots") {
     for (let d = start; d <= today; d = addDays(d, 1)) {
-      if (dayStatus(cfg, checkins, d, now).failed) out.push({ key: `day:${d}`, date: d, xp: XP.failDay });
+      if (dayStatusFor(cfg, p, checkins, d, now).failed) out.push({ key: `day:${d}`, date: d, xp: XP.failDay });
     }
   } else {
     const cur = periodOf(cfg, start, today);
@@ -341,7 +353,7 @@ export function rewardFor(ch: Challenge, p: Participation, after: Checkin[], cre
     const s = slotsSummary(ch.config, p, mine, now);
     const reasons = [`사진 인증 +${XP.photo}`];
     let xp = XP.photo;
-    const day = dayStatus(ch.config, mine, created.local_date, now);
+    const day = dayStatusFor(ch.config, p, mine, created.local_date, now);
     if (day.complete) {
       xp += XP.dayComplete;
       reasons.push(`오늘 전부 완료 +${XP.dayComplete}`);
@@ -458,7 +470,8 @@ export function monthReport(ch: Challenge, p: Participation, checkins: Checkin[]
   let total = 0, complete = 0, fails = 0;
   if (ch.config.kind === "slots") {
     for (let d = from; d <= to; d = addDays(d, 1)) {
-      const st = dayStatus(ch.config, mine, d, now);
+      const st = dayStatusFor(ch.config, p, mine, d, now);
+      if (st.slots.length === 0) continue;
       total++;
       if (st.complete) complete++;
       if (st.failed) fails++;

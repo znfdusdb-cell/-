@@ -1,6 +1,6 @@
 import { ensureBootstrap, getRepo } from "@/lib/repo";
 import { pushEnabled, sendPushToUsers, type PushPayload } from "@/lib/push";
-import { dayStatus, effectiveStartDate, periodStatus } from "@/lib/game";
+import { dayStatusFor, effectiveStartDate, periodStatus } from "@/lib/game";
 import { applyFailPenalties } from "@/lib/data";
 import { addDays, fmtDateKo, hmToMinutes, kstDate, kstMinutes } from "@/lib/time";
 import type { Challenge, Participation } from "@/lib/types";
@@ -35,7 +35,7 @@ export async function GET(req: Request) {
   const planned: { key: string; userIds: string[]; payload: PushPayload }[] = [];
   const byChallenge = new Map<string, Participation[]>();
   for (const p of parts) {
-    if (!challenges.has(p.challenge_id)) continue;
+    if (!challenges.has(p.challenge_id) || p.is_test) continue;
     byChallenge.set(p.challenge_id, [...(byChallenge.get(p.challenge_id) ?? []), p]);
   }
 
@@ -58,7 +58,7 @@ export async function GET(req: Request) {
       if (ids.length) planned.push({ key: `${today}:${cid}:start-day`, userIds: ids, payload: { title: `${ch.emoji} ${ch.title} 오늘부터 시작!`, body: ch.config.kind === "slots" ? `${ch.config.slots.map((x) => `${x.label} ${x.start}~${x.end}`).join(", ")} 안에 인증해 주세요.` : `이번 주 ${ch.config.times}회 인증, 가볍게 시작해요.`, url: "/", tag: `${cid}-start` } });
     }
 
-    const checkins = await repo.listCheckins({ challengeId: cid, from: ch.config.kind === "slots" ? today : undefined });
+    const checkins = (await repo.listCheckins({ challengeId: cid, from: ch.config.kind === "slots" ? today : undefined })).filter((c) => !c.is_test);
 
     if (ch.config.kind === "slots") {
       for (const slot of ch.config.slots) {
@@ -86,7 +86,7 @@ export async function GET(req: Request) {
             .filter((p) => effectiveStartDate(p, ch.config) <= today)
             .filter((p) => {
               const mine = checkins.filter((c) => c.participation_id === p.id);
-              const st = dayStatus(ch.config as Extract<Challenge["config"], { kind: "slots" }>, mine, today, now);
+              const st = dayStatusFor(ch.config as Extract<Challenge["config"], { kind: "slots" }>, p, mine, today, now);
               return st.slots.find((s) => s.slot.key === slot.key)?.state === "open";
             })
             .map((p) => p.user_id);

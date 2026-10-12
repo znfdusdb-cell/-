@@ -12,6 +12,7 @@ import { StartNowButton } from "@/components/StartNowButton";
 import { FailRule } from "@/components/FailRule";
 import { KickButton } from "@/components/KickButton";
 import { NudgeButton } from "@/components/NudgeButton";
+import { TestJoinButton } from "@/components/TestJoinButton";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,15 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
           {canEdit && <Link href={`/challenges/${ch.id}/edit`} className="btn btn-ghost text-sm flex-1">수정</Link>}
           <Link href={`/gallery?c=${ch.id}`} className="btn btn-ghost text-sm flex-1">갤러리</Link>
         </div>
+        {isAdmin(user) && (
+          <div className="mt-2 text-xs">
+            {mine?.status === "active" && mine.is_test ? (
+              <div className="flex items-center gap-2 flex-wrap"><span className="chip bg-navy text-white">테스트 참여 중 · 숨김 · 24시간 업로드</span><TestJoinButton challengeId={ch.id} mode="official" /></div>
+            ) : (
+              <TestJoinButton challengeId={ch.id} mode="join" />
+            )}
+          </div>
+        )}
       </section>
 
       {joined ? (
@@ -121,9 +131,9 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
                         </div>
                       </div>
                     )}
-                    {((isAdmin(user) && waiting) || ((isAdmin(user) || ch.created_by === user.id) && p.user_id !== user.id)) && (
+                    {((isAdmin(user) && (waiting || s.startDate === today)) || ((isAdmin(user) || ch.created_by === user.id) && p.user_id !== user.id)) && (
                       <div className="mt-1.5 pl-9 flex gap-3 items-center flex-wrap">
-                        {isAdmin(user) && waiting && <StartNowButton userId={p.user_id} challengeId={ch.id} />}
+                        {isAdmin(user) && (waiting || s.startDate === today) && <StartNowButton userId={p.user_id} challengeId={ch.id} />}
                         {(isAdmin(user) || ch.created_by === user.id) && p.user_id !== user.id && <KickButton challengeId={ch.id} userId={p.user_id} name={p.user.display_name} />}
                       </div>
                     )}

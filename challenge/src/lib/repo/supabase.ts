@@ -83,7 +83,11 @@ export class SupabaseRepo implements Repo {
     const { data, error } = await this.sb.rpc("ch_add_xp", { p_user_id: userId, p_delta: delta, p_reason: reason });
     if (error) fail("addXp", error);
     return Number(data);
+  }  async findXpLog(userId: string, reason: string) {
+    const row = await this.maybe<{ delta: number }>(this.sb.from("ch_xp_log").select("delta").eq("user_id", userId).eq("reason", reason).order("created_at", { ascending: false }).limit(1).maybeSingle(), "findXpLog");
+    return row ? Number(row.delta) : null;
   }
+
 
   // challenges
   listChallenges(opts?: { includeInactive?: boolean }) {
@@ -338,6 +342,10 @@ export class SupabaseRepo implements Repo {
     const { count, error } = await this.sb.from("ch_notice_log").select("key", { count: "exact", head: true }).eq("key", key);
     if (error) fail("hasNotice", error);
     return (count ?? 0) > 0;
+  }
+  async deleteNotice(key: string) {
+    const { error } = await this.sb.from("ch_notice_log").delete().eq("key", key);
+    if (error) fail("deleteNotice", error);
   }
   async claimNotice(key: string) {
     const { error } = await this.sb.from("ch_notice_log").insert({ key });
