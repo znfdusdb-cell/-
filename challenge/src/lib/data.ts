@@ -1,6 +1,6 @@
 import "server-only";
 import { getRepo, type ParticipantRow } from "./repo";
-import { failedUnits, monthReport, summarize, weightProgress, type MonthReport, type Summary } from "./game";
+import { failedUnits, focusSlot, monthReport, summarize, weightProgress, type MonthReport, type SlotStatus, type Summary } from "./game";
 import { kstDate } from "./time";
 import type { Challenge, Checkin, Participation, User } from "./types";
 
@@ -76,9 +76,21 @@ export type BoardRow = {
   waiting: boolean;
   /** 체중 목표 진행 (몸무게 자체는 공개하지 않음) */
   weight: { targetLoss: number; lost: number; ratio: number; reached: boolean } | null;
+  /** 시간대형: 오늘 슬롯별 상태 (점심 ✓ / 저녁 인증 전 …). 횟수형은 null */
+  slots: SlotStatus[] | null;
+  /** 시간대형: 지금 주목할 슬롯(열린 슬롯, 없으면 다음 슬롯)을 아직 안 함 → 맨 위로 */
+  focusPending: boolean;
 };
 
-/** 챌린지 리더보드: 인증 전 → 완료 → 시작 전·탈락 순, 같은 그룹 안은 연속 → 완료 수 → 경험치 */
+/** 지금 주목할 슬롯 (시간대형만). 리더보드 정렬·범례·찌르기 기준 */
+export function boardFocus(challenge: Challenge, now = new Date()) {
+  return challenge.config.kind === "slots" ? focusSlot(challenge.config, now) : null;
+}
+
+/**
+ * 챌린지 리더보드: (지금 슬롯) 인증 전 → 완료 → 시작 전·탈락 순, 같은 그룹 안은 연속 → 완료 수 → 경험치.
+ * 시간대형은 하루로 뭉개지 않고 지금 열린(또는 다음) 슬롯 기준으로 나눈다: 점심 시간엔 점심 안 한 사람이 위, 점심 한 사람은 아래.
+ */
 export async function loadBoard(challenge: Challenge, now = new Date()): Promise<BoardRow[]> {
   const repo = getRepo();
   const participants = await repo.listParticipants(challenge.id);
@@ -86,11 +98,14 @@ export async function loadBoard(challenge: Challenge, now = new Date()): Promise
   const ids = participants.map((p) => p.id);
   const [checkins, weights] = await Promise.all([repo.listCheckins({ participationIds: ids }), challenge.config.goal === "weight" ? repo.listWeightLogsMany(ids) : Promise.resolve([])]);
   const today = kstDate(now);
+  const focus = boardFocus(challenge, now);
   const rows: BoardRow[] = participants.map((participant) => {
     const mine = checkins.filter((c) => c.participation_id === participant.id);
     const summary = summarize(challenge, participant, mine, now);
     const waiting = summary.startDate > today;
     const pending = !waiting && !summary.eliminated && (summary.kind === "slots" ? summary.today.pending && !summary.today.complete : !summary.current.complete);
+    const slots = summary.kind === "slots" ? summary.today.slots : null;
+    const focusPending = summary.kind === "slots" ? pending && Boolean(focus) && slots!.find((x) => x.slot.key === focus!.slot.key)?.state !== "done" : pending;
     let weight: BoardRow["weight"] = null;
     const g = participant.goal;
     if (challenge.config.goal === "weight" && g.start_kg && g.target_kg) {
@@ -99,9 +114,9 @@ export async function loadBoard(challenge: Challenge, now = new Date()): Promise
       const wp = weightProgress(g.start_kg, g.target_kg, latest);
       weight = { targetLoss: g.target_kg, lost: wp.lost, ratio: wp.ratio, reached: wp.reached };
     }
-    return { participant, summary, checkins: mine, pending, waiting, weight };
+    return { participant, summary, checkins: mine, pending, waiting, weight, slots, focusPending };
   });
-  const group = (r: BoardRow) => (r.summary.eliminated ? 3 : r.waiting ? 2 : r.pending ? 0 : 1);
+  const group = (r: BoardRow) => (r.summary.eliminated ? 3 : r.waiting ? 2 : r.focusPending ? 0 : 1);
   const completes = (s: Summary) => (s.kind === "slots" ? s.completeDays : s.completePeriods);
   return rows.sort((a, b) => group(a) - group(b) || b.summary.streak - a.summary.streak || completes(b.summary) - completes(a.summary) || b.participant.user.xp - a.participant.user.xp);
 }

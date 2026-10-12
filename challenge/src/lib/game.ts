@@ -126,6 +126,19 @@ export function dayStatus(cfg: SlotsConfig, checkins: Checkin[], date: string, n
   };
 }
 
+/**
+ * 지금 주목할 슬롯: 열려 있는 슬롯이 있으면 그것, 없으면 오늘 다음에 열릴 슬롯. 오늘 슬롯이 다 끝났으면 null.
+ * 리더보드는 이 슬롯을 아직 안 한 사람을 맨 위에 올린다 (콕 찌르기 편하게).
+ */
+export function focusSlot(cfg: SlotsConfig, now: Date = new Date()): { slot: SlotDef; phase: "open" | "upcoming" } | null {
+  const nowMin = kstMinutes(now);
+  const sorted = [...cfg.slots].sort((a, b) => hmToMinutes(a.start) - hmToMinutes(b.start));
+  const open = sorted.find((s) => nowMin >= hmToMinutes(s.start) && nowMin < hmToMinutes(s.end));
+  if (open) return { slot: open, phase: "open" };
+  const next = sorted.find((s) => nowMin < hmToMinutes(s.start));
+  return next ? { slot: next, phase: "upcoming" } : null;
+}
+
 export type SlotsSummary = {
   kind: "slots";
   today: DayStatus;

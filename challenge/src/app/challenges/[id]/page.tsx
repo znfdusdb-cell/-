@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { currentUser, isAdmin, toPublic } from "@/lib/current-user";
 import { getRepo } from "@/lib/repo";
-import { loadBoard } from "@/lib/data";
-import { describeConfig, levelFromXp } from "@/lib/game";
+import { boardFocus, loadBoard } from "@/lib/data";
+import { describeConfig, levelFromXp, type SlotStatus } from "@/lib/game";
 import { fmtDateKo, kstDate } from "@/lib/time";
 import { Shell } from "@/components/Shell";
 import { JoinForm } from "@/components/JoinForm";
@@ -27,6 +27,9 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
   const canEdit = isAdmin(user) || ch.created_by === user.id;
   const today = kstDate();
   const cheers = await repo.countCheersReceivedMany(board.map((r) => r.participant.user_id)).catch(() => ({} as Record<string, number>));
+  const focus = boardFocus(ch);
+  const slotDefs = ch.config.kind === "slots" ? ch.config.slots : [];
+  const slotColor = (key: string) => SLOT_COLORS[Math.max(0, slotDefs.findIndex((d) => d.key === key)) % SLOT_COLORS.length];
 
   return (
     <Shell user={toPublic(user)} title={`${ch.emoji} ${ch.title}`} right={<Link href="/challenges">목록</Link>}>
@@ -62,15 +65,21 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
           <div className="card p-6 text-center text-fg-2 text-sm">첫 참가자가 되어 보세요</div>
         ) : (
           <>
-            {joined && (
+            {slotDefs.length > 0 ? (
+              <div className="flex gap-x-3 gap-y-1 flex-wrap text-[11px] text-fg-3 mb-2">
+                {focus ? <span className="font-bold text-fg">{focus.phase === "open" ? `지금 ${focus.slot.label} 인증 시간 (${focus.slot.start}~${focus.slot.end})` : `다음은 ${focus.slot.label} (${focus.slot.start}~)`} · 안 한 사람이 위로</span> : <span className="font-bold text-fg">오늘 인증 시간 끝</span>}
+                {slotDefs.map((d) => <span key={d.key}><span className={`inline-block w-2.5 h-2.5 rounded-sm align-middle mr-1 ${slotColor(d.key)}`} />{d.label} 완료</span>)}
+                <span><span className="inline-block w-2.5 h-2.5 rounded-sm bg-red align-middle mr-1" />인증 전</span>
+              </div>
+            ) : joined ? (
               <div className="flex gap-3 text-[11px] text-fg-3 mb-2">
                 <span><span className="inline-block w-2.5 h-2.5 rounded-sm bg-red-soft border border-red/40 align-middle mr-1" />아직 인증 전</span>
-                <span><span className="inline-block w-2.5 h-2.5 rounded-sm bg-ok-soft border border-ok/40 align-middle mr-1" />오늘 완료</span>
+                <span><span className="inline-block w-2.5 h-2.5 rounded-sm bg-ok-soft border border-ok/40 align-middle mr-1" />완료</span>
               </div>
-            )}
+            ) : null}
             <ol className="space-y-2">
-              {board.map(({ participant: p, summary: s, pending, waiting, weight }, i) => {
-                const tone = s.eliminated ? "bg-bad-soft border-bad/30 opacity-70" : waiting ? "bg-bg-3/60 border-line" : pending ? "bg-red-soft border-red/40" : "bg-ok-soft border-ok/40";
+              {board.map(({ participant: p, summary: s, pending, waiting, weight, slots, focusPending }, i) => {
+                const tone = s.eliminated ? "bg-bad-soft border-bad/30 opacity-70" : waiting ? "bg-bg-3/60 border-line" : focusPending ? "bg-red-soft border-red/40" : "bg-ok-soft border-ok/40";
                 return (
                   <li key={p.id} className={`rounded-2xl border p-3 ${tone} ${p.user_id === user.id ? "ring-2 ring-fg/80" : ""}`}>
                     <div className="flex items-center gap-3">
@@ -80,8 +89,13 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
                           <span className="font-bold truncate">{p.user.display_name}</span>
                           {(cheers[p.user_id] ?? 0) > 0 && <span className="text-[11px] text-red num">🔥{cheers[p.user_id]}</span>}
                           <span className="text-[11px] text-red font-bold">Lv.{levelFromXp(p.user.xp)}</span>
-                          {s.eliminated ? <span className="chip bg-bad text-white">탈락</span> : waiting ? <span className="chip bg-bg-2 text-fg-2">{fmtDateKo(s.startDate)} 시작</span> : pending ? <span className="chip bg-red text-white">인증 전</span> : <span className="chip bg-ok text-white">완료</span>}
+                          {s.eliminated ? <span className="chip bg-bad text-white">탈락</span> : waiting ? <span className="chip bg-bg-2 text-fg-2">{fmtDateKo(s.startDate)} 시작</span> : slots ? null : pending ? <span className="chip bg-red text-white">인증 전</span> : <span className="chip bg-ok text-white">완료</span>}
                         </div>
+                        {slots && !s.eliminated && !waiting && (
+                          <div className="flex gap-1 flex-wrap mt-1">
+                            {slots.map((x) => <SlotChip key={x.slot.key} status={x} color={slotColor(x.slot.key)} focused={focus?.slot.key === x.slot.key} />)}
+                          </div>
+                        )}
                         <div className="text-xs text-fg-2 mt-0.5 truncate">
                           {ch.config.goal === "hobby" && p.goal.hobby ? <>{p.goal.hobby} · </> : null}
                           {ch.config.goal === "weight" && p.goal.days ? <>{p.goal.days}일 도전 · </> : null}
@@ -93,7 +107,7 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
                         <div className={s.fails > 0 ? "text-bad" : "text-fg-3"}>이달 실패 {s.fails}{ch.max_fails > 0 ? `/${ch.max_fails}` : ""}</div>
                       </div>
                     </div>
-                    {joined && pending && p.user_id !== user.id && (
+                    {joined && focusPending && p.user_id !== user.id && (
                       <div className="mt-2 pl-9"><NudgeButton challengeId={ch.id} userId={p.user_id} /></div>
                     )}
                     {weight && (
@@ -122,4 +136,16 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
       </section>
     </Shell>
   );
+}
+
+/** 슬롯별 완료 색: 점심 금색, 저녁 남색 (3개 이상이면 초록) */
+const SLOT_COLORS = ["bg-gold", "bg-navy", "bg-ok"];
+
+/** 리더보드 슬롯 1칸: 완료는 슬롯 색, 열렸는데 안 했으면 빨강, 아직이면 회색, 놓쳤으면 실패 */
+function SlotChip({ status, color, focused }: { status: SlotStatus; color: string; focused: boolean }) {
+  const { slot, state } = status;
+  if (state === "done") return <span className={`chip text-white ${color}`}>{slot.label} ✓</span>;
+  if (state === "open") return <span className="chip bg-red text-white">{slot.label} 인증 전</span>;
+  if (state === "upcoming") return <span className={`chip bg-bg-2 text-fg-2 border ${focused ? "border-red/40 text-red" : "border-line"}`}>{slot.label} {slot.start}~</span>;
+  return <span className="chip bg-bad-soft text-bad">{slot.label} ✗</span>;
 }
