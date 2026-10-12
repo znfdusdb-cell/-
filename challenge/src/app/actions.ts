@@ -239,6 +239,11 @@ function parseConfig(fd: FormData): { config: ChallengeConfig | null; error?: st
   return err ? { config: null, error: err } : { config };
 }
 
+function parseKcalLimit(fd: FormData): number {
+  const n = parseInt(str(fd, "kcal_limit") || "700", 10);
+  return Number.isFinite(n) ? Math.max(0, Math.min(5000, n)) : 700;
+}
+
 export async function createChallenge(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   const user = await requireUser();
   if (!isAdmin(user) && levelFromXp(user.xp) < CREATE_CHALLENGE_LEVEL) {
@@ -267,6 +272,7 @@ export async function createChallenge(_prev: ActionResult | null, fd: FormData):
     is_default: false,
     is_active: true,
     comments_enabled: fd.get("comments_enabled") !== null,
+    kcal_limit: parseKcalLimit(fd),
   });
   revalidatePath("/challenges");
   redirect(`/challenges/${ch.id}`);
@@ -288,6 +294,7 @@ export async function updateChallenge(_prev: ActionResult | null, fd: FormData):
   if (penalty.length < 1 || penalty.length > 80) return { ok: false, error: "벌칙은 1~80자" };
   if (!Number.isInteger(maxFails) || maxFails < 0 || maxFails > 30) return { ok: false, error: "탈락 기준은 0~30" };
   const patch: Partial<typeof ch> = { title, description, emoji, penalty, max_fails: maxFails, is_active: fd.get("is_active") !== null, comments_enabled: fd.get("comments_enabled") !== null };
+  if (fd.has("kcal_limit")) patch.kcal_limit = parseKcalLimit(fd);
   if (str(fd, "kind")) {
     const { config, error } = parseConfig(fd);
     if (!config) return { ok: false, error };
@@ -296,11 +303,12 @@ export async function updateChallenge(_prev: ActionResult | null, fd: FormData):
   try {
     await repo.updateChallenge(ch.id, patch);
   } catch (e) {
-    // 마이그레이션 09 전이면 comments_enabled 컬럼이 없어 실패 → 그것만 빼고 다시 저장
+    // 마이그레이션 09·10 전이면 새 컬럼이 없어 실패 → 그것만 빼고 다시 저장
     delete patch.comments_enabled;
+    delete patch.kcal_limit;
     await repo.updateChallenge(ch.id, patch);
     revalidatePath("/", "layout");
-    return { ok: true, message: `저장했어요 (댓글 설정은 마이그레이션 09 뒤에 적용돼요: ${(e as Error).message.slice(0, 60)})` };
+    return { ok: true, message: `저장했어요 (댓글·AI 칼로리 설정은 마이그레이션 09·10 뒤에 적용돼요: ${(e as Error).message.slice(0, 60)})` };
   }
   revalidatePath("/", "layout");
   return { ok: true, message: "저장했어요" };

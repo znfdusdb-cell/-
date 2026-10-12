@@ -47,6 +47,13 @@ export function ChallengeForm({ challenge }: { challenge?: Challenge }) {
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="comments_enabled" defaultChecked={challenge?.comments_enabled ?? true} /> 인증 사진에 댓글 허용 (갤러리에서 멤버끼리 댓글)
       </label>
+      {kind === "slots" && (
+        <div>
+          <label className="label">AI 칼로리 경고 기준 (한 끼 kcal · 0이면 끄기)</label>
+          <input name="kcal_limit" type="number" min="0" max="5000" step="50" inputMode="numeric" className="input" defaultValue={challenge?.kcal_limit ?? 700} />
+          <p className="text-[11px] text-fg-3 mt-1">식사 사진을 올릴 때 AI가 칼로리를 추정해요. 이 값을 넘으면 경고창이 뜨고, 그래도 올리면 관리자 검토(신고 판정)에 올라가요. 체중 목표형 챌린지에서만 동작하고, 서버에 AI 키가 있어야 해요.</p>
+        </div>
+      )}
       {editing && (
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="is_active" defaultChecked={challenge!.is_active} /> 참여 가능(비활성화하면 목록에서 숨김)

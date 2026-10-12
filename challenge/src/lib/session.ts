@@ -32,6 +32,31 @@ async function key(): Promise<CryptoKey> {
   return crypto.subtle.importKey("raw", enc.encode(secret()), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
 }
 
+/** AI 칼로리 추정 결과 (analyze → checkin 사이에 서명해 넘긴다) */
+export type AiPayload = { uid: string; kcal: number; foods: string[]; note: string; limit: number; high: boolean };
+
+/** 임의 객체를 HMAC 서명해 짧은 토큰으로. 세션 비밀키 재사용 */
+export async function signPayload<T extends object>(data: T, ttlMs: number): Promise<string> {
+  const body = b64url(enc.encode(JSON.stringify({ ...data, exp: Date.now() + ttlMs })));
+  const sig = await crypto.subtle.sign("HMAC", await key(), enc.encode(body));
+  return `${body}.${b64url(sig)}`;
+}
+
+export async function verifyPayload<T extends object>(token: string | undefined | null): Promise<T | null> {
+  if (!token) return null;
+  const [body, sig] = token.split(".");
+  if (!body || !sig) return null;
+  try {
+    const ok = await crypto.subtle.verify("HMAC", await key(), unb64url(sig) as BufferSource, enc.encode(body));
+    if (!ok) return null;
+    const payload = JSON.parse(new TextDecoder().decode(unb64url(body))) as T & { exp: number };
+    if (!payload.exp || payload.exp < Date.now()) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 export async function signSession(uid: string): Promise<string> {
   const payload: Payload = { uid, exp: Date.now() + SESSION_DAYS * 86400000 };
   const body = b64url(enc.encode(JSON.stringify(payload)));

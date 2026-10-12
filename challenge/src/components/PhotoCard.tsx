@@ -43,6 +43,11 @@ export function PhotoCard({ checkin, user, url, caption, canDelete, progress = n
           {kind === "camera" ? "촬영" : kind === "album" ? "앨범" : kind === "audio" ? "녹음" : "링크"} {fmtTimeKo(checkin.taken_at)}
         </div>
         {caption && <div className="absolute top-1.5 left-1.5 chip bg-white/90 text-fg pointer-events-none">{caption}</div>}
+        {typeof checkin.ai_kcal === "number" && checkin.ai_kcal > 0 && (
+          <div className={`absolute bottom-1.5 left-1.5 chip num pointer-events-none ${checkin.ai_flagged ? "bg-bad text-white" : "bg-white/90 text-fg-2"}`} title={checkin.ai_note}>
+            {checkin.ai_flagged ? "⚠" : "🤖"} 약 {checkin.ai_kcal}kcal
+          </div>
+        )}
       </div>
       <figcaption className="px-2.5 py-1.5 text-xs">
         <div className="flex items-center justify-between gap-1">
