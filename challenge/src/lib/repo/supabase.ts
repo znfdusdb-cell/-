@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Challenge, Checkin, Gift, Participation, PushSubscriptionRow, Report, Ticket, TicketMessage, User, WeightLog } from "../types";
+import type { Challenge, Checkin, Comment, Gift, Participation, PushSubscriptionRow, Report, Ticket, TicketMessage, User, WeightLog } from "../types";
 import type { CheckinQuery, ParticipantRow, Repo } from "./types";
 
 export const BUCKET = "ch-photos";
@@ -282,6 +282,22 @@ export class SupabaseRepo implements Repo {
       if (u) out[u] = (out[u] ?? 0) + 1;
     }
     return out;
+  }
+
+  // comments
+  async listComments(checkinIds: string[]) {
+    if (checkinIds.length === 0) return [];
+    return this.many<Comment>(this.sb.from("ch_comments").select("*").in("checkin_id", checkinIds).order("created_at", { ascending: true }), "listComments");
+  }
+  async getComment(id: string) {
+    return this.maybe<Comment>(this.sb.from("ch_comments").select("*").eq("id", id).maybeSingle(), "getComment");
+  }
+  async addComment(data: Omit<Comment, "id" | "created_at">) {
+    return this.one<Comment>(this.sb.from("ch_comments").insert(data).select("*").single(), "addComment");
+  }
+  async deleteComment(id: string) {
+    const { error } = await this.sb.from("ch_comments").delete().eq("id", id);
+    if (error) fail("deleteComment", error);
   }
 
   // photos

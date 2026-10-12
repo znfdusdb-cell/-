@@ -58,6 +58,8 @@ export type Challenge = {
   created_by: string | null;
   is_default: boolean;
   is_active: boolean;
+  /** 인증 사진에 댓글 허용 (마이그레이션 09 전 행은 undefined → 허용으로 본다) */
+  comments_enabled?: boolean;
   created_at: string;
 };
 
@@ -154,6 +156,15 @@ export type Cheer = {
   id: string;
   checkin_id: string;
   user_id: string;
+  created_at: string;
+};
+
+/** 인증 댓글 */
+export type Comment = {
+  id: string;
+  checkin_id: string;
+  user_id: string;
+  body: string;
   created_at: string;
 };
 

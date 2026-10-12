@@ -12,7 +12,10 @@ import { inferMethods, normalizeMethods } from "@/lib/methods";
 import { addDays, kstDate, kstWeekday } from "@/lib/time";
 import type { ChallengeConfig, ParticipationGoal, SlotDef } from "@/lib/types";
 
-export type ActionResult = { ok: boolean; error?: string; message?: string; cheered?: boolean; count?: number };
+export type ActionResult = { ok: boolean; error?: string; message?: string; cheered?: boolean; count?: number; comment?: CommentView };
+
+/** 화면용 댓글 (작성자 이름 포함) */
+export type CommentView = { id: string; checkin_id: string; user_id: string; body: string; created_at: string; name: string };
 
 const USERNAME_RE = /^[\p{L}\p{N}_.-]{2,16}$/u;
 
@@ -263,6 +266,7 @@ export async function createChallenge(_prev: ActionResult | null, fd: FormData):
     created_by: user.id,
     is_default: false,
     is_active: true,
+    comments_enabled: fd.get("comments_enabled") !== null,
   });
   revalidatePath("/challenges");
   redirect(`/challenges/${ch.id}`);
@@ -283,13 +287,21 @@ export async function updateChallenge(_prev: ActionResult | null, fd: FormData):
   if (description.length > 200) return { ok: false, error: "설명은 200자까지" };
   if (penalty.length < 1 || penalty.length > 80) return { ok: false, error: "벌칙은 1~80자" };
   if (!Number.isInteger(maxFails) || maxFails < 0 || maxFails > 30) return { ok: false, error: "탈락 기준은 0~30" };
-  const patch: Partial<typeof ch> = { title, description, emoji, penalty, max_fails: maxFails, is_active: fd.get("is_active") !== null };
+  const patch: Partial<typeof ch> = { title, description, emoji, penalty, max_fails: maxFails, is_active: fd.get("is_active") !== null, comments_enabled: fd.get("comments_enabled") !== null };
   if (str(fd, "kind")) {
     const { config, error } = parseConfig(fd);
     if (!config) return { ok: false, error };
     patch.config = config;
   }
-  await repo.updateChallenge(ch.id, patch);
+  try {
+    await repo.updateChallenge(ch.id, patch);
+  } catch (e) {
+    // 마이그레이션 09 전이면 comments_enabled 컬럼이 없어 실패 → 그것만 빼고 다시 저장
+    delete patch.comments_enabled;
+    await repo.updateChallenge(ch.id, patch);
+    revalidatePath("/", "layout");
+    return { ok: true, message: `저장했어요 (댓글 설정은 마이그레이션 09 뒤에 적용돼요: ${(e as Error).message.slice(0, 60)})` };
+  }
   revalidatePath("/", "layout");
   return { ok: true, message: "저장했어요" };
 }
@@ -443,6 +455,47 @@ export async function toggleCheer(_prev: ActionResult | null, fd: FormData): Pro
   }
   revalidatePath("/gallery");
   return { ok: true, cheered: r.cheered, count: r.count };
+}
+
+/** 인증 사진에 댓글 달기 (챌린지에서 댓글이 켜져 있을 때, 같은 챌린지 참여자·관리자) */
+export async function addComment(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const me = await requireUser();
+  const repo = getRepo();
+  const c = await repo.getCheckin(str(fd, "checkin_id"));
+  if (!c) return { ok: false, error: "없는 인증" };
+  const ch = await repo.getChallenge(c.challenge_id);
+  if (!ch || ch.comments_enabled === false) return { ok: false, error: "이 챌린지는 댓글이 꺼져 있어요" };
+  if (!isAdmin(me)) {
+    const mine = await repo.getParticipation(me.id, c.challenge_id);
+    if (!mine || mine.status !== "active") return { ok: false, error: "같은 챌린지 참여자만 댓글을 쓸 수 있어요" };
+  }
+  const body = str(fd, "body").replace(/\s+/g, " ").trim();
+  if (body.length < 1) return { ok: false, error: "내용을 적어 주세요" };
+  if (body.length > 200) return { ok: false, error: "댓글은 200자까지" };
+  let saved;
+  try {
+    saved = await repo.addComment({ checkin_id: c.id, user_id: me.id, body });
+  } catch (e) {
+    return { ok: false, error: `댓글 저장 실패 (마이그레이션 09 필요?): ${(e as Error).message.slice(0, 80)}` };
+  }
+  if (c.user_id !== me.id) {
+    const { sendPushToUsers } = await import("@/lib/push");
+    await sendPushToUsers([c.user_id], { title: `💬 ${me.display_name}님이 댓글을 남겼어요`, body: body.slice(0, 80), url: `/gallery?c=${c.challenge_id}&d=${c.local_date}`, tag: `comment-${c.id}` }).catch(() => null);
+  }
+  revalidatePath("/gallery");
+  return { ok: true, comment: { ...saved, name: me.display_name } };
+}
+
+/** 댓글 삭제: 본인 또는 관리자 */
+export async function deleteComment(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const me = await requireUser();
+  const repo = getRepo();
+  const c = await repo.getComment(str(fd, "comment_id"));
+  if (!c) return { ok: true };
+  if (c.user_id !== me.id && !isAdmin(me)) return { ok: false, error: "내 댓글만 지울 수 있어요" };
+  await repo.deleteComment(c.id);
+  revalidatePath("/gallery");
+  return { ok: true };
 }
 
 /** 선물함에서 열기 (읽음 처리) */

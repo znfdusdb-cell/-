@@ -54,6 +54,13 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
     const urls = await repo.photoUrls(checkins.filter((c) => c.photo_path).map((c) => c.photo_path));
     // 응원 수·내가 눌렀는지 (마이그레이션 07 전이면 빈 값)
     const cheers = await repo.cheerStats(checkins.map((c) => c.id), user.id).catch(() => ({} as Record<string, { count: number; mine: boolean }>));
+    // 댓글 (챌린지 설정에서 켠 경우만; 마이그레이션 09 전이면 빈 값)
+    const commentsOn = current.comments_enabled !== false;
+    const comments = commentsOn ? await repo.listComments(checkins.map((c) => c.id)).catch(() => []) : [];
+    const commenterIds = [...new Set(comments.map((c) => c.user_id))].filter((id) => !users.has(id));
+    const extraUsers = new Map((commenterIds.length ? await repo.getUsersByIds(commenterIds) : []).map((u) => [u.id, u]));
+    const nameOf = (id: string) => users.get(id)?.user.display_name ?? extraUsers.get(id)?.display_name ?? "탈퇴";
+    const canComment = isAdmin(user) || myIds.has(current.id);
     const slotLabel = (key: string) => (current.config.kind === "slots" ? current.config.slots.find((s) => s.key === key)?.label : undefined);
 
     content = (
@@ -69,7 +76,7 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
               const p = users.get(c.user_id);
               const caption = current.config.kind === "slots" ? slotLabel(c.slot) : p?.goal.hobby;
               const cs = cheers[c.id] ?? { count: 0, mine: false };
-              return <PhotoCard key={c.id} checkin={c} user={p?.user ?? { display_name: "탈퇴", xp: 0 }} url={urls[c.photo_path]} caption={caption} canDelete={isAdmin(user) || c.user_id === user.id} progress={progress.get(c.user_id) ?? null} cheer={{ ...cs, own: c.user_id === user.id }} report={{ own: c.user_id === user.id, reported: myReports.has(c.id) }} />;
+              return <PhotoCard key={c.id} checkin={c} user={p?.user ?? { display_name: "탈퇴", xp: 0 }} url={urls[c.photo_path]} caption={caption} canDelete={isAdmin(user) || c.user_id === user.id} progress={progress.get(c.user_id) ?? null} cheer={{ ...cs, own: c.user_id === user.id }} report={{ own: c.user_id === user.id, reported: myReports.has(c.id) }} comments={commentsOn ? { list: comments.filter((x) => x.checkin_id === c.id).map((x) => ({ ...x, name: nameOf(x.user_id) })), meId: user.id, admin: isAdmin(user), canWrite: canComment, ownerName: p?.user.display_name ?? "탈퇴" } : null} />;
             })}
           </div>
         )}
