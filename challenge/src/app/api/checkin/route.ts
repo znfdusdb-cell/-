@@ -6,6 +6,7 @@ import { normalizeMethods } from "@/lib/methods";
 import { loadBoard } from "@/lib/data";
 import { fmtDateKo, fmtHmKo, kstDate } from "@/lib/time";
 import type { Checkin } from "@/lib/types";
+import { verifyPayload, type AiPayload } from "@/lib/session";
 
 export const runtime = "nodejs";
 
@@ -106,11 +107,33 @@ export async function POST(req: Request) {
     note: String(fd.get("note") ?? "").slice(0, 100),
   };
 
+  // AI 칼로리 추정 결과 (analyze 에서 서명한 토큰). 기준 초과면 관리자 검토(신고함)에 올린다
+  const ai = ch.config.kind === "slots" ? await verifyPayload<AiPayload>(String(fd.get("ai_token") ?? "")) : null;
+  const aiOk = ai && ai.uid === user.id ? ai : null;
+  const applyAi = async (checkinId: string) => {
+    if (!aiOk) return;
+    try {
+      await repo.updateCheckin(checkinId, { ai_kcal: aiOk.kcal, ai_note: aiOk.note, ai_flagged: aiOk.high });
+    } catch {
+      /* 마이그레이션 10 전: 컬럼이 없으면 저장만 건너뛴다 */
+    }
+    if (!aiOk.high) return;
+    const admins = (await repo.listUsers()).filter((u) => u.role === "admin");
+    if (admins.length === 0) return;
+    const label = ch.config.kind === "slots" ? ch.config.slots.find((s) => s.key === slot)?.label ?? slot : slot;
+    await repo.createReport({ checkin_id: checkinId, reporter_id: admins[0].id, reason: `🤖 AI 칼로리 경고: 예상 ${aiOk.kcal}kcal (기준 ${aiOk.limit}kcal)${aiOk.foods.length ? ` · ${aiOk.foods.join(", ")}` : ""}` }).catch(() => null);
+    const { sendPushToUsers } = await import("@/lib/push");
+    await sendPushToUsers(admins.map((a) => a.id), { title: "🍔 고칼로리 인증 검토", body: `${user.display_name}님 ${label} 예상 ${aiOk.kcal}kcal (기준 ${aiOk.limit}). 인정 또는 불인정을 골라 주세요`, url: "/admin/reports", tag: `ai-${checkinId}` }).catch(() => null);
+  };
+  const aiOut = aiOk ? { aiKcal: aiOk.kcal, aiNote: aiOk.note, aiFlagged: aiOk.high } : {};
+
   if (replacing) {
     const old = existing.find((c) => c.id === replacing)!;
     const updated = await repo.updateCheckin(replacing, { ...base, xp: old.xp });
     if (old.photo_path) await repo.deletePhoto(old.photo_path);
+    await applyAi(replacing);
     return Response.json({
+      ...aiOut,
       ok: true,
       replaced: true,
       checkin: updated,
@@ -126,6 +149,7 @@ export async function POST(req: Request) {
   }
 
   const created = await repo.createCheckin({ ...base, xp: 0 });
+  await applyAi(created.id);
   const after = [...allMine, created];
   const reward = rewardFor(ch, p, after, created, now);
   let totalXp = user.xp;
@@ -142,6 +166,7 @@ export async function POST(req: Request) {
     completedRank = board.filter((r) => !r.waiting && !r.summary.eliminated && !r.pending).length;
   }
   return Response.json({
+    ...aiOut,
     completedRank,
     ok: true,
     replaced: false,

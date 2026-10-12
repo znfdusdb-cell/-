@@ -60,6 +60,8 @@ export type Challenge = {
   is_active: boolean;
   /** 인증 사진에 댓글 허용 (마이그레이션 09 전 행은 undefined → 허용으로 본다) */
   comments_enabled?: boolean;
+  /** 식단 사진 AI 칼로리 경고 기준(한 끼 kcal). 0 = 끄기. 마이그레이션 10 전 행은 undefined → 700 */
+  kcal_limit?: number;
   created_at: string;
 };
 
@@ -116,6 +118,11 @@ export type Checkin = {
   xp: number;
   /** 관리자가 불인정 처리한 시각 (있으면 집계에서 제외) */
   rejected_at?: string | null;
+  /** AI 예상 칼로리 (식단 사진, 없으면 null) */
+  ai_kcal?: number | null;
+  ai_note?: string;
+  /** 기준 초과로 관리자 검토에 올라간 인증 */
+  ai_flagged?: boolean;
   rejected_reason?: string;
 };
 

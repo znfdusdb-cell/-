@@ -127,7 +127,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                       <div className="text-[11px] text-fg-3 num">{slot.start}~{slot.end}{(todayCounts[slot.key] ?? 0) > 0 ? ` · ${todayCounts[slot.key]}명 인증` : ""}</div>
                       <div className="mt-2">
                         {state === "done" && checkin && <div className="text-xs text-ok num">{fmtTimeKo(checkin.taken_at)} 인증</div>}
-                        {state === "open" && <CheckinButton challengeId={ch.id} slot={slot.key} label="촬영 인증" className="btn btn-red w-full text-sm py-2" autoOpen={focus && (!sp.slot || sp.slot === slot.key)} />}
+                        {state === "open" && <CheckinButton challengeId={ch.id} slot={slot.key} label="촬영 인증" className="btn btn-red w-full text-sm py-2" autoOpen={focus && (!sp.slot || sp.slot === slot.key)} aiCheck={ch.config.goal === "weight" && (ch.kcal_limit ?? 700) > 0} />}
                         {state === "upcoming" && <div className="text-xs text-fg-3">{fmtHmKo(slot.start)}부터</div>}
                         {state === "missed" && <div className="text-xs text-bad">시간이 지났어요</div>}
                       </div>

@@ -4,6 +4,7 @@ import { currentUser, isAdmin, toPublic } from "@/lib/current-user";
 import { getRepo } from "@/lib/repo";
 import { describeConfig, levelFromXp } from "@/lib/game";
 import { pushEnabled, vapidProblem } from "@/lib/push";
+import { visionProvider } from "@/lib/vision";
 import { fmtDateTimeKo } from "@/lib/time";
 import { Shell } from "@/components/Shell";
 import { AdminUserRow } from "@/components/AdminUserRow";
@@ -21,6 +22,8 @@ export default async function AdminPage() {
   const cheersOk = await repo.countCheersReceived(user.id).then(() => true).catch(() => false);
   const reportsOk = await repo.listOpenReports().then(() => true).catch(() => false);
   const commentsOk = await repo.listComments(["00000000-0000-0000-0000-000000000000"]).then(() => true).catch(() => false);
+  const kcalOk = repo.mode !== "supabase" || challenges.every((c) => typeof c.kcal_limit === "number");
+  const vision = visionProvider();
   const openReports = reportsOk ? await repo.listOpenReports() : [];
   const openTickets = ticketsOk ? await repo.listOpenTickets() : [];
   const subCount = new Map<string, number>();
@@ -32,9 +35,10 @@ export default async function AdminPage() {
         <div>저장소: <b className="text-fg">{repo.mode === "supabase" ? "Supabase" : "메모리(임시 · 재시작하면 사라짐)"}</b></div>
         <div>알림(웹 푸시): <b className={vapidProblem() ? "text-bad" : "text-fg"}>{vapidProblem() ?? "키 정상"}</b> · 구독 {subs.length}건{pushEnabled() ? "" : ""}</div>
         <div>크론: <code>/api/cron/remind?key=CRON_SECRET</code> 를 30분마다 호출 (README 참고)</div>
-        {(!giftsOk || !ticketsOk || !cheersOk || !reportsOk || !commentsOk) && (
+        <div>AI 칼로리(식단 사진): <b className={vision ? "text-fg" : "text-bad"}>{vision === "gemini" ? "Gemini 키 있음 (무료 등급)" : vision === "claude" ? "Claude 키 있음 (유료)" : vision === "fake" ? "테스트 모드" : "꺼짐 — GEMINI_API_KEY 를 넣으면 켜져요 (README)"}</b></div>
+        {(!giftsOk || !ticketsOk || !cheersOk || !reportsOk || !commentsOk || !kcalOk) && (
           <div className="text-bad font-bold">
-            마이그레이션 필요: {[!giftsOk && "05 (ch_gifts, 선물함)", !ticketsOk && "06 (ch_tickets, 문의 채팅)", !cheersOk && "07 (ch_cheers, 응원)", !reportsOk && "08 (ch_reports, 신고)", !commentsOk && "09 (ch_comments, 댓글)"].filter(Boolean).join(" · ")} — Supabase SQL Editor에서 `challenge/supabase/migrations/` 파일 실행
+            마이그레이션 필요: {[!giftsOk && "05 (ch_gifts, 선물함)", !ticketsOk && "06 (ch_tickets, 문의 채팅)", !cheersOk && "07 (ch_cheers, 응원)", !reportsOk && "08 (ch_reports, 신고)", !commentsOk && "09 (ch_comments, 댓글)", !kcalOk && "10 (AI 칼로리)"].filter(Boolean).join(" · ")} — Supabase SQL Editor에서 `challenge/supabase/migrations/` 파일 실행
           </div>
         )}
       </section>

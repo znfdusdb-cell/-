@@ -59,6 +59,7 @@ async function bootstrap() {
       is_default: true,
       is_active: true,
       comments_enabled: true,
+      kcal_limit: 700,
     });
   }
   if (!existing.some((c) => c.type === "hobby" && c.is_default)) {
@@ -74,6 +75,7 @@ async function bootstrap() {
       is_default: true,
       is_active: true,
       comments_enabled: true,
+      kcal_limit: 0,
     });
   }
 }

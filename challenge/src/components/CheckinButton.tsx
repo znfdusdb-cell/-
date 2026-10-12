@@ -18,7 +18,47 @@ export type CheckinResult = {
   leveledUp: boolean;
   completed: boolean;
   streak: number;
+  /** AI 예상 칼로리 (식단) */
+  aiKcal?: number | null;
+  aiNote?: string;
+  aiFlagged?: boolean;
 };
+
+export type MealAnalysis = { available: boolean; kcal: number; foods: string[]; note: string; limit: number; high: boolean; token: string };
+
+async function analyzeMeal(challengeId: string, blob: Blob): Promise<MealAnalysis | null> {
+  try {
+    const fd = new FormData();
+    fd.set("challenge_id", challengeId);
+    fd.set("file", blob, "photo.jpg");
+    const res = await fetch("/api/checkin/analyze", { method: "POST", body: fd });
+    const j = (await res.json()) as { ok: boolean } & MealAnalysis;
+    return j.ok && j.available ? j : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 고칼로리 경고창: 다시 찍거나, 알고도 올리기(관리자 검토) */
+export function KcalWarning({ a, onRetake, onProceed, busy }: { a: MealAnalysis; onRetake: () => void; onProceed: () => void; busy: boolean }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6">
+      <div className="card w-full max-w-sm p-6 text-center animate-pop">
+        <div className="text-xs font-extrabold tracking-widest text-bad">AI 칼로리 경고</div>
+        <div className="text-4xl font-extrabold text-bad mt-2 num">약 {a.kcal} kcal</div>
+        <div className="text-xs text-fg-3 num mt-0.5">이 챌린지 한 끼 기준 {a.limit} kcal</div>
+        {a.foods.length > 0 && <div className="text-sm mt-2">{a.foods.join(" · ")}</div>}
+        {a.note && <div className="text-xs text-fg-2 mt-1">{a.note}</div>}
+        <div className="rounded-xl bg-bad-soft text-bad text-sm font-bold p-3 mt-4">이대로 올리면 관리자 검토를 받아요. 불인정되면 이 시간대는 실패 처리돼요.</div>
+        <div className="flex gap-2 mt-4">
+          <button type="button" className="btn btn-ghost flex-1" disabled={busy} onClick={onRetake}>다시 찍기</button>
+          <button type="button" className="btn btn-dark flex-1" disabled={busy} onClick={onProceed}>{busy ? "올리는 중…" : "그대로 올리기"}</button>
+        </div>
+        <p className="text-[11px] text-fg-3 mt-2">AI 추정이라 오차가 있어요. 샐러드처럼 보이면 그냥 통과해요.</p>
+      </div>
+    </div>
+  );
+}
 
 function stampText(d: Date) {
   const p = (n: number) => String(n).padStart(2, "0");
@@ -93,6 +133,12 @@ export function ResultModal({ result, onClose }: { result: CheckinResult; onClos
         <ul className="text-sm text-fg-2 mt-3 space-y-0.5">
           {result.reasons.map((r) => <li key={r}>{r}</li>)}
         </ul>
+        {typeof result.aiKcal === "number" && result.aiKcal > 0 && (
+          <div className={`mt-3 text-sm rounded-xl p-2 ${result.aiFlagged ? "bg-bad-soft text-bad" : "bg-bg-3 text-fg-2"}`}>
+            🤖 AI 예상 <b className="num">{result.aiKcal} kcal</b>{result.aiNote ? ` · ${result.aiNote}` : ""}
+            {result.aiFlagged && <div className="text-xs font-bold mt-0.5">관리자 검토 대상이에요</div>}
+          </div>
+        )}
         {result.streak > 1 && <div className="chip bg-gold-soft text-gold mt-3">{result.streak} 연속</div>}
         <button className="btn btn-dark w-full mt-5" onClick={onClose}>닫기</button>
       </div>
@@ -113,6 +159,7 @@ export function CheckinButton({
   disabled,
   className = "btn btn-red w-full",
   autoOpen = false,
+  aiCheck = false,
 }: {
   challengeId: string;
   slot?: string;
@@ -122,6 +169,8 @@ export function CheckinButton({
   className?: string;
   /** 알림에서 들어왔을 때: 바로 카메라 열기 시도, 막히면 버튼 강조 */
   autoOpen?: boolean;
+  /** 식단: 올리기 전 AI 칼로리 추정, 기준 초과면 경고창 */
+  aiCheck?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
@@ -129,6 +178,8 @@ export function CheckinButton({
   const [result, setResult] = useState<CheckinResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pulse, setPulse] = useState(autoOpen);
+  const [stage, setStage] = useState<"idle" | "ai" | "upload">("idle");
+  const [warn, setWarn] = useState<{ fd: FormData; a: MealAnalysis } | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -155,13 +206,41 @@ export function CheckinButton({
       fd.set("media", mode);
       fd.set("taken_at", String(now.getTime()));
       fd.set("file", blob, "photo.jpg");
-      const data = await uploadCheckin(fd);
-      if (!data.ok) return setError(data.error ?? "업로드에 실패했어요");
-      setResult(data);
+      if (aiCheck && mode === "camera") {
+        setStage("ai");
+        const a = await analyzeMeal(challengeId, blob);
+        if (a) {
+          fd.set("ai_token", a.token);
+          if (a.high) { setWarn({ fd, a }); return; }
+        }
+      }
+      await send(fd);
     } catch {
       setError("네트워크 오류. 다시 시도해 주세요");
     } finally {
       setBusy(false);
+      setStage("idle");
+    }
+  }
+
+  async function send(fd: FormData) {
+    setStage("upload");
+    const data = await uploadCheckin(fd);
+    if (!data.ok) return setError(data.error ?? "업로드에 실패했어요");
+    setResult(data);
+  }
+
+  async function proceedAnyway() {
+    if (!warn) return;
+    setBusy(true);
+    try {
+      await send(warn.fd);
+    } catch {
+      setError("네트워크 오류. 다시 시도해 주세요");
+    } finally {
+      setWarn(null);
+      setBusy(false);
+      setStage("idle");
     }
   }
 
@@ -174,9 +253,10 @@ export function CheckinButton({
     <>
       <input ref={input} type="file" accept="image/*" {...(mode === "camera" ? { capture: "environment" } : {})} className="hidden" onChange={onFile} />
       <button ref={btn} type="button" className={`${className} ${pulse ? "animate-pulse-ring" : ""}`} disabled={disabled || busy} onClick={() => { setPulse(false); input.current?.click(); }}>
-        {busy ? "올리는 중…" : label}
+        {busy ? (stage === "ai" ? "AI가 칼로리 보는 중…" : "올리는 중…") : label}
       </button>
       {error && <p className="text-sm text-bad mt-2">{error}</p>}
+      {warn && <KcalWarning a={warn.a} busy={busy} onRetake={() => { setWarn(null); input.current?.click(); }} onProceed={proceedAnyway} />}
       {result && <ResultModal result={result} onClose={close} />}
     </>
   );
