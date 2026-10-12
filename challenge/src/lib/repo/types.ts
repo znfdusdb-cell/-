@@ -29,6 +29,8 @@ export interface Repo {
   deleteUser(id: string): Promise<void>;
   /** 경험치 가감 + 로그. 새 xp 반환 */
   addXp(userId: string, delta: number, reason: string): Promise<number>;
+  /** 같은 사유로 기록된 가장 최근 경험치 변동(실제 반영량). 없으면 null */
+  findXpLog(userId: string, reason: string): Promise<number | null>;
 
   // challenges
   listChallenges(opts?: { includeInactive?: boolean }): Promise<Challenge[]>;
@@ -108,4 +110,6 @@ export interface Repo {
   claimNotice(key: string): Promise<boolean>;
   /** 이미 보냈는지(주장했는지)만 확인 */
   hasNotice(key: string): Promise<boolean>;
+  /** 주장 취소 (실패 취소 시 경험치 차감 키를 되돌릴 때) */
+  deleteNotice(key: string): Promise<void>;
 }

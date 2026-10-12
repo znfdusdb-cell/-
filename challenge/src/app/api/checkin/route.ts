@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { currentUser } from "@/lib/current-user";
 import { getRepo } from "@/lib/repo";
-import { dayStatus, effectiveStartDate, levelFromXp, rewardFor, summarize } from "@/lib/game";
+import { dayStatusFor, effectiveStartDate, levelFromXp, rewardFor, summarize } from "@/lib/game";
 import { normalizeMethods } from "@/lib/methods";
 import { loadBoard } from "@/lib/data";
 import { fmtDateKo, fmtHmKo, kstDate } from "@/lib/time";
@@ -64,10 +64,12 @@ export async function POST(req: Request) {
   const now = new Date();
   const today = kstDate(now);
   const start = effectiveStartDate(p, ch.config);
-  if (today < start) return bad(`이 챌린지는 ${fmtDateKo(start)}부터 시작해요. 그날 아침에 알려 드릴게요!`);
+  // 관리자 테스트 참여: 시작일·탈락·시간대 제한 없이 올리고, 경험치·집계 없음, 관리자에게만 보임
+  const test = Boolean(p.is_test && user.role === "admin");
+  if (!test && today < start) return bad(`이 챌린지는 ${fmtDateKo(start)}부터 시작해요. 그날 아침에 알려 드릴게요!`);
   const allMine = await repo.listCheckins({ participationId: p.id });
-  if (summarize(ch, p, allMine, now).eliminated) return bad(`실패 ${ch.max_fails}번으로 탈락했어요. 벌칙(${ch.penalty})을 하고 '다시 도전'을 눌러 주세요`);
-  if (ch.config.kind === "count" && ch.config.goal === "hobby") {
+  if (!test && summarize(ch, p, allMine, now).eliminated) return bad(`실패 ${ch.max_fails}번으로 탈락했어요. 벌칙(${ch.penalty})을 하고 '다시 도전'을 눌러 주세요`);
+  if (!test && ch.config.kind === "count" && ch.config.goal === "hobby") {
     const allowed = normalizeMethods(p.goal.methods);
     if (allowed.length && !allowed.includes(media)) return bad("이 취미에 설정한 인증 방식이 아니에요. 목표 수정에서 바꿀 수 있어요");
   }
@@ -81,11 +83,16 @@ export async function POST(req: Request) {
     if (media !== "camera") return bad("식사 인증은 앱에서 바로 촬영한 사진만 돼요");
     const def = ch.config.slots.find((s) => s.key === slotKey);
     if (!def) return bad("어느 시간대인지 골라 주세요");
-    const st = dayStatus(ch.config, existing, today, now).slots.find((s) => s.slot.key === def.key)!;
-    if (st.state === "upcoming") return bad(`${def.label} 인증은 ${fmtHmKo(def.start)}부터예요`);
-    if (st.state === "missed") return bad(`${def.label} 인증 시간(${fmtHmKo(def.start)}~${fmtHmKo(def.end)})이 지났어요`);
     slot = def.key;
-    if (st.checkin) replacing = st.checkin.id;
+    if (test) {
+      replacing = existing.find((c) => c.slot === def.key)?.id ?? null;
+    } else {
+      const st = dayStatusFor(ch.config, p, existing, today, now).slots.find((s) => s.slot.key === def.key);
+      if (!st) return bad(`${def.label}은 시작 전에 끝난 시간대예요. 다음 시간대부터 올려 주세요`);
+      if (st.state === "upcoming") return bad(`${def.label} 인증은 ${fmtHmKo(def.start)}부터예요`);
+      if (st.state === "missed") return bad(`${def.label} 인증 시간(${fmtHmKo(def.start)}~${fmtHmKo(def.end)})이 지났어요`);
+      if (st.checkin) replacing = st.checkin.id;
+    }
   }
 
   let path = "";
@@ -105,6 +112,7 @@ export async function POST(req: Request) {
     taken_at: takenAt.toISOString(),
     local_date: today,
     note: String(fd.get("note") ?? "").slice(0, 100),
+    ...(test ? { is_test: true } : {}),
   };
 
   // AI 칼로리 추정 결과 (analyze 에서 서명한 토큰). 기준 초과면 관리자 검토(신고함)에 올린다
@@ -150,6 +158,9 @@ export async function POST(req: Request) {
 
   const created = await repo.createCheckin({ ...base, xp: 0 });
   await applyAi(created.id);
+  if (test) {
+    return Response.json({ ...aiOut, ok: true, replaced: false, checkin: created, xp: 0, reasons: ["관리자 테스트 인증 · 경험치·집계 없음 · 남들에겐 안 보여요"], totalXp: user.xp, level: levelFromXp(user.xp), gender: user.gender, leveledUp: false, completed: false, streak: 0 });
+  }
   const after = [...allMine, created];
   const reward = rewardFor(ch, p, after, created, now);
   let totalXp = user.xp;

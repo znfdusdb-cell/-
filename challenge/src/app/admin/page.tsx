@@ -8,6 +8,7 @@ import { visionProvider } from "@/lib/vision";
 import { fmtDateTimeKo } from "@/lib/time";
 import { Shell } from "@/components/Shell";
 import { AdminUserRow } from "@/components/AdminUserRow";
+import { TestJoinButton } from "@/components/TestJoinButton";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,9 @@ export default async function AdminPage() {
   const reportsOk = await repo.listOpenReports().then(() => true).catch(() => false);
   const commentsOk = await repo.listComments(["00000000-0000-0000-0000-000000000000"]).then(() => true).catch(() => false);
   const kcalOk = repo.mode !== "supabase" || challenges.every((c) => typeof c.kcal_limit === "number");
+  const myParts = await repo.listParticipationsByUser(user.id);
+  const testOk = repo.mode !== "supabase" || myParts.length === 0 || myParts.every((p) => typeof p.is_test === "boolean");
+  const testCount = myParts.filter((p) => p.status === "active" && p.is_test).length;
   const vision = visionProvider();
   const openReports = reportsOk ? await repo.listOpenReports() : [];
   const openTickets = ticketsOk ? await repo.listOpenTickets() : [];
@@ -36,11 +40,17 @@ export default async function AdminPage() {
         <div>알림(웹 푸시): <b className={vapidProblem() ? "text-bad" : "text-fg"}>{vapidProblem() ?? "키 정상"}</b> · 구독 {subs.length}건{pushEnabled() ? "" : ""}</div>
         <div>크론: <code>/api/cron/remind?key=CRON_SECRET</code> 를 30분마다 호출 (README 참고)</div>
         <div>AI 칼로리(식단 사진): <b className={vision ? "text-fg" : "text-bad"}>{vision === "gemini" ? "Gemini 키 있음 (무료 등급)" : vision === "claude" ? "Claude 키 있음 (유료)" : vision === "fake" ? "테스트 모드" : "꺼짐 — GEMINI_API_KEY 를 넣으면 켜져요 (README)"}</b></div>
-        {(!giftsOk || !ticketsOk || !cheersOk || !reportsOk || !commentsOk || !kcalOk) && (
+        {(!giftsOk || !ticketsOk || !cheersOk || !reportsOk || !commentsOk || !kcalOk || !testOk) && (
           <div className="text-bad font-bold">
-            마이그레이션 필요: {[!giftsOk && "05 (ch_gifts, 선물함)", !ticketsOk && "06 (ch_tickets, 문의 채팅)", !cheersOk && "07 (ch_cheers, 응원)", !reportsOk && "08 (ch_reports, 신고)", !commentsOk && "09 (ch_comments, 댓글)", !kcalOk && "10 (AI 칼로리)"].filter(Boolean).join(" · ")} — Supabase SQL Editor에서 `challenge/supabase/migrations/` 파일 실행
+            마이그레이션 필요: {[!giftsOk && "05 (ch_gifts, 선물함)", !ticketsOk && "06 (ch_tickets, 문의 채팅)", !cheersOk && "07 (ch_cheers, 응원)", !reportsOk && "08 (ch_reports, 신고)", !commentsOk && "09 (ch_comments, 댓글)", !kcalOk && "10 (AI 칼로리)", !testOk && "11 (테스트 참여·지금부터 시작)"].filter(Boolean).join(" · ")} — Supabase SQL Editor에서 `challenge/supabase/migrations/` 파일 실행
           </div>
         )}
+      </section>
+
+      <section className="card p-4 mt-3">
+        <div className="font-bold">🧪 테스트 참여 {testCount > 0 && <span className="chip bg-navy text-white ml-1 num">{testCount}개</span>}</div>
+        <div className="text-xs text-fg-2 mt-0.5 mb-2">모든 챌린지에 숨김으로 참여해 시간 제한 없이 사진을 올려 봅니다. 리더보드·갤러리(남들)·집계·경험치에서 빠지고, AI 칼로리 경고와 검토 흐름은 그대로 돌아요. 챌린지 상세에서 정식 참여로 되돌릴 수 있어요.</div>
+        <TestJoinButton mode="all" className="btn btn-dark text-sm w-full" />
       </section>
 
       <Link href="/admin/support" className={`card p-4 mt-3 flex items-center justify-between ${openTickets.length > 0 ? "border-red/40 bg-red-soft" : ""}`}>

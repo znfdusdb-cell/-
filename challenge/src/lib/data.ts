@@ -47,8 +47,8 @@ export async function loadMyChallenges(user: User, now = new Date()): Promise<My
     const ch = challenges.find((c) => c.id === p.challenge_id);
     if (!ch) continue;
     const mine = checkins.filter((c) => c.participation_id === p.id);
-    await applyFailPenalties(ch, p, mine, now);
-    const todays = todayAll.filter((c) => c.challenge_id === ch.id);
+    if (!p.is_test) await applyFailPenalties(ch, p, mine, now);
+    const todays = todayAll.filter((c) => c.challenge_id === ch.id && !c.is_test);
     const todayCounts: Record<string, number> = {};
     for (const c of todays) todayCounts[c.slot] = (todayCounts[c.slot] ?? 0) + 1;
     out.push({ challenge: ch, participation: p, summary: summarize(ch, p, mine, now), checkins: mine, todayCounts, todayPeople: new Set(todays.map((c) => c.user_id)).size });
@@ -93,7 +93,7 @@ export function boardFocus(challenge: Challenge, now = new Date()) {
  */
 export async function loadBoard(challenge: Challenge, now = new Date()): Promise<BoardRow[]> {
   const repo = getRepo();
-  const participants = await repo.listParticipants(challenge.id);
+  const participants = (await repo.listParticipants(challenge.id)).filter((p) => !p.is_test);
   if (participants.length === 0) return [];
   const ids = participants.map((p) => p.id);
   const [checkins, weights] = await Promise.all([repo.listCheckins({ participationIds: ids }), challenge.config.goal === "weight" ? repo.listWeightLogsMany(ids) : Promise.resolve([])]);
@@ -131,6 +131,7 @@ export async function loadPendingMonthlyReports(mine: MyChallenge[], now = new D
   const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
   const out: MonthlyReportView[] = [];
   for (const mc of mine) {
+    if (mc.participation.is_test) continue;
     if (await repo.hasNotice(`monthly:${mc.participation.id}:${prev}`)) continue;
     const report = monthReport(mc.challenge, mc.participation, mc.checkins, prev, now);
     if (!report) continue;

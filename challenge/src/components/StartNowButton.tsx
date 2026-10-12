@@ -10,7 +10,7 @@ export function StartNowButton({ userId, challengeId }: { userId: string; challe
     <form action={action} className="mt-1">
       <input type="hidden" name="user_id" value={userId} />
       <input type="hidden" name="challenge_id" value={challengeId} />
-      <SubmitButton className="btn btn-ghost text-[11px] py-1 px-2">관리자: 오늘부터 바로 시작</SubmitButton>
+      <SubmitButton className="btn btn-ghost text-[11px] py-1 px-2">관리자: 지금부터 시작</SubmitButton>
       <FormMessage state={state} />
     </form>
   );

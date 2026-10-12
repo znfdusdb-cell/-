@@ -36,7 +36,10 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
 
   let content: React.ReactNode = null;
   if (current) {
-    const [checkins, participants] = await Promise.all([repo.listCheckins({ challengeId: current.id, from, to, includeRejected: true }), repo.listParticipants(current.id)]);
+    const [checkinsAll, participants] = await Promise.all([repo.listCheckins({ challengeId: current.id, from, to, includeRejected: true }), repo.listParticipants(current.id)]);
+    // 관리자 테스트 인증은 관리자에게만 보인다
+    const checkins = checkinsAll.filter((c) => !c.is_test || isAdmin(user));
+    const realCount = participants.filter((p) => !p.is_test).length;
     const myReports = new Set((await repo.listReportsFor(checkins.map((c) => c.id)).catch(() => [])).filter((r) => r.reporter_id === user.id).map((r) => r.checkin_id));
     const users = new Map(participants.map((p) => [p.user_id, p]));
     // 다이어트: 사람별 감량 진행률 (몸무게 숫자는 비공개)
@@ -66,7 +69,7 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
     content = (
       <>
         <p className="text-xs text-fg-3 mb-2">
-          {step === 1 ? fmtDateKo(date) : `${fmtDateKo(from)} ~ ${fmtDateKo(to)}`} · 참가자 {participants.length}명 · 인증 {checkins.length}건
+          {step === 1 ? fmtDateKo(date) : `${fmtDateKo(from)} ~ ${fmtDateKo(to)}`} · 참가자 {realCount}명 · 인증 {checkins.filter((c) => !c.is_test).length}건
         </p>
         {checkins.length === 0 ? (
           <div className="card p-8 text-center text-fg-2 text-sm">아직 올라온 인증이 없어요</div>
@@ -74,7 +77,8 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
           <div className="grid grid-cols-2 gap-2">
             {checkins.map((c) => {
               const p = users.get(c.user_id);
-              const caption = current.config.kind === "slots" ? slotLabel(c.slot) : p?.goal.hobby;
+              const base = current.config.kind === "slots" ? slotLabel(c.slot) : p?.goal.hobby;
+              const caption = c.is_test ? `${base ? `${base} · ` : ""}테스트` : base;
               const cs = cheers[c.id] ?? { count: 0, mine: false };
               return <PhotoCard key={c.id} checkin={c} user={p?.user ?? { display_name: "탈퇴", xp: 0 }} url={urls[c.photo_path]} caption={caption} canDelete={isAdmin(user) || c.user_id === user.id} progress={progress.get(c.user_id) ?? null} cheer={{ ...cs, own: c.user_id === user.id }} report={{ own: c.user_id === user.id, reported: myReports.has(c.id) }} comments={commentsOn ? { list: comments.filter((x) => x.checkin_id === c.id).map((x) => ({ ...x, name: nameOf(x.user_id) })), meId: user.id, admin: isAdmin(user), canWrite: canComment, ownerName: p?.user.display_name ?? "탈퇴" } : null} />;
             })}

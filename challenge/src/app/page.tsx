@@ -82,8 +82,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               </div>
               {ch.config.goal === "hobby" && p.goal.hobby && <p className="text-sm text-fg-2 mt-0.5">도전: {p.goal.hobby}</p>}
 
-              {/* 손실 프레이밍 */}
-              {s.eliminated ? (
+              {/* 손실 프레이밍 (테스트 참여는 집계 없음) */}
+              {p.is_test ? (
+                <div className="mt-3 rounded-xl bg-navy/10 border border-navy/30 px-3 py-2 text-xs leading-relaxed">
+                  <b className="text-navy">관리자 테스트 참여</b> · 시간 제한 없이 올릴 수 있고, 경험치·실패 집계 없음. 사진은 관리자에게만 보여요. (AI 칼로리 경고·검토는 그대로 동작)
+                </div>
+              ) : s.eliminated ? (
                 <div className="mt-3 rounded-2xl bg-bad-soft border border-bad/30 p-3">
                   <div className="font-extrabold text-bad">탈락 · 이번 달 실패 {s.fails}번</div>
                   <div className="text-sm mt-0.5">벌칙: <b>{ch.penalty}</b></div>
@@ -109,12 +113,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                 </div>
               )}
 
-              {waiting ? (
+              {waiting && !p.is_test ? (
                 <div className="mt-3 rounded-2xl border border-line bg-bg-3/60 p-3 text-sm">
                   <div className="font-bold">{fmtDateKo(s.startDate)}부터 시작 <span className="text-fg-3 num font-normal">D-{daysBetween(today, s.startDate)}</span></div>
                   <div className="text-xs text-fg-2 mt-0.5">챌린지는 매주 월요일에 시작해요. 시작하는 날 아침에 알려 드릴게요.</div>
                 </div>
-              ) : s.eliminated ? null : s.kind === "slots" ? (
+              ) : s.eliminated && !p.is_test ? null : s.kind === "slots" ? (
                 <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(s.today.slots.length, 3)}, minmax(0,1fr))` }}>
                   {s.today.slots.map(({ slot, state, checkin }) => (
                     <div key={slot.key} className={`rounded-2xl p-3 border ${state === "done" ? "border-ok/30 bg-ok-soft" : state === "open" ? "border-red/40 bg-red-soft" : state === "missed" ? "border-bad/30 bg-bad-soft" : "border-line bg-bg-3/60"}`}>
@@ -127,9 +131,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                       <div className="text-[11px] text-fg-3 num">{slot.start}~{slot.end}{(todayCounts[slot.key] ?? 0) > 0 ? ` · ${todayCounts[slot.key]}명 인증` : ""}</div>
                       <div className="mt-2">
                         {state === "done" && checkin && <div className="text-xs text-ok num">{fmtTimeKo(checkin.taken_at)} 인증</div>}
-                        {state === "open" && <CheckinButton challengeId={ch.id} slot={slot.key} label="촬영 인증" className="btn btn-red w-full text-sm py-2" autoOpen={focus && (!sp.slot || sp.slot === slot.key)} aiCheck={ch.config.goal === "weight" && (ch.kcal_limit ?? 700) > 0} />}
-                        {state === "upcoming" && <div className="text-xs text-fg-3">{fmtHmKo(slot.start)}부터</div>}
-                        {state === "missed" && <div className="text-xs text-bad">시간이 지났어요</div>}
+                        {(state === "open" || p.is_test) && <CheckinButton challengeId={ch.id} slot={slot.key} label={p.is_test ? (state === "done" ? "테스트 다시 찍기" : "테스트 촬영") : "촬영 인증"} className={`btn w-full text-sm py-2 ${p.is_test && state !== "open" ? "btn-ghost" : "btn-red"}`} autoOpen={!p.is_test && focus && (!sp.slot || sp.slot === slot.key)} aiCheck={ch.config.goal === "weight" && (ch.kcal_limit ?? 700) > 0} />}
+                        {state === "upcoming" && !p.is_test && <div className="text-xs text-fg-3">{fmtHmKo(slot.start)}부터</div>}
+                        {state === "missed" && !p.is_test && <div className="text-xs text-bad">시간이 지났어요</div>}
                       </div>
                     </div>
                   ))}

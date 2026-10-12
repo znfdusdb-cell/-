@@ -93,6 +93,10 @@ export type Participation = {
   goal: ParticipationGoal;
   /** 관리자가 지정한 집계 시작일 (없으면 월요일 규칙) */
   start_date?: string | null;
+  /** '지금부터 시작': 시작일에 이 시각(HH:MM) 전에 끝난 시간대는 집계에서 뺀다 */
+  start_time?: string | null;
+  /** 관리자 테스트 참여: 리더보드·갤러리(남들)·집계·경험치에서 제외, 시간 제한 없이 업로드 */
+  is_test?: boolean;
 };
 
 export type Checkin = {
@@ -123,6 +127,8 @@ export type Checkin = {
   ai_note?: string;
   /** 기준 초과로 관리자 검토에 올라간 인증 */
   ai_flagged?: boolean;
+  /** 관리자 테스트 인증 (관리자에게만 보임) */
+  is_test?: boolean;
   rejected_reason?: string;
 };
 

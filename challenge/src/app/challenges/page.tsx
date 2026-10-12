@@ -14,7 +14,7 @@ export default async function ChallengesPage() {
   const [challenges, parts, allActive] = await Promise.all([repo.listChallenges(), repo.listParticipationsByUser(user.id), repo.listActiveParticipations()]);
   const joined = new Set(parts.filter((p) => p.status === "active").map((p) => p.challenge_id));
   const countMap = new Map<string, number>();
-  for (const p of allActive) countMap.set(p.challenge_id, (countMap.get(p.challenge_id) ?? 0) + 1);
+  for (const p of allActive) if (!p.is_test) countMap.set(p.challenge_id, (countMap.get(p.challenge_id) ?? 0) + 1);
   const canCreate = isAdmin(user) || levelFromXp(user.xp) >= CREATE_CHALLENGE_LEVEL;
 
   return (
