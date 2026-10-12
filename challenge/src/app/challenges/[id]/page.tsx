@@ -35,7 +35,7 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
     <Shell user={toPublic(user)} title={`${ch.emoji} ${ch.title}`} right={<Link href="/challenges">목록</Link>}>
       <section className="card p-4">
         <p className="text-sm">{ch.description}</p>
-        <p className="text-xs text-fg-3 mt-1">{describeConfig(ch.config)} · 참가자 {board.length}명</p>
+        <p className="text-xs text-fg-3 mt-1">{describeConfig(ch.config)} · 참가자 {board.length}명{ch.comments_enabled === false ? " · 댓글 꺼짐" : ""}</p>
         <FailRule challenge={ch} />
         {!ch.is_active && <p className="chip bg-bad-soft text-bad mt-2">비활성 (새 참여 불가)</p>}
         <div className="flex gap-2 mt-3">

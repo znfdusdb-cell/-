@@ -6,11 +6,12 @@ import { ProtectedImage } from "./ProtectedMedia";
 import { DeleteCheckinButton } from "./DeleteCheckinButton";
 import { CheerButton, type CheerState } from "./CheerButton";
 import { ReportButton } from "./ReportButton";
+import { CommentButton, type CommentThreadProps } from "./CommentThread";
 
 /** 갤러리 카드 1장: 사진·녹음·링크 + 시각 + 사용자. 사진은 저장 못 하게 막는다. */
 export type WeightBadge = { targetLoss: number; lost: number; ratio: number; reached: boolean };
 
-export function PhotoCard({ checkin, user, url, caption, canDelete, progress = null, cheer = null, report = null }: { checkin: Checkin; user: Pick<User, "display_name" | "xp">; url: string | undefined; caption?: string; canDelete: boolean; progress?: WeightBadge | null; cheer?: CheerState | null; report?: { own: boolean; reported: boolean } | null }) {
+export function PhotoCard({ checkin, user, url, caption, canDelete, progress = null, cheer = null, report = null, comments = null }: { checkin: Checkin; user: Pick<User, "display_name" | "xp">; url: string | undefined; caption?: string; canDelete: boolean; progress?: WeightBadge | null; cheer?: CheerState | null; report?: { own: boolean; reported: boolean } | null; comments?: Omit<CommentThreadProps, "checkinId"> | null }) {
   const kind = checkin.media_type;
   const rejected = Boolean(checkin.rejected_at);
   const embed = kind === "link" ? youtubeEmbed(checkin.link_url) : null;
@@ -47,11 +48,16 @@ export function PhotoCard({ checkin, user, url, caption, canDelete, progress = n
         <div className="flex items-center justify-between gap-1">
           <span className="font-bold truncate">{user.display_name} <span className="text-red font-bold">Lv.{levelFromXp(user.xp)}</span></span>
           <span className="flex items-center gap-2 shrink-0">
-            {cheer && !rejected && <CheerButton checkinId={checkin.id} cheer={cheer} />}
             {report && !report.own && !rejected && <ReportButton checkinId={checkin.id} reported={report.reported} />}
             {canDelete && <DeleteCheckinButton checkinId={checkin.id} />}
           </span>
         </div>
+        {(cheer || comments) && !rejected && (
+          <div className="flex items-center gap-1.5 mt-1">
+            {cheer && <CheerButton checkinId={checkin.id} cheer={cheer} />}
+            {comments && <CommentButton checkinId={checkin.id} {...comments} />}
+          </div>
+        )}
         {progress && (
           <div className="mt-1">
             <div className="flex justify-between text-[10px] text-fg-2 num">

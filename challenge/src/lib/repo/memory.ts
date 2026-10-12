@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Challenge, Cheer, Checkin, Gift, Participation, PushSubscriptionRow, Report, Ticket, TicketMessage, User, WeightLog } from "../types";
+import type { Challenge, Cheer, Checkin, Comment, Gift, Participation, PushSubscriptionRow, Report, Ticket, TicketMessage, User, WeightLog } from "../types";
 import type { CheckinQuery, ParticipantRow, Repo } from "./types";
 
 type Store = {
@@ -15,6 +15,7 @@ type Store = {
   ticketMessages: TicketMessage[];
   cheers: Cheer[];
   reports: Report[];
+  comments: Comment[];
   notices: Set<string>;
   xpLog: { user_id: string; delta: number; reason: string; created_at: string }[];
 };
@@ -36,6 +37,7 @@ function store(): Store {
       ticketMessages: [],
       cheers: [],
       reports: [],
+      comments: [],
       notices: new Set(),
       xpLog: [],
     };
@@ -286,6 +288,23 @@ export class MemoryRepo implements Repo {
     const out: Record<string, number> = {};
     for (const id of userIds) out[id] = await this.countCheersReceived(id);
     return out;
+  }
+
+  async listComments(checkinIds: string[]) {
+    const set = new Set(checkinIds);
+    return clone(store().comments.filter((c) => set.has(c.checkin_id)).sort((a, b) => a.created_at.localeCompare(b.created_at)));
+  }
+  async getComment(id: string) {
+    return clone(store().comments.find((c) => c.id === id) ?? null);
+  }
+  async addComment(data: Omit<Comment, "id" | "created_at">) {
+    const c: Comment = { ...data, id: randomUUID(), created_at: now() };
+    store().comments.push(c);
+    return clone(c);
+  }
+  async deleteComment(id: string) {
+    const s = store();
+    s.comments = s.comments.filter((c) => c.id !== id);
   }
 
   async putPhoto(path: string, bytes: Uint8Array, contentType: string) {

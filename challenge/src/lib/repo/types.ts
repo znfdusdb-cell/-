@@ -1,4 +1,4 @@
-import type { Challenge, Checkin, Gift, Participation, PushSubscriptionRow, Report, Ticket, TicketMessage, User, WeightLog } from "../types";
+import type { Challenge, Checkin, Comment, Gift, Participation, PushSubscriptionRow, Report, Ticket, TicketMessage, User, WeightLog } from "../types";
 
 export type CheckinQuery = {
   challengeId?: string;
@@ -76,6 +76,12 @@ export interface Repo {
   /** 내 인증들이 받은 응원 합 */
   countCheersReceived(userId: string): Promise<number>;
   countCheersReceivedMany(userIds: string[]): Promise<Record<string, number>>;
+
+  // comments (인증 댓글)
+  listComments(checkinIds: string[]): Promise<Comment[]>;
+  getComment(id: string): Promise<Comment | null>;
+  addComment(data: Omit<Comment, "id" | "created_at">): Promise<Comment>;
+  deleteComment(id: string): Promise<void>;
 
   // support (개발자 문의)
   getOpenTicket(userId: string): Promise<Ticket | null>;

@@ -44,6 +44,9 @@ export function ChallengeForm({ challenge }: { challenge?: Challenge }) {
         </div>
       </div>
       <p className="text-[11px] text-fg-3 -mt-2">실패 1번마다 경험치가 깎이고, 한 달 안에 이 횟수에 닿으면 탈락해서 벌칙(기프티콘)을 올려요. 0이면 탈락 없음.</p>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="comments_enabled" defaultChecked={challenge?.comments_enabled ?? true} /> 인증 사진에 댓글 허용 (갤러리에서 멤버끼리 댓글)
+      </label>
       {editing && (
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="is_active" defaultChecked={challenge!.is_active} /> 참여 가능(비활성화하면 목록에서 숨김)

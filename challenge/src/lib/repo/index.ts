@@ -58,6 +58,7 @@ async function bootstrap() {
       created_by: admin.id,
       is_default: true,
       is_active: true,
+      comments_enabled: true,
     });
   }
   if (!existing.some((c) => c.type === "hobby" && c.is_default)) {
@@ -72,6 +73,7 @@ async function bootstrap() {
       created_by: admin.id,
       is_default: true,
       is_active: true,
+      comments_enabled: true,
     });
   }
 }
