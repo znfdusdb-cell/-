@@ -36,6 +36,7 @@ export default async function AdminPage() {
   return (
     <Shell user={toPublic(user)} title="관리">
       <section className="card p-4 text-xs text-fg-2 space-y-1">
+        <div>배포 버전: <b className="text-fg num">{(process.env.VERCEL_GIT_COMMIT_SHA ?? "").slice(0, 7) || "local"}</b>{process.env.VERCEL_GIT_COMMIT_MESSAGE ? <span className="text-fg-3"> · {process.env.VERCEL_GIT_COMMIT_MESSAGE.split("\n")[0].slice(0, 40)}</span> : null}</div>
         <div>저장소: <b className="text-fg">{repo.mode === "supabase" ? "Supabase" : "메모리(임시 · 재시작하면 사라짐)"}</b></div>
         <div>알림(웹 푸시): <b className={vapidProblem() ? "text-bad" : "text-fg"}>{vapidProblem() ?? "키 정상"}</b> · 구독 {subs.length}건{pushEnabled() ? "" : ""}</div>
         <div>크론: <code>/api/cron/remind?key=CRON_SECRET</code> 를 30분마다 호출 (README 참고)</div>
