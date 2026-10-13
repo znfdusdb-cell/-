@@ -39,7 +39,7 @@ export default async function OnboardingPage() {
             </div>
             <FailRule challenge={ch} />
             <div className="mt-3">
-              {joined.has(ch.id) ? <div className="chip bg-ok-soft text-ok">참여 중</div> : <JoinForm challenge={ch} next="/onboarding" />}
+              {joined.has(ch.id) ? <div className="chip bg-ok-soft text-ok">참여 중</div> : <JoinForm challenge={ch} next="/onboarding" gender={user.gender} />}
             </div>
           </section>
         ))}

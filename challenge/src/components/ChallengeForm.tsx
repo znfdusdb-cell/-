@@ -49,9 +49,9 @@ export function ChallengeForm({ challenge }: { challenge?: Challenge }) {
       </label>
       {kind === "slots" && (
         <div>
-          <label className="label">AI 칼로리 경고 기준 (한 끼 kcal · 0이면 끄기)</label>
+          <label className="label">AI 칼로리 경고 기본 기준 (한 끼 kcal · 0이면 끄기)</label>
           <input name="kcal_limit" type="number" min="0" max="5000" step="50" inputMode="numeric" className="input" defaultValue={challenge?.kcal_limit ?? 700} />
-          <p className="text-[11px] text-fg-3 mt-1">식사 사진을 올릴 때 AI가 칼로리를 추정해요. 이 값을 넘으면 경고창이 뜨고, 그래도 올리면 관리자 검토(신고 판정)에 올라가요. 체중 목표형 챌린지에서만 동작하고, 서버에 AI 키가 있어야 해요.</p>
+          <p className="text-[11px] text-fg-3 mt-1">식사 사진을 올릴 때 AI가 칼로리를 추정해요. 키를 넣은 사람은 기초대사량·목표·기간으로 자기 기준이 따로 계산되고, 이 값은 키를 안 넣은 사람에게 쓰는 기본값이에요. 넘으면 경고창이 뜨고, 그래도 올리면 관리자 검토(신고 판정)에 올라가요.</p>
         </div>
       )}
       {editing && (

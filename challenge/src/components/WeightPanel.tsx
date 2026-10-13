@@ -2,7 +2,8 @@
 
 import { useActionState } from "react";
 import { logWeight } from "@/app/actions";
-import { dailyCalorieDeficit, weightProgress } from "@/lib/game";
+import { dailyCalorieDeficit, weightProgress, type MealPlan } from "@/lib/game";
+import Link from "next/link";
 import { FormMessage, SubmitButton } from "./Form";
 
 /** 다이어트 체중 게이지 (본인만 보임). 매일 체중을 넣으면 목표까지 얼마나 왔는지, 하루 줄일 칼로리를 보여준다. */
@@ -14,6 +15,7 @@ export function WeightPanel({
   elapsedDays,
   logs,
   today,
+  meal,
 }: {
   challengeId: string;
   startKg: number;
@@ -22,6 +24,8 @@ export function WeightPanel({
   elapsedDays: number;
   logs: { date: string; kg: number }[];
   today: string;
+  /** 한 끼 칼로리 기준 (키가 있으면 개인화, plan 있음) */
+  meal?: { limit: number; plan: MealPlan | null };
 }) {
   const [state, action] = useActionState(logWeight, null);
   const latest = logs.length ? logs[logs.length - 1] : null;
@@ -63,6 +67,22 @@ export function WeightPanel({
         </p>
       )}
       {p.reached && <p className="text-xs text-ok font-semibold mt-2">목표 체중에 도달했어요. 유지가 진짜 승부예요.</p>}
+      {meal && meal.limit > 0 && (
+        <div className="mt-2 rounded-xl bg-bg-2 border border-line px-3 py-2 text-xs">
+          {meal.plan ? (
+            <>
+              🤖 내 한 끼 기준 <b className="text-red num">{meal.limit} kcal</b>
+              <span className="text-fg-3 num"> · 기초대사 {meal.plan.bmr.toLocaleString()} · 하루 목표 {meal.plan.dailyTarget.toLocaleString()} kcal</span>
+              {meal.plan.clamped && <div className="text-bad mt-0.5">기간 대비 목표가 커서 최소 섭취선 기준이에요.</div>}
+            </>
+          ) : (
+            <>
+              🤖 한 끼 기준 <b className="num">{meal.limit} kcal</b> (챌린지 기본값)
+              {" · "}<Link href={`/challenges/${challengeId}`} className="underline">키를 넣으면 내 몸에 맞게 바뀌어요</Link>
+            </>
+          )}
+        </div>
+      )}
       <form action={action} className="flex gap-2 mt-3">
         <input type="hidden" name="challenge_id" value={challengeId} />
         <input name="kg" type="number" step="0.1" min="20" max="300" inputMode="decimal" className="input py-2" placeholder={todayLog ? `오늘 ${todayLog.kg} kg 기록됨` : "오늘 체중 (kg)"} required />

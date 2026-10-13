@@ -2,6 +2,8 @@ import { currentUser } from "@/lib/current-user";
 import { getRepo } from "@/lib/repo";
 import { estimateMeal, visionProvider } from "@/lib/vision";
 import { signPayload, type AiPayload } from "@/lib/session";
+import { mealLimitFor } from "@/lib/game";
+import { kstDate } from "@/lib/time";
 
 export const runtime = "nodejs";
 
@@ -20,7 +22,12 @@ export async function POST(req: Request) {
   const repo = getRepo();
   const ch = await repo.getChallenge(String(fd.get("challenge_id") ?? ""));
   if (!ch) return Response.json({ ok: false, error: "없는 챌린지예요" }, { status: 400 });
-  const limit = ch.config.kind === "slots" && ch.config.goal === "weight" ? (ch.kcal_limit ?? 700) : 0;
+  const p = await repo.getParticipation(user.id, ch.id);
+  if (!p || p.status !== "active") return Response.json({ ok: true, available: false });
+  // 키·체중·목표로 개인화된 한 끼 기준 (키가 없으면 챌린지 기본값)
+  const logs = await repo.listWeightLogs(p.id).catch(() => []);
+  const latestKg = logs.length ? Number(logs[logs.length - 1].kg) : null;
+  const { limit } = mealLimitFor(ch, p, user.gender, latestKg, kstDate());
   if (limit <= 0 || !visionProvider()) return Response.json({ ok: true, available: false });
   const f = fd.get("file");
   if (!(f instanceof File) || f.size > MAX_BYTES) return Response.json({ ok: true, available: false });

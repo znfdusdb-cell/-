@@ -126,6 +126,12 @@ function parseGoal(fd: FormData, cfg: ChallengeConfig): { goal: ParticipationGoa
     goal.start_kg = start;
     goal.target_kg = target;
     goal.days = days;
+    const height = parseFloat(str(fd, "height_cm"));
+    const age = parseInt(str(fd, "age"), 10);
+    if (str(fd, "height_cm") && (!Number.isFinite(height) || height < 100 || height > 250)) return { goal, error: "키는 100~250cm" };
+    if (str(fd, "age") && (!Number.isInteger(age) || age < 10 || age > 100)) return { goal, error: "나이는 10~100" };
+    if (Number.isFinite(height) && height >= 100) goal.height_cm = Math.round(height);
+    if (Number.isInteger(age) && age >= 10) goal.age = age;
   }
   if (cfg.goal === "hobby") {
     const hobby = str(fd, "hobby");
