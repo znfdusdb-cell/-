@@ -74,6 +74,8 @@ export type ParticipationGoal = {
   height_cm?: number;
   /** 나이 (선택, 없으면 30) */
   age?: number;
+  /** 인증하지 않는 식사(아침·간식) 몫: 0 = 안 먹음(기본), 0.5 = 간단히, 1 = 한 끼 더 */
+  extra_meals?: number;
   hobby?: string;
   /** 취미 인증 방식 (camera/album/audio/link) */
   methods?: string[];
