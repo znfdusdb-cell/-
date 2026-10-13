@@ -332,6 +332,65 @@ export function dailyCalorieDeficit(remainingKg: number, remainingDays: number):
   return Math.round((remainingKg * 7700) / remainingDays / 10) * 10;
 }
 
+/* ───────── 개인 칼로리 기준 (기초대사량) ───────── */
+
+/** 가벼운 활동 기준 활동 계수 */
+export const ACTIVITY_FACTOR = 1.375;
+export const DEFAULT_AGE = 30;
+
+/** Mifflin-St Jeor 기초대사량 */
+export function bmr(gender: "m" | "f", kg: number, cm: number, age: number = DEFAULT_AGE): number {
+  const base = 10 * kg + 6.25 * cm - 5 * age;
+  return Math.round(gender === "m" ? base + 5 : base - 161);
+}
+
+export type MealPlan = {
+  bmr: number;
+  /** 하루 소비 (기초대사 × 활동) */
+  tdee: number;
+  /** 목표 달성에 필요한 하루 결손 */
+  deficit: number;
+  /** 하루 섭취 목표 (최소선 아래로는 안 내려감) */
+  dailyTarget: number;
+  /** 한 끼 기준 (인증 시간대 수 + 간식 반 끼로 나눔) */
+  perMeal: number;
+  /** 결손이 너무 커서 최소선에 걸림 → 기간이 짧다는 신호 */
+  clamped: boolean;
+};
+
+/**
+ * 키·체중·목표·남은 기간으로 한 끼 기준을 만든다.
+ * 하루 섭취 목표 = 소비량 − 필요한 결손, 단 여성 1,200 / 남성 1,500 kcal 아래로는 안 내려간다.
+ * 한 끼 = 하루 목표 ÷ (시간대 수 + 0.5): 인증하지 않는 아침·간식 몫을 반 끼로 남긴다.
+ */
+export function mealPlan(args: { gender: "m" | "f"; kg: number; heightCm: number; age?: number; remainingKg: number; remainingDays: number; slots: number }): MealPlan {
+  const b = bmr(args.gender, args.kg, args.heightCm, args.age ?? DEFAULT_AGE);
+  const tdee = Math.round(b * ACTIVITY_FACTOR);
+  const deficit = dailyCalorieDeficit(args.remainingKg, Math.max(1, args.remainingDays));
+  const floor = args.gender === "m" ? 1500 : 1200;
+  const raw = tdee - deficit;
+  const dailyTarget = Math.max(floor, Math.round(raw / 10) * 10);
+  const perMeal = Math.max(300, Math.round(dailyTarget / (Math.max(1, args.slots) + 0.5) / 10) * 10);
+  return { bmr: b, tdee, deficit, dailyTarget, perMeal, clamped: raw < floor };
+}
+
+/**
+ * 이 참가자의 한 끼 기준. 키가 있으면 개인화(mealPlan), 없으면 챌린지 기본값.
+ * 0 이면 AI 칼로리 경고 꺼짐.
+ */
+export function mealLimitFor(ch: Challenge, p: Participation, gender: "m" | "f", latestKg: number | null, today: string): { limit: number; plan: MealPlan | null } {
+  if (ch.config.kind !== "slots" || ch.config.goal !== "weight") return { limit: 0, plan: null };
+  const base = ch.kcal_limit ?? 700;
+  if (base <= 0) return { limit: 0, plan: null };
+  const g = p.goal;
+  if (!g.height_cm || !g.start_kg || !g.target_kg || !g.days) return { limit: base, plan: null };
+  const wp = weightProgress(g.start_kg, g.target_kg, latestKg);
+  const start = effectiveStartDate(p, ch.config);
+  const elapsed = today > start ? daysBetween(start, today) : 0;
+  const plan = mealPlan({ gender, kg: latestKg ?? g.start_kg, heightCm: g.height_cm, age: g.age, remainingKg: wp.remainingKg, remainingDays: Math.max(1, g.days - elapsed), slots: ch.config.slots.length });
+  return { limit: plan.perMeal, plan };
+}
+
 /* ───────── 인증 시 경험치 계산 ───────── */
 
 export type CheckinOutcome = {

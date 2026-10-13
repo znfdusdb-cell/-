@@ -70,6 +70,10 @@ export type ParticipationGoal = {
   /** 감량 목표 kg */
   target_kg?: number;
   days?: number;
+  /** 키(cm). 있으면 기초대사량으로 한 끼 칼로리 기준을 개인화한다 */
+  height_cm?: number;
+  /** 나이 (선택, 없으면 30) */
+  age?: number;
   hobby?: string;
   /** 취미 인증 방식 (camera/album/audio/link) */
   methods?: string[];

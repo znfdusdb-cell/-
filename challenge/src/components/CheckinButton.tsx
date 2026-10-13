@@ -46,7 +46,7 @@ export function KcalWarning({ a, onRetake, onProceed, busy }: { a: MealAnalysis;
       <div className="card w-full max-w-sm p-6 text-center animate-pop">
         <div className="text-xs font-extrabold tracking-widest text-bad">AI 칼로리 경고</div>
         <div className="text-4xl font-extrabold text-bad mt-2 num">약 {a.kcal} kcal</div>
-        <div className="text-xs text-fg-3 num mt-0.5">이 챌린지 한 끼 기준 {a.limit} kcal</div>
+        <div className="text-xs text-fg-3 num mt-0.5">내 한 끼 기준 {a.limit} kcal (키·체중·목표로 계산)</div>
         {a.foods.length > 0 && <div className="text-sm mt-2">{a.foods.join(" · ")}</div>}
         {a.note && <div className="text-xs text-fg-2 mt-1">{a.note}</div>}
         <div className="rounded-xl bg-bad-soft text-bad text-sm font-bold p-3 mt-4">이대로 올리면 관리자 검토를 받아요. 불인정되면 이 시간대는 실패 처리돼요.</div>

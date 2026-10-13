@@ -57,7 +57,7 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
       {joined ? (
         <section className="card p-4 mt-3">
           <h2 className="font-bold mb-2">내 목표</h2>
-          {ch.config.goal === "none" ? <p className="text-sm text-fg-2">이 챌린지는 따로 설정할 목표가 없어요.</p> : <JoinForm challenge={ch} goal={mine!.goal} mode="edit" />}
+          {ch.config.goal === "none" ? <p className="text-sm text-fg-2">이 챌린지는 따로 설정할 목표가 없어요.</p> : <JoinForm challenge={ch} goal={mine!.goal} mode="edit" gender={user.gender} />}
           <div className="mt-3 pt-3 border-t border-line">
             <LeaveButton challengeId={ch.id} />
           </div>
@@ -65,7 +65,7 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
       ) : ch.is_active ? (
         <section className="card p-4 mt-3">
           <h2 className="font-bold mb-2">참여하기</h2>
-          <JoinForm challenge={ch} next={`/challenges/${ch.id}`} />
+          <JoinForm challenge={ch} next={`/challenges/${ch.id}`} gender={user.gender} />
         </section>
       ) : null}
 
