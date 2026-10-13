@@ -2,7 +2,7 @@ import { currentUser } from "@/lib/current-user";
 import { getRepo } from "@/lib/repo";
 import { estimateMeal, visionProvider } from "@/lib/vision";
 import { signPayload, type AiPayload } from "@/lib/session";
-import { mealLimitFor } from "@/lib/game";
+import { consumedToday, dailyBudgetFor } from "@/lib/game";
 import { kstDate } from "@/lib/time";
 
 export const runtime = "nodejs";
@@ -24,11 +24,16 @@ export async function POST(req: Request) {
   if (!ch) return Response.json({ ok: false, error: "없는 챌린지예요" }, { status: 400 });
   const p = await repo.getParticipation(user.id, ch.id);
   if (!p || p.status !== "active") return Response.json({ ok: true, available: false });
-  // 키·체중·목표로 개인화된 한 끼 기준 (키가 없으면 챌린지 기본값)
+  // 오늘 예산(키·체중·목표로 개인화, 없으면 기본 한 끼 × 끼니 수)에서 이미 먹은 만큼 뺀 게 이 끼니의 한도
+  const today = kstDate();
   const logs = await repo.listWeightLogs(p.id).catch(() => []);
   const latestKg = logs.length ? Number(logs[logs.length - 1].kg) : null;
-  const { limit } = mealLimitFor(ch, p, user.gender, latestKg, kstDate());
-  if (limit <= 0 || !visionProvider()) return Response.json({ ok: true, available: false });
+  const { budget } = dailyBudgetFor(ch, p, user.gender, latestKg, today);
+  if (budget <= 0 || !visionProvider()) return Response.json({ ok: true, available: false });
+  const slot = String(fd.get("slot") ?? "");
+  const todays = await repo.listCheckins({ participationId: p.id, from: today, to: today }).catch(() => []);
+  const consumed = consumedToday(todays, today, slot || undefined);
+  const limit = Math.max(0, budget - consumed);
   const f = fd.get("file");
   if (!(f instanceof File) || f.size > MAX_BYTES) return Response.json({ ok: true, available: false });
   const mime = f.type.split(";")[0].trim();
@@ -37,7 +42,7 @@ export async function POST(req: Request) {
   const est = await estimateMeal(new Uint8Array(await f.arrayBuffer()), mime);
   if (!est) return Response.json({ ok: true, available: false });
   const high = est.kcal > limit;
-  const payload: AiPayload = { uid: user.id, kcal: est.kcal, foods: est.foods, note: est.note, limit, high };
+  const payload: AiPayload = { uid: user.id, kcal: est.kcal, foods: est.foods, note: est.note, limit, high, budget, consumed };
   const token = await signPayload(payload, 15 * 60 * 1000);
-  return Response.json({ ok: true, available: true, provider: est.provider, kcal: est.kcal, foods: est.foods, note: est.note, limit, high, token });
+  return Response.json({ ok: true, available: true, provider: est.provider, kcal: est.kcal, foods: est.foods, note: est.note, limit, high, budget, consumed, token });
 }

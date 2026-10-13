@@ -22,14 +22,18 @@ export type CheckinResult = {
   aiKcal?: number | null;
   aiNote?: string;
   aiFlagged?: boolean;
+  /** 오늘 예산과 이 끼니까지의 합계 */
+  aiBudget?: number;
+  aiTotal?: number;
 };
 
-export type MealAnalysis = { available: boolean; kcal: number; foods: string[]; note: string; limit: number; high: boolean; token: string };
+export type MealAnalysis = { available: boolean; kcal: number; foods: string[]; note: string; limit: number; high: boolean; budget: number; consumed: number; token: string };
 
-async function analyzeMeal(challengeId: string, blob: Blob): Promise<MealAnalysis | null> {
+async function analyzeMeal(challengeId: string, blob: Blob, slot?: string): Promise<MealAnalysis | null> {
   try {
     const fd = new FormData();
     fd.set("challenge_id", challengeId);
+    if (slot) fd.set("slot", slot);
     fd.set("file", blob, "photo.jpg");
     const res = await fetch("/api/checkin/analyze", { method: "POST", body: fd });
     const j = (await res.json()) as { ok: boolean } & MealAnalysis;
@@ -46,7 +50,9 @@ export function KcalWarning({ a, onRetake, onProceed, busy }: { a: MealAnalysis;
       <div className="card w-full max-w-sm p-6 text-center animate-pop">
         <div className="text-xs font-extrabold tracking-widest text-bad">AI 칼로리 경고</div>
         <div className="text-4xl font-extrabold text-bad mt-2 num">약 {a.kcal} kcal</div>
-        <div className="text-xs text-fg-3 num mt-0.5">내 한 끼 기준 {a.limit} kcal (키·체중·목표로 계산)</div>
+        <div className="text-xs text-fg-3 num mt-0.5">
+          오늘 먹을 수 있는 칼로리 {a.budget.toLocaleString()} kcal{a.consumed > 0 ? ` · 이미 ${a.consumed.toLocaleString()} 먹음` : ""} → 이 끼니 한도 <b className="text-bad">{a.limit.toLocaleString()} kcal</b>
+        </div>
         {a.foods.length > 0 && <div className="text-sm mt-2">{a.foods.join(" · ")}</div>}
         {a.note && <div className="text-xs text-fg-2 mt-1">{a.note}</div>}
         <div className="rounded-xl bg-bad-soft text-bad text-sm font-bold p-3 mt-4">이대로 올리면 관리자 검토를 받아요. 불인정되면 이 시간대는 실패 처리돼요.</div>
@@ -136,6 +142,12 @@ export function ResultModal({ result, onClose }: { result: CheckinResult; onClos
         {typeof result.aiKcal === "number" && result.aiKcal > 0 && (
           <div className={`mt-3 text-sm rounded-xl p-2 ${result.aiFlagged ? "bg-bad-soft text-bad" : "bg-bg-3 text-fg-2"}`}>
             🤖 AI 예상 <b className="num">{result.aiKcal} kcal</b>{result.aiNote ? ` · ${result.aiNote}` : ""}
+            {typeof result.aiBudget === "number" && typeof result.aiTotal === "number" && result.aiBudget > 0 && (
+              <div className="text-xs mt-0.5 num">
+                오늘 {result.aiTotal.toLocaleString()} / {result.aiBudget.toLocaleString()} kcal ·{" "}
+                {result.aiTotal > result.aiBudget ? <b>예산 {(result.aiTotal - result.aiBudget).toLocaleString()} kcal 초과</b> : <>남은 끼니는 <b>{(result.aiBudget - result.aiTotal).toLocaleString()} kcal</b> 안에서</>}
+              </div>
+            )}
             {result.aiFlagged && <div className="text-xs font-bold mt-0.5">관리자 검토 대상이에요</div>}
           </div>
         )}
@@ -208,7 +220,7 @@ export function CheckinButton({
       fd.set("file", blob, "photo.jpg");
       if (aiCheck && mode === "camera") {
         setStage("ai");
-        const a = await analyzeMeal(challengeId, blob);
+        const a = await analyzeMeal(challengeId, blob, slot);
         if (a) {
           fd.set("ai_token", a.token);
           if (a.high) { setWarn({ fd, a }); return; }
