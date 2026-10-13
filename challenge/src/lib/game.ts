@@ -352,7 +352,9 @@ export type MealPlan = {
   deficit: number;
   /** 하루 섭취 목표 (최소선 아래로는 안 내려감) */
   dailyTarget: number;
-  /** 한 끼 기준 (하루 목표 ÷ (인증 시간대 수 + 인증 외 식사 몫)) */
+  /** 인증하는 끼니들에 쓸 수 있는 하루 예산 (인증 외 식사 몫을 뺀 값). 점심+저녁 합이 이 안이면 OK */
+  budget: number;
+  /** 참고용 한 끼 평균 (예산 ÷ 인증 끼니 수) */
   perMeal: number;
   /** 결손이 너무 커서 최소선에 걸림 → 기간이 짧다는 신호 */
   clamped: boolean;
@@ -371,25 +373,32 @@ export function mealPlan(args: { gender: "m" | "f"; kg: number; heightCm: number
   const raw = tdee - deficit;
   const dailyTarget = Math.max(floor, Math.round(raw / 10) * 10);
   const extra = [0, 0.5, 1].includes(args.extra ?? 0) ? (args.extra ?? 0) : 0;
-  const perMeal = Math.max(300, Math.round(dailyTarget / (Math.max(1, args.slots) + extra) / 10) * 10);
-  return { bmr: b, tdee, deficit, dailyTarget, perMeal, clamped: raw < floor };
+  const slots = Math.max(1, args.slots);
+  const budget = Math.max(300 * slots, Math.round((dailyTarget * slots) / (slots + extra) / 10) * 10);
+  const perMeal = Math.round(budget / slots / 10) * 10;
+  return { bmr: b, tdee, deficit, dailyTarget, budget, perMeal, clamped: raw < floor };
 }
 
 /**
- * 이 참가자의 한 끼 기준. 키가 있으면 개인화(mealPlan), 없으면 챌린지 기본값.
- * 0 이면 AI 칼로리 경고 꺼짐.
+ * 이 참가자의 오늘 칼로리 예산(인증 끼니 합계 한도). 키가 있으면 개인화(mealPlan), 없으면 챌린지 기본 한 끼 기준 × 끼니 수.
+ * 0 이면 AI 칼로리 경고 꺼짐. 끼니별로 균등 배분하지 않는다: 점심에 많이 먹으면 저녁 한도가 그만큼 준다.
  */
-export function mealLimitFor(ch: Challenge, p: Participation, gender: "m" | "f", latestKg: number | null, today: string): { limit: number; plan: MealPlan | null } {
-  if (ch.config.kind !== "slots" || ch.config.goal !== "weight") return { limit: 0, plan: null };
+export function dailyBudgetFor(ch: Challenge, p: Participation, gender: "m" | "f", latestKg: number | null, today: string): { budget: number; plan: MealPlan | null } {
+  if (ch.config.kind !== "slots" || ch.config.goal !== "weight") return { budget: 0, plan: null };
   const base = ch.kcal_limit ?? 700;
-  if (base <= 0) return { limit: 0, plan: null };
+  if (base <= 0) return { budget: 0, plan: null };
   const g = p.goal;
-  if (!g.height_cm || !g.start_kg || !g.target_kg || !g.days) return { limit: base, plan: null };
+  if (!g.height_cm || !g.start_kg || !g.target_kg || !g.days) return { budget: base * ch.config.slots.length, plan: null };
   const wp = weightProgress(g.start_kg, g.target_kg, latestKg);
   const start = effectiveStartDate(p, ch.config);
   const elapsed = today > start ? daysBetween(start, today) : 0;
   const plan = mealPlan({ gender, kg: latestKg ?? g.start_kg, heightCm: g.height_cm, age: g.age, remainingKg: wp.remainingKg, remainingDays: Math.max(1, g.days - elapsed), slots: ch.config.slots.length, extra: g.extra_meals ?? 0 });
-  return { limit: plan.perMeal, plan };
+  return { budget: plan.budget, plan };
+}
+
+/** 오늘 이미 AI 추정으로 잡힌 칼로리 합 (불인정 제외, 특정 slot 은 제외 가능: 같은 끼니 사진을 바꿀 때) */
+export function consumedToday(checkins: Checkin[], today: string, exceptSlot?: string): number {
+  return checkins.filter((c) => c.local_date === today && !c.rejected_at && c.slot !== exceptSlot && typeof c.ai_kcal === "number").reduce((s, c) => s + (c.ai_kcal ?? 0), 0);
 }
 
 /* ───────── 인증 시 경험치 계산 ───────── */

@@ -15,7 +15,7 @@ export function WeightPanel({
   elapsedDays,
   logs,
   today,
-  meal,
+  budget,
 }: {
   challengeId: string;
   startKg: number;
@@ -24,8 +24,8 @@ export function WeightPanel({
   elapsedDays: number;
   logs: { date: string; kg: number }[];
   today: string;
-  /** 한 끼 칼로리 기준 (키가 있으면 개인화, plan 있음) */
-  meal?: { limit: number; plan: MealPlan | null };
+  /** 오늘 칼로리 예산(인증 끼니 합계 한도)과 지금까지 AI로 잡힌 양 */
+  budget?: { budget: number; plan: MealPlan | null; consumed: number };
 }) {
   const [state, action] = useActionState(logWeight, null);
   const latest = logs.length ? logs[logs.length - 1] : null;
@@ -67,19 +67,22 @@ export function WeightPanel({
         </p>
       )}
       {p.reached && <p className="text-xs text-ok font-semibold mt-2">목표 체중에 도달했어요. 유지가 진짜 승부예요.</p>}
-      {meal && meal.limit > 0 && (
+      {budget && budget.budget > 0 && (
         <div className="mt-2 rounded-xl bg-bg-2 border border-line px-3 py-2 text-xs">
-          {meal.plan ? (
-            <>
-              🤖 내 한 끼 기준 <b className="text-red num">{meal.limit} kcal</b>
-              <span className="text-fg-3 num"> · 기초대사 {meal.plan.bmr.toLocaleString()} · 하루 목표 {meal.plan.dailyTarget.toLocaleString()} kcal</span>
-              {meal.plan.clamped && <div className="text-bad mt-0.5">기간 대비 목표가 커서 최소 섭취선 기준이에요.</div>}
-            </>
+          <div className="flex items-center justify-between num">
+            <span>🤖 오늘 먹을 수 있는 칼로리 <b className="text-fg">{budget.budget.toLocaleString()}</b></span>
+            <span className={budget.consumed > budget.budget ? "text-bad font-bold" : "text-fg-2"}>
+              {budget.consumed > 0 ? `먹음 ${budget.consumed.toLocaleString()} · ` : ""}
+              {budget.consumed > budget.budget ? `초과 ${(budget.consumed - budget.budget).toLocaleString()}` : `남음 ${(budget.budget - budget.consumed).toLocaleString()}`}
+            </span>
+          </div>
+          <div className="h-1.5 rounded-full bg-bg-3 mt-1 overflow-hidden">
+            <div className={`h-full rounded-full ${budget.consumed > budget.budget ? "bg-bad" : "bg-red"}`} style={{ width: `${Math.min(100, (budget.consumed / budget.budget) * 100)}%` }} />
+          </div>
+          {budget.plan ? (
+            <div className="text-fg-3 num mt-1">기초대사 {budget.plan.bmr.toLocaleString()} · 하루 섭취 목표 {budget.plan.dailyTarget.toLocaleString()} kcal · 끼니별로 나누지 않고 합계로 봐요{budget.plan.clamped ? " · 기간 대비 목표가 커서 최소 섭취선 기준" : ""}</div>
           ) : (
-            <>
-              🤖 한 끼 기준 <b className="num">{meal.limit} kcal</b> (챌린지 기본값)
-              {" · "}<Link href={`/challenges/${challengeId}`} className="underline">키를 넣으면 내 몸에 맞게 바뀌어요</Link>
-            </>
+            <div className="text-fg-3 mt-1">챌린지 기본값 · <Link href={`/challenges/${challengeId}`} className="underline">키를 넣으면 내 몸에 맞게 바뀌어요</Link></div>
           )}
         </div>
       )}

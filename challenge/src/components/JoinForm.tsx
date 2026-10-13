@@ -86,11 +86,11 @@ export function JoinForm({ challenge, goal, mode = "join", next, gender = "f" }:
               목표 체중 <b className="num">{preview.goalKg} kg</b> · 매일 <b className="num">{preview.kcal.toLocaleString()} kcal</b> 덜 먹어야 해요
               {preview.plan ? (
                 <div className="mt-1 text-xs text-fg-2">
-                  기초대사 <b className="text-fg num">{preview.plan.bmr.toLocaleString()}</b> · 하루 섭취 목표 <b className="text-fg num">{preview.plan.dailyTarget.toLocaleString()} kcal</b> → <b className="text-red num">한 끼 {preview.plan.perMeal} kcal</b> 기준
+                  기초대사 <b className="text-fg num">{preview.plan.bmr.toLocaleString()}</b> · 하루 섭취 목표 <b className="text-fg num">{preview.plan.dailyTarget.toLocaleString()} kcal</b> → 인증 끼니 합계 <b className="text-red num">{preview.plan.budget.toLocaleString()} kcal</b> 안에서 (한 끼 평균 {preview.plan.perMeal})
                   {preview.plan.clamped && <div className="text-bad mt-0.5">기간에 비해 목표가 커서 최소 섭취선에 걸렸어요. 기간을 늘리는 걸 권해요.</div>}
                 </div>
               ) : aiOn ? (
-                <div className="text-[11px] text-fg-3 mt-0.5">키를 넣으면 내 몸에 맞는 한 끼 칼로리 기준이 계산돼요. (안 넣으면 챌린지 기본 {challenge.kcal_limit ?? 700} kcal)</div>
+                <div className="text-[11px] text-fg-3 mt-0.5">키를 넣으면 내 몸에 맞는 하루 칼로리 예산이 계산돼요. (안 넣으면 챌린지 기본 한 끼 {challenge.kcal_limit ?? 700} kcal × 끼니 수)</div>
               ) : null}
               <div className="text-[11px] text-fg-3 mt-0.5">체중은 나만 볼 수 있어요. 매일 홈에서 기록하면 게이지가 움직여요.</div>
             </div>

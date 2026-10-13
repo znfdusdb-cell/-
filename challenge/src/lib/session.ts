@@ -33,7 +33,7 @@ async function key(): Promise<CryptoKey> {
 }
 
 /** AI 칼로리 추정 결과 (analyze → checkin 사이에 서명해 넘긴다) */
-export type AiPayload = { uid: string; kcal: number; foods: string[]; note: string; limit: number; high: boolean };
+export type AiPayload = { uid: string; kcal: number; foods: string[]; note: string; /** 이 끼니에 남아 있던 예산 */ limit: number; high: boolean; /** 오늘 예산 */ budget: number; /** 이 끼니 전까지 먹은 양 */ consumed: number };
 
 /** 임의 객체를 HMAC 서명해 짧은 토큰으로. 세션 비밀키 재사용 */
 export async function signPayload<T extends object>(data: T, ttlMs: number): Promise<string> {

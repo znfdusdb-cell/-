@@ -129,11 +129,12 @@ export async function POST(req: Request) {
     const admins = (await repo.listUsers()).filter((u) => u.role === "admin");
     if (admins.length === 0) return;
     const label = ch.config.kind === "slots" ? ch.config.slots.find((s) => s.key === slot)?.label ?? slot : slot;
-    await repo.createReport({ checkin_id: checkinId, reporter_id: admins[0].id, reason: `🤖 AI 칼로리 경고: 예상 ${aiOk.kcal}kcal (기준 ${aiOk.limit}kcal)${aiOk.foods.length ? ` · ${aiOk.foods.join(", ")}` : ""}` }).catch(() => null);
+    const total = (aiOk.consumed ?? 0) + aiOk.kcal;
+    await repo.createReport({ checkin_id: checkinId, reporter_id: admins[0].id, reason: `🤖 AI 칼로리 경고: ${label} 예상 ${aiOk.kcal}kcal · 오늘 합계 ${total}kcal / 예산 ${aiOk.budget}kcal${aiOk.foods.length ? ` · ${aiOk.foods.join(", ")}` : ""}` }).catch(() => null);
     const { sendPushToUsers } = await import("@/lib/push");
-    await sendPushToUsers(admins.map((a) => a.id), { title: "🍔 고칼로리 인증 검토", body: `${user.display_name}님 ${label} 예상 ${aiOk.kcal}kcal (기준 ${aiOk.limit}). 인정 또는 불인정을 골라 주세요`, url: "/admin/reports", tag: `ai-${checkinId}` }).catch(() => null);
+    await sendPushToUsers(admins.map((a) => a.id), { title: "🍔 고칼로리 인증 검토", body: `${user.display_name}님 ${label} 예상 ${aiOk.kcal}kcal, 오늘 합계 ${total}/${aiOk.budget}kcal. 인정 또는 불인정을 골라 주세요`, url: "/admin/reports", tag: `ai-${checkinId}` }).catch(() => null);
   };
-  const aiOut = aiOk ? { aiKcal: aiOk.kcal, aiNote: aiOk.note, aiFlagged: aiOk.high } : {};
+  const aiOut = aiOk ? { aiKcal: aiOk.kcal, aiNote: aiOk.note, aiFlagged: aiOk.high, aiBudget: aiOk.budget, aiTotal: (aiOk.consumed ?? 0) + aiOk.kcal } : {};
 
   if (replacing) {
     const old = existing.find((c) => c.id === replacing)!;

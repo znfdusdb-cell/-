@@ -4,7 +4,7 @@ import { currentUser, toPublic } from "@/lib/current-user";
 import { loadMyChallenges, loadPendingMonthlyReports } from "@/lib/data";
 import { MonthlyReportModal } from "@/components/MonthlyReportModal";
 import { getRepo } from "@/lib/repo";
-import { CREATE_CHALLENGE_LEVEL, LEVEL_PERKS, levelFromXp, mealLimitFor } from "@/lib/game";
+import { consumedToday, CREATE_CHALLENGE_LEVEL, dailyBudgetFor, LEVEL_PERKS, levelFromXp } from "@/lib/game";
 import { inferMethods, METHOD_LABEL, normalizeMethods, type Method } from "@/lib/methods";
 import { daysBetween, fmtDateKo, fmtHmKo, fmtTimeKo, kstDate } from "@/lib/time";
 import { Shell } from "@/components/Shell";
@@ -70,7 +70,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       )}
 
       <div className="space-y-3 mt-3">
-        {mine.map(({ challenge: ch, participation: p, summary: s, todayCounts, todayPeople }) => {
+        {mine.map(({ challenge: ch, participation: p, summary: s, todayCounts, todayPeople, checkins: myCheckins }) => {
           const waiting = today < s.startDate;
           const focus = sp.go === ch.id;
           const methods: Method[] = ch.config.kind === "count" ? (normalizeMethods(p.goal.methods).length ? normalizeMethods(p.goal.methods) : ch.config.goal === "hobby" ? inferMethods(p.goal.hobby ?? "") : ["camera", "album", "link"]) : [];
@@ -169,7 +169,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                   elapsedDays={waiting ? 0 : daysBetween(s.startDate, today)}
                   logs={(weightLogs[p.id] ?? []).map((w) => ({ date: w.local_date, kg: Number(w.kg) }))}
                   today={today}
-                  meal={mealLimitFor(ch, p, user.gender, (weightLogs[p.id] ?? []).length ? Number((weightLogs[p.id] ?? []).slice(-1)[0].kg) : null, today)}
+                  budget={{ ...dailyBudgetFor(ch, p, user.gender, (weightLogs[p.id] ?? []).length ? Number((weightLogs[p.id] ?? []).slice(-1)[0].kg) : null, today), consumed: consumedToday(myCheckins, today) }}
                 />
               )}
             </section>
