@@ -18,14 +18,15 @@ export function JoinForm({ challenge, goal, mode = "join", next, gender = "f" }:
   const [days, setDays] = useState(goal?.days?.toString() ?? "30");
   const [height, setHeight] = useState(goal?.height_cm?.toString() ?? "");
   const [age, setAge] = useState(goal?.age?.toString() ?? "");
+  const [extra, setExtra] = useState(String(goal?.extra_meals ?? 0));
   const slotCount = challenge.config.kind === "slots" ? challenge.config.slots.length : 2;
   const aiOn = (challenge.kcal_limit ?? 700) > 0;
   const preview = useMemo(() => {
     const s = parseFloat(startKg), l = parseFloat(loss), d = parseInt(days, 10), h = parseFloat(height), a = parseInt(age, 10);
     if (!(s > 0) || !(l > 0) || !(d > 0)) return null;
-    const plan = h >= 100 ? mealPlan({ gender, kg: s, heightCm: h, age: a >= 10 ? a : undefined, remainingKg: l, remainingDays: d, slots: slotCount }) : null;
+    const plan = h >= 100 ? mealPlan({ gender, kg: s, heightCm: h, age: a >= 10 ? a : undefined, remainingKg: l, remainingDays: d, slots: slotCount, extra: parseFloat(extra) }) : null;
     return { goalKg: Math.round((s - l) * 10) / 10, kcal: dailyCalorieDeficit(l, d), plan };
-  }, [startKg, loss, days, height, age, gender, slotCount]);
+  }, [startKg, loss, days, height, age, extra, gender, slotCount]);
 
   // 취미: 글자에 맞춰 인증 방식 자동 추천, 직접 바꿀 수 있음
   const [hobby, setHobby] = useState(goal?.hobby ?? "");
@@ -70,6 +71,16 @@ export function JoinForm({ challenge, goal, mode = "join", next, gender = "f" }:
               <input name="age" type="number" min="10" max="100" inputMode="numeric" className="input" value={age} onChange={(e) => setAge(e.target.value)} placeholder="30" />
             </div>
           </div>
+          {aiOn && (
+            <div>
+              <label className="label">인증 안 하는 식사(아침·간식)는?</label>
+              <select name="extra_meals" className="input" value={extra} onChange={(e) => setExtra(e.target.value)}>
+                <option value="0">안 먹어요 (인증 끼니만 먹음)</option>
+                <option value="0.5">간단히 먹어요 (반 끼)</option>
+                <option value="1">한 끼 더 먹어요</option>
+              </select>
+            </div>
+          )}
           {preview && (
             <div className="rounded-xl bg-bg-3/70 px-3 py-2 text-sm">
               목표 체중 <b className="num">{preview.goalKg} kg</b> · 매일 <b className="num">{preview.kcal.toLocaleString()} kcal</b> 덜 먹어야 해요

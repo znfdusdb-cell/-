@@ -352,7 +352,7 @@ export type MealPlan = {
   deficit: number;
   /** 하루 섭취 목표 (최소선 아래로는 안 내려감) */
   dailyTarget: number;
-  /** 한 끼 기준 (인증 시간대 수 + 간식 반 끼로 나눔) */
+  /** 한 끼 기준 (하루 목표 ÷ (인증 시간대 수 + 인증 외 식사 몫)) */
   perMeal: number;
   /** 결손이 너무 커서 최소선에 걸림 → 기간이 짧다는 신호 */
   clamped: boolean;
@@ -361,16 +361,17 @@ export type MealPlan = {
 /**
  * 키·체중·목표·남은 기간으로 한 끼 기준을 만든다.
  * 하루 섭취 목표 = 소비량 − 필요한 결손, 단 여성 1,200 / 남성 1,500 kcal 아래로는 안 내려간다.
- * 한 끼 = 하루 목표 ÷ (시간대 수 + 0.5): 인증하지 않는 아침·간식 몫을 반 끼로 남긴다.
+ * 한 끼 = 하루 목표 ÷ (시간대 수 + extra). extra 는 인증하지 않는 아침·간식 몫(0 안 먹음 / 0.5 간단히 / 1 한 끼 더).
  */
-export function mealPlan(args: { gender: "m" | "f"; kg: number; heightCm: number; age?: number; remainingKg: number; remainingDays: number; slots: number }): MealPlan {
+export function mealPlan(args: { gender: "m" | "f"; kg: number; heightCm: number; age?: number; remainingKg: number; remainingDays: number; slots: number; extra?: number }): MealPlan {
   const b = bmr(args.gender, args.kg, args.heightCm, args.age ?? DEFAULT_AGE);
   const tdee = Math.round(b * ACTIVITY_FACTOR);
   const deficit = dailyCalorieDeficit(args.remainingKg, Math.max(1, args.remainingDays));
   const floor = args.gender === "m" ? 1500 : 1200;
   const raw = tdee - deficit;
   const dailyTarget = Math.max(floor, Math.round(raw / 10) * 10);
-  const perMeal = Math.max(300, Math.round(dailyTarget / (Math.max(1, args.slots) + 0.5) / 10) * 10);
+  const extra = [0, 0.5, 1].includes(args.extra ?? 0) ? (args.extra ?? 0) : 0;
+  const perMeal = Math.max(300, Math.round(dailyTarget / (Math.max(1, args.slots) + extra) / 10) * 10);
   return { bmr: b, tdee, deficit, dailyTarget, perMeal, clamped: raw < floor };
 }
 
@@ -387,7 +388,7 @@ export function mealLimitFor(ch: Challenge, p: Participation, gender: "m" | "f",
   const wp = weightProgress(g.start_kg, g.target_kg, latestKg);
   const start = effectiveStartDate(p, ch.config);
   const elapsed = today > start ? daysBetween(start, today) : 0;
-  const plan = mealPlan({ gender, kg: latestKg ?? g.start_kg, heightCm: g.height_cm, age: g.age, remainingKg: wp.remainingKg, remainingDays: Math.max(1, g.days - elapsed), slots: ch.config.slots.length });
+  const plan = mealPlan({ gender, kg: latestKg ?? g.start_kg, heightCm: g.height_cm, age: g.age, remainingKg: wp.remainingKg, remainingDays: Math.max(1, g.days - elapsed), slots: ch.config.slots.length, extra: g.extra_meals ?? 0 });
   return { limit: plan.perMeal, plan };
 }
 

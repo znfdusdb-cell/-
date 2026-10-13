@@ -132,6 +132,8 @@ function parseGoal(fd: FormData, cfg: ChallengeConfig): { goal: ParticipationGoa
     if (str(fd, "age") && (!Number.isInteger(age) || age < 10 || age > 100)) return { goal, error: "나이는 10~100" };
     if (Number.isFinite(height) && height >= 100) goal.height_cm = Math.round(height);
     if (Number.isInteger(age) && age >= 10) goal.age = age;
+    const extra = parseFloat(str(fd, "extra_meals"));
+    if ([0, 0.5, 1].includes(extra)) goal.extra_meals = extra;
   }
   if (cfg.goal === "hobby") {
     const hobby = str(fd, "hobby");
