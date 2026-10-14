@@ -15,6 +15,7 @@ import { InstallHint } from "@/components/InstallHint";
 import { WeightPanel } from "@/components/WeightPanel";
 import { RechallengeButton } from "@/components/RechallengeButton";
 import { GiftUploadButton } from "@/components/GiftUploadButton";
+import { DeepLinkNotice } from "@/components/DeepLinkNotice";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +121,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                 </div>
               ) : s.eliminated && !p.is_test ? null : s.kind === "slots" ? (
                 <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(s.today.slots.length, 3)}, minmax(0,1fr))` }}>
+                  {/* 알림 딥링크의 시간대가 오늘 칸에 없을 때(시작일에 이미 지난 시간대 등) 안내 */}
+                  {focus && sp.slot && !p.is_test && !s.today.slots.some((x) => x.slot.key === sp.slot) && ch.config.kind === "slots" && (() => { const d = ch.config.slots.find((x) => x.key === sp.slot); return d ? <DeepLinkNotice label={d.label} start={d.start} end={d.end} state="missed" /> : null; })()}
                   {s.today.slots.map(({ slot, state, checkin }) => (
                     <div key={slot.key} className={`rounded-2xl p-3 border ${state === "done" ? "border-ok/30 bg-ok-soft" : state === "open" ? "border-red/40 bg-red-soft" : state === "missed" ? "border-bad/30 bg-bad-soft" : "border-line bg-bg-3/60"}`}>
                       <div className="flex items-center justify-between">
@@ -131,8 +134,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                       <div className="text-[11px] text-fg-3 num">{slot.start}~{slot.end}{(todayCounts[slot.key] ?? 0) > 0 ? ` · ${todayCounts[slot.key]}명 인증` : ""}</div>
                       <div className="mt-2">
                         {state === "done" && checkin && <div className="text-xs text-ok num">{fmtTimeKo(checkin.taken_at)} 인증</div>}
-                        {(state === "open" || p.is_test) && <CheckinButton challengeId={ch.id} slot={slot.key} label={p.is_test ? (state === "done" ? "테스트 다시 찍기" : "테스트 촬영") : "촬영 인증"} className={`btn w-full text-sm py-2 ${p.is_test && state !== "open" ? "btn-ghost" : "btn-red"}`} autoOpen={!p.is_test && focus && (!sp.slot || sp.slot === slot.key)} aiCheck={ch.config.goal === "weight" && (ch.kcal_limit ?? 700) > 0} />}
+                        {(state === "open" || p.is_test) && <CheckinButton challengeId={ch.id} slot={slot.key} label={p.is_test ? (state === "done" ? "테스트 다시 찍기" : "테스트 촬영") : "촬영 인증"} className={`btn w-full text-sm py-2 ${p.is_test && state !== "open" ? "btn-ghost" : "btn-red"}`} autoOpen={focus && (!sp.slot || sp.slot === slot.key)} aiCheck={ch.config.goal === "weight" && (ch.kcal_limit ?? 700) > 0} />}
                         {state === "upcoming" && !p.is_test && <div className="text-xs text-fg-3">{fmtHmKo(slot.start)}부터</div>}
+                        {focus && sp.slot === slot.key && state !== "open" && !p.is_test && <DeepLinkNotice label={slot.label} start={slot.start} end={slot.end} state={state} />}
                         {state === "missed" && !p.is_test && <div className="text-xs text-bad">시간이 지났어요</div>}
                       </div>
                     </div>
