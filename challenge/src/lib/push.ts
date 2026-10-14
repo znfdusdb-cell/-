@@ -55,7 +55,7 @@ export function configurePush(): string | null {
   }
 }
 
-export type PushPayload = { title: string; body: string; url?: string; tag?: string };
+export type PushPayload = { title: string; body: string; url?: string; tag?: string; /** 알림 버튼 (안드로이드). 비우면 url 에 go= 가 있을 때 "📷 지금 촬영" 자동 */ actions?: { action: string; title: string }[] };
 
 export type PushResult = { ok: boolean; reason?: string };
 
