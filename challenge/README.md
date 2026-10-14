@@ -80,6 +80,22 @@ GitHub 저장소 페이지 → **Settings → Secrets and variables → Actions 
 
 이러면 30분마다 자동으로 "점심 인증 시간이에요", "마감 30분 전" 알림이 나갑니다.
 
+### 5단계가 자꾸 실패하거나 알림이 제때 안 오면
+
+- GitHub Actions 에서 `challenge-remind` 가 **HTTP 401** 로 실패하면: GitHub 비밀값 `CHALLENGE_CRON_SECRET` 과 Vercel 환경 변수 `CRON_SECRET` 이 글자 하나까지 같아야 해요(앞뒤 공백·따옴표 없이). 둘 중 하나를 다시 붙여넣고 Vercel 은 Redeploy, GitHub 은 Actions → challenge-remind → **Run workflow** 로 바로 확인.
+- GitHub 무료 크론은 바쁠 때 몇 시간씩 밀려요. 점심 시작·마감 30분 전 같은 알림은 제때 못 가요. 정확히 보내려면 Supabase 의 pg_cron 을 쓰세요(0원):
+  1. Supabase → **Database → Extensions** 에서 `pg_cron` 과 `pg_net` 을 켠다
+  2. SQL Editor 에서 아래를 실행 (주소와 비밀값만 바꿔서)
+     ```sql
+     select cron.schedule('challenge-remind', '*/5 * * * *', $$
+       select net.http_get(
+         url := 'https://gunners-challenge.vercel.app/api/cron/remind',
+         headers := '{"x-cron-secret": "여기에_CRON_SECRET"}'::jsonb
+       );
+     $$);
+     ```
+  3. 5분마다 자동 호출돼요. 끄려면 `select cron.unschedule('challenge-remind');`. 이걸 쓰면 GitHub 쪽은 Settings → Secrets and variables → Actions → Variables 에 `CHALLENGE_REMIND_ENABLED` = `false` 를 넣어 꺼 두면 돼요.
+
 ---
 
 ## 6단계(선택). AI 칼로리 경고 켜기 (3분, 0원)
