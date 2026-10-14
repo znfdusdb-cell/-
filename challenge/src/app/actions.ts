@@ -643,6 +643,19 @@ export async function adminSendSlotPush(_prev: ActionResult | null, fd: FormData
   }
 }
 
+/** 관리자: 멤버의 알림 구독을 전부 지운다 (예전 주소 구독이 남아 두 번 올 때). 멤버는 앱에서 알림을 다시 켜야 한다 */
+export async function adminResetPush(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const me = await currentUser();
+  if (!isAdmin(me)) return { ok: false, error: "관리자만" };
+  const repo = getRepo();
+  const target = await repo.getUserById(str(fd, "user_id"));
+  if (!target) return { ok: false, error: "없는 사용자" };
+  const subs = await repo.listPushSubscriptions([target.id]);
+  for (const s of subs) await repo.deletePushSubscription(s.endpoint);
+  revalidatePath("/admin");
+  return { ok: true, message: `${target.display_name}님 알림 구독 ${subs.length}건 삭제. 앱(홈 화면 아이콘)에서 내 정보 → 알림 켜기를 다시 해야 해요` };
+}
+
 /** 관리자: 특정 멤버에게 테스트 알림 */
 export async function adminSendTestPush(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   const me = await currentUser();
