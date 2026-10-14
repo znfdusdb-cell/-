@@ -1,14 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { SwRegister } from "@/components/SwRegister";
-
-function siteUrl(): string {
-  const explicit = (process.env.NEXT_PUBLIC_SITE_URL ?? "").trim();
-  if (explicit) return explicit.startsWith("http") ? explicit : `https://${explicit}`;
-  const vercel = (process.env.VERCEL_PROJECT_PRODUCTION_URL ?? "").trim();
-  if (vercel) return `https://${vercel}`;
-  return "http://localhost:3000";
-}
+import { siteUrl } from "@/lib/site";
 
 const TITLE = "거너스 챌린지";
 const DESC = "아스날 인사이드 톡방 챌린지. 다이어트·취미 인증, 실패하면 메가커피 쏘기";

@@ -88,7 +88,16 @@ export async function sendPush(sub: PushSubscriptionRow, payload: PushPayload): 
 /** 여러 사용자에게 전송. 성공 수와 마지막 실패 이유 */
 export async function sendPushToUsers(userIds: string[], payload: PushPayload): Promise<{ sent: number; total: number; reason?: string }> {
   if (userIds.length === 0) return { sent: 0, total: 0 };
-  const subs = await getRepo().listPushSubscriptions(userIds);
+  const { siteUrl, splitUa } = await import("./site");
+  const site = siteUrl().replace(/\/$/, "");
+  const all = await getRepo().listPushSubscriptions(userIds);
+  // 정식 주소가 아닌 곳에서 켠 구독(출처가 기록된 것만 판별 가능)은 보내지 않고 지운다
+  const subs = [];
+  for (const s of all) {
+    const o = splitUa(s.user_agent).origin;
+    if (o && o !== site && !/^https?:\/\/(localhost|127\.0\.0\.1)/.test(o)) { await getRepo().deletePushSubscription(s.endpoint).catch(() => {}); continue; }
+    subs.push(s);
+  }
   const results = await Promise.all(subs.map((s) => sendPushOne(s, payload)));
   const sent = results.filter((r) => r.ok).length;
   const reason = results.find((r) => !r.ok)?.reason;
