@@ -1,7 +1,7 @@
 import { currentUser } from "@/lib/current-user";
 import { getRepo } from "@/lib/repo";
 import { pushEnabled } from "@/lib/push";
-import { siteUrl, splitUa } from "@/lib/site";
+import { deviceKey, siteUrl, splitUa } from "@/lib/site";
 
 type Sub = { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
 
@@ -22,11 +22,13 @@ export async function POST(req: Request) {
   const repo = getRepo();
   const ua = req.headers.get("user-agent") ?? "";
   await repo.upsertPushSubscription({ user_id: user.id, endpoint: s.endpoint, keys: { p256dh: s.keys.p256dh, auth: s.keys.auth }, user_agent: origin ? `${ua} @${origin}` : ua });
-  // 같은 기기·같은 브라우저의 다른 구독(예전 주소에서 켠 것)은 지운다 → 알림이 두 번 오지 않게
+  // 알림이 두 번 오지 않게: (1) 출처 기록이 없는 예전 구독, (2) 같은 기기(브라우저 버전 무시)의 다른 구독은 지운다
   let cleaned = 0;
+  const mine = deviceKey(ua);
   for (const old of await repo.listPushSubscriptions([user.id])) {
     if (old.endpoint === s.endpoint) continue;
-    if (splitUa(old.user_agent).ua === ua) { await repo.deletePushSubscription(old.endpoint); cleaned++; }
+    const legacy = !splitUa(old.user_agent).origin;
+    if (legacy || deviceKey(old.user_agent) === mine) { await repo.deletePushSubscription(old.endpoint); cleaned++; }
   }
   return Response.json({ ok: true, cleaned });
 }
