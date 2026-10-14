@@ -45,8 +45,10 @@ self.addEventListener("notificationclick", (event) => {
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
       for (const c of list) {
         if ("focus" in c) {
-          c.navigate(url);
-          return c.focus();
+          // 열려 있는 앱 창으로 이동. navigate 가 막히는 기기(다른 출처·권한)는 새 창으로
+          return Promise.resolve(c.navigate ? c.navigate(url) : null)
+            .then(() => c.focus())
+            .catch(() => self.clients.openWindow(url));
         }
       }
       return self.clients.openWindow(url);
