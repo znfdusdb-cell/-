@@ -619,6 +619,30 @@ export async function nudge(_prev: ActionResult | null, fd: FormData): Promise<A
   return r.total === 0 ? { ok: true, message: `찔렀어요. (${target.display_name}님은 알림을 안 켜서 폰엔 안 가요)` } : { ok: true, message: `${target.display_name}님을 찔렀어요` };
 }
 
+/** 관리자: 크론이 보내는 것과 똑같은 시간대 알림을 내 폰으로 (누르면 바로 촬영) */
+export async function adminSendSlotPush(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const me = await currentUser();
+  if (!me || !isAdmin(me)) return { ok: false, error: "관리자만" };
+  try {
+    const { configurePush, sendPushToUsers } = await import("@/lib/push");
+    const problem = configurePush();
+    if (problem) return { ok: false, error: problem };
+    const ch = await getRepo().getChallenge(str(fd, "challenge_id"));
+    if (!ch || ch.config.kind !== "slots") return { ok: false, error: "시간대형 챌린지가 아니에요" };
+    const slot = ch.config.slots.find((s) => s.key === str(fd, "slot")) ?? ch.config.slots[0];
+    const kind = str(fd, "kind") === "ending" ? "ending" : "start";
+    const payload = kind === "ending"
+      ? { title: `⏰ ${slot.label} 인증 30분 남았어요`, body: `${slot.end}에 마감! 아직 ${slot.label} 사진을 안 올렸어요. (테스트)`, url: `/?go=${ch.id}&slot=${slot.key}`, tag: `${ch.id}-${slot.key}` }
+      : { title: `${ch.emoji} ${slot.label} 인증 시간!`, body: `${slot.end}까지 ${slot.label} 사진을 올려 주세요. (테스트)`, url: `/?go=${ch.id}&slot=${slot.key}`, tag: `${ch.id}-${slot.key}` };
+    const r = await sendPushToUsers([me.id], payload);
+    if (r.total === 0) return { ok: false, error: "내 폰에 알림이 안 켜져 있어요 (홈 화면 아이콘으로 열고 → 내 정보 → 알림 켜기)" };
+    if (r.sent === 0) return { ok: false, error: r.reason ?? "전송 실패" };
+    return { ok: true, message: `내 기기 ${r.sent}/${r.total}대에 보냈어요. 알림을 누르면(안드로이드는 📷 버튼) 카메라가 바로 열려야 해요` };
+  } catch (e) {
+    return { ok: false, error: `알림 오류: ${(e as Error).message}` };
+  }
+}
+
 /** 관리자: 특정 멤버에게 테스트 알림 */
 export async function adminSendTestPush(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   const me = await currentUser();

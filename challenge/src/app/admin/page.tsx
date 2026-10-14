@@ -9,6 +9,7 @@ import { fmtDateTimeKo } from "@/lib/time";
 import { Shell } from "@/components/Shell";
 import { AdminUserRow } from "@/components/AdminUserRow";
 import { TestJoinButton } from "@/components/TestJoinButton";
+import { SlotPushButton } from "@/components/SlotPushButton";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,24 @@ export default async function AdminPage() {
             마이그레이션 필요: {[!giftsOk && "05 (ch_gifts, 선물함)", !ticketsOk && "06 (ch_tickets, 문의 채팅)", !cheersOk && "07 (ch_cheers, 응원)", !reportsOk && "08 (ch_reports, 신고)", !commentsOk && "09 (ch_comments, 댓글)", !kcalOk && "10 (AI 칼로리)", !testOk && "11 (테스트 참여·지금부터 시작)"].filter(Boolean).join(" · ")} — Supabase SQL Editor에서 `challenge/supabase/migrations/` 파일 실행
           </div>
         )}
+      </section>
+
+      <section className="card p-4 mt-3">
+        <div className="font-bold">🔔 알림 미리 보내기 (내 폰으로)</div>
+        <div className="text-xs text-fg-2 mt-0.5 mb-2">크론이 보내는 것과 똑같은 알림을 비움 폰으로 보내요. 알림을 누르면(안드로이드는 📷 지금 촬영 버튼) 홈이 열리면서 그 시간대 카메라가 바로 떠야 해요. 먼저 내 정보에서 알림을 켜 두세요.</div>
+        <div className="space-y-2">
+          {challenges.filter((c) => c.config.kind === "slots" && c.is_active).map((c) => (
+            <div key={c.id} className="flex items-center gap-2 flex-wrap text-xs">
+              <span className="font-bold shrink-0">{c.emoji} {c.title}</span>
+              {c.config.kind === "slots" && c.config.slots.map((s) => (
+                <span key={s.key} className="flex gap-1">
+                  <SlotPushButton challengeId={c.id} slotKey={s.key} label={s.label} kind="start" />
+                  <SlotPushButton challengeId={c.id} slotKey={s.key} label={s.label} kind="ending" />
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="card p-4 mt-3">

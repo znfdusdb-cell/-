@@ -17,10 +17,12 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let data = { title: "거너스 챌린지", body: "인증 시간이에요!", url: "/", tag: "ch" };
+  let data = { title: "거너스 챌린지", body: "인증 시간이에요!", url: "/", tag: "ch", actions: [] };
   try {
     data = { ...data, ...event.data.json() };
   } catch {}
+  // 인증 유도 알림(go=)이면 "촬영" 버튼을 단다 (안드로이드 크롬. 아이폰은 버튼 없이 알림 자체를 누르면 됨)
+  const actions = Array.isArray(data.actions) && data.actions.length ? data.actions : /[?&]go=/.test(data.url || "") ? [{ action: "shoot", title: "📷 지금 촬영" }] : [];
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
@@ -30,12 +32,14 @@ self.addEventListener("push", (event) => {
       badge: "/icons/badge-96.png",
       data: { url: data.url },
       vibrate: [100, 50, 100],
+      actions,
     }),
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+  // 버튼(촬영)을 눌러도, 알림 본문을 눌러도 같은 주소로: /?go=챌린지&slot=시간대 → 카메라가 바로 열린다
   const url = (event.notification.data && event.notification.data.url) || "/";
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
