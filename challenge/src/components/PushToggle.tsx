@@ -42,7 +42,7 @@ export function PushToggle({ vapidKey }: { vapidKey: string | null }) {
       const data = await res.json();
       if (!data.ok) throw new Error(data.error);
       setState("on");
-      setMsg("알림을 켰어요. 인증 시간 시작과 마감 30분 전에 알려 드려요.");
+      setMsg(`알림을 켰어요. 인증 시간 시작과 마감 30분 전에 알려 드려요.${data.cleaned ? ` (예전 주소 구독 ${data.cleaned}개 정리)` : ""}`);
     } catch (e) {
       setMsg((e as Error).message || "알림 설정에 실패했어요");
     }
