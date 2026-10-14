@@ -17,4 +17,10 @@ jobs:
           KEY: ${{ secrets.CHALLENGE_CRON_SECRET }}
         run: |
           if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "secrets not set; skipping"; exit 0; fi
-          curl -fsS -H "x-cron-secret: $KEY" "$URL/api/cron/remind"
+          URL="${URL%/}"
+          # 상태 코드와 응답 본문을 같이 남긴다 (비밀값은 안 찍힘). 401=CRON_SECRET 불일치, 404=주소 오류, 500=앱 오류
+          code=$(curl -sS -o /tmp/body -w "%{http_code}" -H "x-cron-secret: $KEY" "$URL/api/cron/remind")
+          echo "HTTP $code"; head -c 2000 /tmp/body; echo
+          case "$code" in 2*) exit 0;; esac
+          echo "::error::remind endpoint returned HTTP $code (401: CHALLENGE_CRON_SECRET 가 Vercel 의 CRON_SECRET 과 다름 / 404: CHALLENGE_URL 확인 / 5xx: 앱 오류, 본문 참고)"
+          exit 1
