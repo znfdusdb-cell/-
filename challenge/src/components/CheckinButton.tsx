@@ -190,6 +190,8 @@ export function CheckinButton({
   const [result, setResult] = useState<CheckinResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pulse, setPulse] = useState(autoOpen);
+  // 알림에서 들어온 경우: 브라우저가 "직접 누른 동작" 없이는 카메라를 못 열게 막으므로, 화면 전체에 큰 촬영 버튼 하나를 띄워 한 번 누르면 바로 열리게 한다
+  const [prompt, setPrompt] = useState(autoOpen);
   const [stage, setStage] = useState<"idle" | "ai" | "upload">("idle");
   const [warn, setWarn] = useState<{ fd: FormData; a: MealAnalysis } | null>(null);
   const router = useRouter();
@@ -199,13 +201,17 @@ export function CheckinButton({
     btn.current?.scrollIntoView({ block: "center", behavior: "smooth" });
     const t = window.setTimeout(() => { try { input.current?.click(); } catch {} }, 350);
     const clean = window.setTimeout(() => router.replace("/"), 1200);
-    return () => { window.clearTimeout(t); window.clearTimeout(clean); };
+    // 파일 선택창이 실제로 열리면 창이 포커스를 잃는다 → 큰 버튼은 치운다
+    const onBlur = () => setPrompt(false);
+    window.addEventListener("blur", onBlur);
+    return () => { window.clearTimeout(t); window.clearTimeout(clean); window.removeEventListener("blur", onBlur); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpen]);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
+    setPrompt(false);
     if (!file) return;
     setBusy(true);
     setError(null);
@@ -268,6 +274,15 @@ export function CheckinButton({
         {busy ? (stage === "ai" ? "AI가 칼로리 보는 중…" : "올리는 중…") : label}
       </button>
       {error && <p className="text-sm text-bad mt-2">{error}</p>}
+      {prompt && !busy && !result && !warn && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/70 p-6" onClick={() => setPrompt(false)}>
+          <div className="text-white text-sm mb-4 text-center">알림에서 들어왔어요. 한 번만 눌러 주세요.</div>
+          <button type="button" className="btn btn-red w-full max-w-sm text-2xl py-8 rounded-3xl shadow-xl animate-pulse-ring" onClick={(e) => { e.stopPropagation(); setPrompt(false); setPulse(false); input.current?.click(); }}>
+            📷 {label === "촬영 인증" ? "지금 촬영" : label}
+          </button>
+          <button type="button" className="mt-5 text-white/80 text-sm underline" onClick={() => setPrompt(false)}>나중에 할게요</button>
+        </div>
+      )}
       {warn && <KcalWarning a={warn.a} busy={busy} onRetake={() => { setWarn(null); input.current?.click(); }} onProceed={proceedAnyway} />}
       {result && <ResultModal result={result} onClose={close} />}
     </>
