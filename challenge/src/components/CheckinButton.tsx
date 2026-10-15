@@ -97,7 +97,9 @@ async function compress(file: File, stamp: Date | null): Promise<Blob> {
       ctx.fillStyle = "#ffd54a";
       ctx.fillText(text, w - tw - pad * 2, h - pad * 1.1);
     }
-    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.82));
+    let blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.82));
+    // 업로드 한도(4MB) 안전선: 너무 크면 더 줄인다
+    if (blob && blob.size > 3_000_000) blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.6));
     return blob ?? file;
   } catch {
     return file;
@@ -105,8 +107,20 @@ async function compress(file: File, stamp: Date | null): Promise<Blob> {
 }
 
 export async function uploadCheckin(fd: FormData): Promise<CheckinResult> {
-  const res = await fetch("/api/checkin", { method: "POST", body: fd });
-  return (await res.json()) as CheckinResult;
+  let res: Response;
+  try {
+    res = await fetch("/api/checkin", { method: "POST", body: fd });
+  } catch (e) {
+    throw new Error(`서버에 연결하지 못했어요 (${(e as Error).message || "네트워크"}). 와이파이·데이터를 확인하고 다시 눌러 주세요`);
+  }
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as CheckinResult;
+  } catch {
+    // JSON 이 아니면 Vercel 이 막은 것(용량 초과 413, 시간 초과 504 등)
+    const hint = res.status === 413 ? "사진이 너무 커요" : res.status === 504 || res.status === 503 ? "서버가 늦게 답했어요" : "서버 오류";
+    throw new Error(`${hint} (HTTP ${res.status}). 다시 시도해 주세요`);
+  }
 }
 
 /** 인증 결과 모달. 닫으면 화면을 새로고침한다. */
@@ -233,8 +247,8 @@ export function CheckinButton({
         }
       }
       await send(fd);
-    } catch {
-      setError("네트워크 오류. 다시 시도해 주세요");
+    } catch (e) {
+      setError((e as Error).message || "네트워크 오류. 다시 시도해 주세요");
     } finally {
       setBusy(false);
       setStage("idle");
@@ -253,8 +267,8 @@ export function CheckinButton({
     setBusy(true);
     try {
       await send(warn.fd);
-    } catch {
-      setError("네트워크 오류. 다시 시도해 주세요");
+    } catch (e) {
+      setError((e as Error).message || "네트워크 오류. 다시 시도해 주세요");
     } finally {
       setWarn(null);
       setBusy(false);

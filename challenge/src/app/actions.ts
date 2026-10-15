@@ -7,10 +7,10 @@ import { ensureBootstrap, getRepo } from "@/lib/repo";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { SESSION_COOKIE, SESSION_DAYS, signSession } from "@/lib/session";
 import { currentUser, isAdmin, requireUser } from "@/lib/current-user";
-import { CREATE_CHALLENGE_LEVEL, DEFAULT_PENALTY, failedUnits, levelFromXp, MONTH_BONUS_XP, validateConfig } from "@/lib/game";
+import { CREATE_CHALLENGE_LEVEL, DEFAULT_PENALTY, failedUnits, levelFromXp, MONTH_BONUS_XP, validateConfig, type FailedUnit } from "@/lib/game";
 import { inferMethods, normalizeMethods } from "@/lib/methods";
 import { addDays, hmToMinutes, kstDate, kstMinutes, kstWeekday } from "@/lib/time";
-import type { ChallengeConfig, ParticipationGoal, SlotDef } from "@/lib/types";
+import type { Challenge, ChallengeConfig, Participation, ParticipationGoal, SlotDef } from "@/lib/types";
 
 export type ActionResult = { ok: boolean; error?: string; message?: string; cheered?: boolean; count?: number; comment?: CommentView };
 
@@ -355,6 +355,55 @@ export async function adminUpdateUser(_prev: ActionResult | null, fd: FormData):
 }
 
 /** 관리자: 대기 중인 참가자를 오늘부터 바로 시작시킨다 */
+/** 실패 목록이 before → after 로 줄었을 때, 사라진 실패에 깎였던 경험치를 실제 차감량만큼 돌려주고 차감 키를 지운다 */
+async function refundCancelledFails(ch: Challenge, p: Participation, before: FailedUnit[], after: FailedUnit[], why: string): Promise<number> {
+  const repo = getRepo();
+  const keep = new Set(after.map((u) => u.key));
+  let refunded = 0;
+  for (const u of before) {
+    if (keep.has(u.key)) continue;
+    const key = `xpfail:${p.id}:${u.key}`;
+    if (!(await repo.hasNotice(key))) continue;
+    const logged = await repo.findXpLog(p.user_id, `${ch.title} 실패 (${u.date})`).catch(() => null);
+    const give = logged !== null ? Math.max(0, -logged) : -u.xp;
+    if (give > 0) await repo.addXp(p.user_id, give, `${ch.title} ${why}`);
+    await repo.deleteNotice(key);
+    refunded += give;
+  }
+  return refunded;
+}
+
+/** 관리자: 특정 날짜·시간대를 인증 완료로 수동 처리 (앱 오류·네트워크 문제로 못 올린 경우). 사진 없이 기록되고, 깎였던 실패·경험치는 복구 */
+export async function adminExcuseSlot(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const me = await currentUser();
+  if (!isAdmin(me)) return { ok: false, error: "관리자만" };
+  const repo = getRepo();
+  const target = await repo.getUserById(str(fd, "user_id"));
+  const ch = await repo.getChallenge(str(fd, "challenge_id"));
+  if (!target || !ch) return { ok: false, error: "없는 참가자" };
+  const p = await repo.getParticipation(target.id, ch.id);
+  if (!p || p.status !== "active") return { ok: false, error: "참여 중이 아니에요" };
+  const date = str(fd, "date");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > kstDate()) return { ok: false, error: "날짜는 오늘까지" };
+  const slotKey = ch.config.kind === "slots" ? str(fd, "slot") : "count";
+  if (ch.config.kind === "slots" && !ch.config.slots.some((s) => s.key === slotKey)) return { ok: false, error: "시간대를 골라 주세요" };
+  const reason = str(fd, "reason").slice(0, 100) || "관리자 수동 처리";
+  const now = new Date();
+  const mine = await repo.listCheckins({ participationId: p.id });
+  if (mine.some((c) => c.local_date === date && c.slot === slotKey)) return { ok: false, error: "이미 그 날짜·시간대 인증이 있어요" };
+  const before = failedUnits(ch.config, p, mine, now);
+  const created = await repo.createCheckin({
+    participation_id: p.id, user_id: target.id, challenge_id: ch.id, slot: slotKey, media_type: "album", photo_path: "", link_url: "",
+    taken_at: new Date(`${date}T12:00:00+09:00`).toISOString(), local_date: date, note: `관리자 처리: ${reason}`, xp: 0,
+  });
+  const refunded = await refundCancelledFails(ch, p, before, failedUnits(ch.config, p, [...mine, created], now), "관리자 수동 처리 (실패 취소)");
+  const label = ch.config.kind === "slots" ? ch.config.slots.find((s) => s.key === slotKey)?.label ?? slotKey : "인증";
+  const { sendPushToUsers } = await import("@/lib/push");
+  await sendPushToUsers([target.id], { title: "인증이 수동으로 처리됐어요", body: `${date} ${label} · ${reason}${refunded > 0 ? ` · 경험치 +${refunded} 복구` : ""}`, url: "/", tag: `excuse-${created.id}` }).catch(() => null);
+  revalidatePath("/", "layout");
+  return { ok: true, message: `${target.display_name} ${date} ${label} 완료 처리${refunded > 0 ? ` · 실패 취소, 경험치 +${refunded}` : ""}` };
+}
+
 export async function adminStartNow(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   const me = await currentUser();
   if (!isAdmin(me)) return { ok: false, error: "관리자만" };
@@ -392,19 +441,7 @@ export async function adminStartNow(_prev: ActionResult | null, fd: FormData): P
     when = ch.config.kind === "slots" ? `${patch.start_date === today ? "오늘" : "내일"} ${ch.config.slots[0].label}부터` : when;
   }
   // 이미 깎인 실패(오늘 지난 시간대 등)는 되돌린다
-  const after = new Set(failedUnits(ch.config, { ...p, ...patch }, mine, now).map((u) => u.key));
-  let refunded = 0;
-  for (const u of before) {
-    if (after.has(u.key)) continue;
-    const key = `xpfail:${p.id}:${u.key}`;
-    if (!(await repo.hasNotice(key))) continue;
-    // 실제로 깎인 만큼만 돌려준다 (0 아래로는 안 깎였을 수 있음). 기록이 없으면 기본 차감량
-    const logged = await repo.findXpLog(p.user_id, `${ch.title} 실패 (${u.date})`).catch(() => null);
-    const give = logged !== null ? Math.max(0, -logged) : -u.xp;
-    if (give > 0) await repo.addXp(p.user_id, give, `${ch.title} 시작 조정 (실패 취소)`);
-    await repo.deleteNotice(key);
-    refunded += give;
-  }
+  const refunded = await refundCancelledFails(ch, p, before, failedUnits(ch.config, { ...p, ...patch }, mine, now), "시작 조정 (실패 취소)");
   revalidatePath("/", "layout");
   return { ok: true, message: `${target.display_name} ${when} 시작${refunded > 0 ? ` · 실패 취소, 경험치 +${refunded}` : ""}` };
 }

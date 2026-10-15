@@ -13,6 +13,7 @@ import { FailRule } from "@/components/FailRule";
 import { KickButton } from "@/components/KickButton";
 import { NudgeButton } from "@/components/NudgeButton";
 import { TestJoinButton } from "@/components/TestJoinButton";
+import { AdminExcuseForm } from "@/components/AdminExcuseForm";
 
 export const dynamic = "force-dynamic";
 
@@ -131,9 +132,10 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
                         </div>
                       </div>
                     )}
-                    {((isAdmin(user) && (waiting || s.startDate === today)) || ((isAdmin(user) || ch.created_by === user.id) && p.user_id !== user.id)) && (
+                    {(isAdmin(user) || (ch.created_by === user.id && p.user_id !== user.id)) && (
                       <div className="mt-1.5 pl-9 flex gap-3 items-center flex-wrap">
                         {isAdmin(user) && (waiting || s.startDate === today) && <StartNowButton userId={p.user_id} challengeId={ch.id} />}
+                        {isAdmin(user) && !waiting && <AdminExcuseForm challengeId={ch.id} userId={p.user_id} name={p.user.display_name} slots={ch.config.kind === "slots" ? ch.config.slots.map((x) => ({ key: x.key, label: x.label })) : []} today={today} />}
                         {(isAdmin(user) || ch.created_by === user.id) && p.user_id !== user.id && <KickButton challengeId={ch.id} userId={p.user_id} name={p.user.display_name} />}
                       </div>
                     )}
