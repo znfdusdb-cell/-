@@ -6,6 +6,8 @@ import { consumedToday, dailyBudgetFor } from "@/lib/game";
 import { kstDate } from "@/lib/time";
 
 export const runtime = "nodejs";
+/** Vercel 기본 10초는 사진 업로드 + AI 추정에 빠듯하다 */
+export const maxDuration = 60;
 
 const MAX_BYTES = 12 * 1024 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);

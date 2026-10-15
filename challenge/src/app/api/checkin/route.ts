@@ -9,6 +9,8 @@ import type { Checkin } from "@/lib/types";
 import { verifyPayload, type AiPayload } from "@/lib/session";
 
 export const runtime = "nodejs";
+/** Vercel 기본 10초는 사진 업로드 + AI 추정에 빠듯하다 */
+export const maxDuration = 60;
 
 const MAX_BYTES = 12 * 1024 * 1024;
 const IMAGE_EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
