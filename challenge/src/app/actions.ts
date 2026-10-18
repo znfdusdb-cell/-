@@ -380,6 +380,26 @@ async function refundCancelledFails(ch: Challenge, p: Participation, before: Fai
   return refunded;
 }
 
+/** 관리자: 탈락한 멤버를 대신 재도전 처리 (다음 월요일부터). 기프티콘을 올렸거나, 관리자가 면제(force)한 경우 */
+export async function adminRechallenge(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const me = await currentUser();
+  if (!isAdmin(me)) return { ok: false, error: "관리자만" };
+  const repo = getRepo();
+  const target = await repo.getUserById(str(fd, "user_id"));
+  const ch = await repo.getChallenge(str(fd, "challenge_id"));
+  if (!target || !ch) return { ok: false, error: "없는 참가자" };
+  const p = await repo.getParticipation(target.id, ch.id);
+  if (!p || p.status !== "active") return { ok: false, error: "참여 중이 아니에요" };
+  const gifts = await repo.listGiftsSentSince(target.id, ch.id, p.joined_at).catch(() => []);
+  const force = str(fd, "force") === "1";
+  if (gifts.length === 0 && !force) return { ok: false, error: `${target.display_name}님은 아직 기프티콘을 안 올렸어요. 면제하려면 '벌칙 면제하고 재도전'을 누르세요` };
+  await repo.updateParticipation(p.id, { joined_at: new Date().toISOString(), start_date: null });
+  const { sendPushToUsers } = await import("@/lib/push");
+  await sendPushToUsers([target.id], { title: `${ch.emoji} ${ch.title} 다시 시작!`, body: "관리자가 재도전을 처리했어요. 다음 월요일부터 다시 시작해요.", url: "/", tag: `rechallenge-${ch.id}` }).catch(() => null);
+  revalidatePath("/", "layout");
+  return { ok: true, message: `${target.display_name} 다음 월요일부터 재도전${force && gifts.length === 0 ? " (벌칙 면제)" : ""}` };
+}
+
 /** 관리자: 특정 날짜·시간대를 인증 완료로 수동 처리 (앱 오류·네트워크 문제로 못 올린 경우). 사진 없이 기록되고, 깎였던 실패·경험치는 복구 */
 export async function adminExcuseSlot(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   const me = await currentUser();
