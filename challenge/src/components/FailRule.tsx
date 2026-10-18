@@ -15,7 +15,7 @@ export function FailRule({ challenge: ch, compact = false }: { challenge: Challe
         {ch.max_fails > 0 ? <>, 한 달에 <b>{ch.max_fails}번</b> 실패하면 탈락 → </> : <>, 실패하면 → </>}
         <b className="text-red">{ch.penalty}</b>
       </div>
-      <div className="text-[11px] text-fg-3 mt-1">탈락하면 기프티콘을 올려야 하고, 살아남은 멤버 한 명에게 깜짝 선물로 랜덤 전달돼요.</div>
+      <div className="text-[11px] text-fg-3 mt-1">탈락하면 기프티콘을 올려야 하고, 살아남은 멤버 한 명에게 깜짝 선물로 랜덤 전달돼요. 시작한 뒤엔 탈락 전까지 그만둘 수 없고, 기프티콘을 올린 뒤에 다시 도전 또는 그만하기를 고릅니다.</div>
       {ch.config.kind === "slots" && ch.config.goal === "weight" && (ch.kcal_limit ?? 700) > 0 && (
         <div className="text-[11px] text-fg-3 mt-1">🤖 사진을 올릴 때 AI가 칼로리를 추정해요. 키·체중·목표·기간으로 사람마다 하루 예산이 정해지고(키를 안 넣으면 한 끼 <b className="num">{ch.kcal_limit ?? 700} kcal</b> × 끼니 수), 끼니별이 아니라 하루 합계로 봐요. 점심에 많이 먹으면 저녁 한도가 그만큼 줄고, 예산을 넘기는 끼니에서 경고가 뜨고 그대로 올리면 관리자 검토를 받아요.</div>
       )}

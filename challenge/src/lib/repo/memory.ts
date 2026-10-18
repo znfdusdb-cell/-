@@ -210,6 +210,9 @@ export class MemoryRepo implements Repo {
   async listGiftsSentSince(userId: string, challengeId: string, sinceIso: string) {
     return clone(store().gifts.filter((g) => g.from_user_id === userId && g.challenge_id === challengeId && g.created_at >= sinceIso));
   }
+  async listGiftsByChallenge(challengeId: string) {
+    return clone(store().gifts.filter((g) => g.challenge_id === challengeId).sort((a, b) => b.created_at.localeCompare(a.created_at)));
+  }
   async markGiftOpened(id: string, userId: string) {
     const g = store().gifts.find((x) => x.id === id && x.to_user_id === userId);
     if (g && !g.opened_at) g.opened_at = now();

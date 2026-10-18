@@ -3,8 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { currentUser, isAdmin, toPublic } from "@/lib/current-user";
 import { getRepo } from "@/lib/repo";
 import { boardFocus, loadBoard } from "@/lib/data";
-import { describeConfig, levelFromXp, type SlotStatus } from "@/lib/game";
-import { fmtDateKo, kstDate } from "@/lib/time";
+import { describeConfig, leavePolicy, levelFromXp, summarize, type SlotStatus } from "@/lib/game";
+import { fmtDateKo, fmtDateTimeKo, kstDate } from "@/lib/time";
 import { Shell } from "@/components/Shell";
 import { JoinForm } from "@/components/JoinForm";
 import { LeaveButton } from "@/components/LeaveButton";
@@ -29,6 +29,19 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
   const canEdit = isAdmin(user) || ch.created_by === user.id;
   const today = kstDate();
   const cheers = await repo.countCheersReceivedMany(board.map((r) => r.participant.user_id)).catch(() => ({} as Record<string, number>));
+  // 그만두기 가능 여부 (시작 전 / 탈락 후 벌칙 제출 / 테스트 참여)
+  let leave = { allowed: true, reason: "" };
+  if (joined && mine) {
+    const myCheckins = await repo.listCheckins({ participationId: mine.id });
+    const sent = (await repo.listGiftsSentSince(user.id, ch.id, mine.joined_at).catch(() => [])).length > 0;
+    leave = leavePolicy(ch, mine, summarize(ch, mine, myCheckins), sent, today);
+  }
+  // 개설자·관리자: 벌칙 현황 (누가 탈락했고, 기프티콘을 올렸는지, 누구에게 갔는지)
+  const gifts = canEdit ? await repo.listGiftsByChallenge(ch.id).catch(() => []) : [];
+  const giftUserIds = [...new Set(gifts.flatMap((g) => [g.from_user_id, g.to_user_id ?? ""]).filter(Boolean))];
+  const giftUsers = new Map((giftUserIds.length ? await repo.getUsersByIds(giftUserIds) : []).map((u) => [u.id, u.display_name]));
+  const nameOf = (id: string | null) => (id ? giftUsers.get(id) ?? board.find((r) => r.participant.user_id === id)?.participant.user.display_name ?? "탈퇴" : "받을 사람 없음");
+  const pendingGift = board.filter((r) => r.summary.eliminated && !gifts.some((g) => g.from_user_id === r.participant.user_id && g.created_at >= r.participant.joined_at));
   const focus = boardFocus(ch);
   const slotDefs = ch.config.kind === "slots" ? ch.config.slots : [];
   const slotColor = (key: string) => SLOT_COLORS[Math.max(0, slotDefs.findIndex((d) => d.key === key)) % SLOT_COLORS.length];
@@ -60,7 +73,7 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
           <h2 className="font-bold mb-2">내 목표</h2>
           {ch.config.goal === "none" ? <p className="text-sm text-fg-2">이 챌린지는 따로 설정할 목표가 없어요.</p> : <JoinForm challenge={ch} goal={mine!.goal} mode="edit" gender={user.gender} />}
           <div className="mt-3 pt-3 border-t border-line">
-            <LeaveButton challengeId={ch.id} />
+            <LeaveButton challengeId={ch.id} allowed={leave.allowed} reason={leave.reason} />
           </div>
         </section>
       ) : ch.is_active ? (
@@ -69,6 +82,31 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
           <JoinForm challenge={ch} next={`/challenges/${ch.id}`} gender={user.gender} />
         </section>
       ) : null}
+
+      {canEdit && (
+        <section className="card p-4 mt-3">
+          <h2 className="font-bold">🎁 벌칙 현황 <span className="text-xs text-fg-3 font-normal">(개설자·관리자만 보여요)</span></h2>
+          {pendingGift.length === 0 && gifts.length === 0 ? (
+            <p className="text-sm text-fg-2 mt-1">아직 탈락자가 없어요.</p>
+          ) : (
+            <div className="mt-2 space-y-1.5 text-sm">
+              {pendingGift.map((r) => (
+                <div key={r.participant.id} className="flex items-center justify-between rounded-xl bg-bad-soft px-3 py-2">
+                  <span><b>{r.participant.user.display_name}</b> · 탈락 (이달 실패 {r.summary.fails})</span>
+                  <span className="chip bg-bad text-white">기프티콘 안 올림</span>
+                </div>
+              ))}
+              {gifts.map((g) => (
+                <div key={g.id} className="flex items-center justify-between rounded-xl bg-bg-3/70 px-3 py-2 gap-2">
+                  <span className="min-w-0"><b>{nameOf(g.from_user_id)}</b> → <b>{nameOf(g.to_user_id)}</b><span className="text-fg-3 num text-xs"> · {fmtDateTimeKo(g.created_at)}</span></span>
+                  <span className={`chip shrink-0 ${g.opened_at ? "bg-ok-soft text-ok" : "bg-gold-soft text-gold"}`}>{g.opened_at ? "열어봄" : "전달됨"}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-[11px] text-fg-3 mt-2">기프티콘 이미지는 받은 사람만 볼 수 있어요.</p>
+        </section>
+      )}
 
       <section className="mt-4">
         <h2 className="text-lg font-extrabold mb-2">리더보드</h2>

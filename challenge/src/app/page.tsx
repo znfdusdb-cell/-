@@ -16,6 +16,7 @@ import { WeightPanel } from "@/components/WeightPanel";
 import { RechallengeButton } from "@/components/RechallengeButton";
 import { GiftUploadButton } from "@/components/GiftUploadButton";
 import { DeepLinkNotice } from "@/components/DeepLinkNotice";
+import { LeaveButton } from "@/components/LeaveButton";
 
 export const dynamic = "force-dynamic";
 
@@ -94,11 +95,15 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                   <div className="text-sm mt-0.5">벌칙: <b>{ch.penalty}</b></div>
                   {giftSent[p.id] ? (
                     <>
-                      <div className="text-xs text-ok font-bold mt-2">벌칙 기프티콘 전달 완료</div>
+                      <div className="text-xs text-ok font-bold mt-2">벌칙 기프티콘 전달 완료 · 이제 고를 수 있어요</div>
                       <RechallengeButton challengeId={ch.id} />
+                      <div className="mt-2 text-center"><LeaveButton challengeId={ch.id} label="이 챌린지 그만하기" className="btn btn-ghost w-full text-sm" /></div>
                     </>
                   ) : (
-                    <GiftUploadButton challengeId={ch.id} />
+                    <>
+                      <GiftUploadButton challengeId={ch.id} />
+                      <p className="text-[11px] text-fg-3 mt-2">🔒 기프티콘을 올려야 다시 도전하거나 그만둘 수 있어요.</p>
+                    </>
                   )}
                 </div>
               ) : (

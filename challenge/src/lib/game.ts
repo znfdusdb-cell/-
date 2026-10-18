@@ -332,6 +332,19 @@ export function dailyCalorieDeficit(remainingKg: number, remainingDays: number):
   return Math.round((remainingKg * 7700) / remainingDays / 10) * 10;
 }
 
+/* ───────── 그만두기 규칙 ───────── */
+
+/**
+ * 시작하면 탈락 전까지는 그만둘 수 없다(중간 이탈 방지).
+ * 그만둘 수 있는 때: 아직 시작 전 / 탈락하고 벌칙 기프티콘을 올린 뒤 / 관리자 테스트 참여.
+ */
+export function leavePolicy(ch: Challenge, p: Participation, summary: Summary, giftSent: boolean, today: string): { allowed: boolean; reason: string } {
+  if (p.is_test) return { allowed: true, reason: "" };
+  if (summary.startDate > today) return { allowed: true, reason: "" };
+  if (summary.eliminated) return giftSent ? { allowed: true, reason: "" } : { allowed: false, reason: `탈락했어요. 벌칙 기프티콘을 올린 뒤에 '다시 도전' 또는 '그만하기'를 고를 수 있어요.` };
+  return { allowed: false, reason: `시작한 챌린지는 탈락 전까지 그만둘 수 없어요. (한 달에 ${ch.max_fails || "∞"}번 실패하면 탈락 → 벌칙 후 선택)` };
+}
+
 /* ───────── 개인 칼로리 기준 (기초대사량) ───────── */
 
 /** 가벼운 활동 기준 활동 계수 */

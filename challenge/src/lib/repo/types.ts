@@ -62,6 +62,8 @@ export interface Repo {
   createGift(data: Omit<Gift, "id" | "created_at" | "opened_at">): Promise<Gift>;
   listGiftsReceived(userId: string): Promise<Gift[]>;
   listGiftsSentSince(userId: string, challengeId: string, sinceIso: string): Promise<Gift[]>;
+  /** 챌린지의 벌칙 기프티콘 전부 (최근순) — 개설자·관리자 벌칙 현황용 */
+  listGiftsByChallenge(challengeId: string): Promise<Gift[]>;
   markGiftOpened(id: string, userId: string): Promise<void>;
   countUnreadGifts(userId: string): Promise<number>;
 

@@ -7,7 +7,7 @@ import { ensureBootstrap, getRepo } from "@/lib/repo";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { SESSION_COOKIE, SESSION_DAYS, signSession } from "@/lib/session";
 import { currentUser, isAdmin, requireUser } from "@/lib/current-user";
-import { CREATE_CHALLENGE_LEVEL, DEFAULT_PENALTY, failedUnits, levelFromXp, MONTH_BONUS_XP, validateConfig, type FailedUnit } from "@/lib/game";
+import { CREATE_CHALLENGE_LEVEL, DEFAULT_PENALTY, failedUnits, leavePolicy, levelFromXp, MONTH_BONUS_XP, summarize, validateConfig, type FailedUnit } from "@/lib/game";
 import { inferMethods, normalizeMethods } from "@/lib/methods";
 import { addDays, hmToMinutes, kstDate, kstMinutes, kstWeekday } from "@/lib/time";
 import type { Challenge, ChallengeConfig, Participation, ParticipationGoal, SlotDef } from "@/lib/types";
@@ -171,6 +171,13 @@ export async function leaveChallenge(_prev: ActionResult | null, fd: FormData): 
   const repo = getRepo();
   const p = await repo.getParticipation(user.id, str(fd, "challenge_id"));
   if (!p || p.status !== "active") return { ok: false, error: "참여 중이 아니에요" };
+  const ch = await repo.getChallenge(p.challenge_id);
+  if (!ch) return { ok: false, error: "없는 챌린지예요" };
+  // 중간 이탈 방지: 시작 전이거나, 탈락 후 벌칙을 올린 경우에만
+  const mine = await repo.listCheckins({ participationId: p.id });
+  const giftSent = (await repo.listGiftsSentSince(user.id, ch.id, p.joined_at).catch(() => [])).length > 0;
+  const policy = leavePolicy(ch, p, summarize(ch, p, mine), giftSent, kstDate());
+  if (!policy.allowed) return { ok: false, error: policy.reason };
   await repo.updateParticipation(p.id, { status: "left" });
   revalidatePath("/", "layout");
   redirect("/challenges");

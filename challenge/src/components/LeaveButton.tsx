@@ -4,10 +4,11 @@ import { useActionState, useState } from "react";
 import { leaveChallenge } from "@/app/actions";
 import { FormMessage, SubmitButton } from "./Form";
 
-export function LeaveButton({ challengeId }: { challengeId: string }) {
+export function LeaveButton({ challengeId, allowed = true, reason = "", label = "이 챌린지 그만두기", className = "text-xs text-fg-3 underline" }: { challengeId: string; allowed?: boolean; reason?: string; label?: string; className?: string }) {
   const [confirm, setConfirm] = useState(false);
   const [state, action] = useActionState(leaveChallenge, null);
-  if (!confirm) return <button type="button" className="text-xs text-fg-3 underline" onClick={() => setConfirm(true)}>이 챌린지 그만두기</button>;
+  if (!allowed) return <p className="text-[11px] text-fg-3">🔒 {reason}</p>;
+  if (!confirm) return <button type="button" className={className} onClick={() => setConfirm(true)}>{label}</button>;
   return (
     <form action={action} className="flex items-center gap-2">
       <input type="hidden" name="challenge_id" value={challengeId} />
