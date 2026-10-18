@@ -181,6 +181,9 @@ export class SupabaseRepo implements Repo {
   listGiftsReceived(userId: string) {
     return this.many<Gift>(this.sb.from("ch_gifts").select("*").eq("to_user_id", userId).order("created_at", { ascending: false }), "listGiftsReceived");
   }
+  listGiftsByChallenge(challengeId: string) {
+    return this.many<Gift>(this.sb.from("ch_gifts").select("*").eq("challenge_id", challengeId).order("created_at", { ascending: false }), "listGiftsByChallenge");
+  }
   listGiftsSentSince(userId: string, challengeId: string, sinceIso: string) {
     return this.many<Gift>(this.sb.from("ch_gifts").select("*").eq("from_user_id", userId).eq("challenge_id", challengeId).gte("created_at", sinceIso), "listGiftsSentSince");
   }
