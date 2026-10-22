@@ -38,7 +38,7 @@ export function GiftUploadButton({ challengeId }: { challengeId: string }) {
       <button type="button" className="btn btn-red w-full mt-3" disabled={busy} onClick={() => input.current?.click()}>
         {busy ? "보내는 중…" : "벌칙 기프티콘 올리기"}
       </button>
-      <p className="text-[11px] text-fg-3 mt-1.5">앨범에서 기프티콘 캡처를 고르면 성공 중인 멤버 한 명에게 랜덤으로 전달돼요. 누구에게 가는지는 보낸 뒤에 알려 드려요.</p>
+      <p className="text-[11px] text-fg-3 mt-1.5">앨범에서 기프티콘 캡처를 고르면 성공 중인 멤버 중 아직 선물을 덜 받은 사람에게 골고루 전달돼요. 누구에게 가는지는 보낸 뒤에 알려 드려요.</p>
       {error && <p className="text-sm text-bad mt-2">{error}</p>}
       {done && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6" onClick={() => { setDone(null); router.refresh(); }}>

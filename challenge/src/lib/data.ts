@@ -1,6 +1,6 @@
 import "server-only";
 import { getRepo, type ParticipantRow } from "./repo";
-import { failedUnits, focusSlot, monthReport, summarize, weightProgress, type MonthReport, type SlotStatus, type Summary } from "./game";
+import { failedUnits, focusSlot, monthReport, pickFairRecipient, summarize, weightProgress, type MonthReport, type SlotStatus, type Summary } from "./game";
 import { kstDate } from "./time";
 import type { Challenge, Checkin, Participation, User } from "./types";
 
@@ -56,14 +56,19 @@ export async function loadMyChallenges(user: User, now = new Date()): Promise<My
   return out.sort((a, b) => Number(b.challenge.is_default) - Number(a.challenge.is_default));
 }
 
-/** 탈락자의 기프티콘을 받을 사람: 같은 챌린지의 성공 중인 멤버 중 랜덤 (실패 0 우선 → 실패 적은 순). 없으면 null */
+/**
+ * 탈락자의 기프티콘을 받을 사람: 같은 챌린지의 성공 중인 멤버 중, 이 챌린지에서 받은 횟수가 가장 적은 사람 우선(골고루),
+ * 그중 이달 실패가 적은 사람, 그래도 여럿이면 랜덤. 없으면 null
+ */
 export async function pickGiftRecipient(challenge: Challenge, fromUserId: string, now = new Date()): Promise<User | null> {
+  const repo = getRepo();
   const board = await loadBoard(challenge, now);
   const pool = board.filter((r) => r.participant.user_id !== fromUserId && !r.summary.eliminated && !r.waiting);
   if (pool.length === 0) return null;
-  const min = Math.min(...pool.map((r) => r.summary.fails));
-  const best = pool.filter((r) => r.summary.fails === min);
-  return best[Math.floor(Math.random() * best.length)].participant.user;
+  const received: Record<string, number> = {};
+  for (const g of await repo.listGiftsByChallenge(challenge.id).catch(() => [])) if (g.to_user_id) received[g.to_user_id] = (received[g.to_user_id] ?? 0) + 1;
+  const pick = pickFairRecipient(pool.map((r) => ({ userId: r.participant.user_id, fails: r.summary.fails, row: r })), received);
+  return pick ? pick.row.participant.user : null;
 }
 
 export type BoardRow = {

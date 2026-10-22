@@ -332,6 +332,21 @@ export function dailyCalorieDeficit(remainingKg: number, remainingDays: number):
   return Math.round((remainingKg * 7700) / remainingDays / 10) * 10;
 }
 
+/* ───────── 벌칙 기프티콘 받을 사람 고르기 ───────── */
+
+/**
+ * 골고루: 이 챌린지에서 받은 횟수가 가장 적은 사람 → 그중 이달 실패가 가장 적은 사람 → 그래도 여럿이면 랜덤.
+ * rnd 는 테스트용 (0~1).
+ */
+export function pickFairRecipient<T extends { userId: string; fails: number }>(pool: T[], received: Record<string, number>, rnd: () => number = Math.random): T | null {
+  if (pool.length === 0) return null;
+  const minReceived = Math.min(...pool.map((r) => received[r.userId] ?? 0));
+  const fewest = pool.filter((r) => (received[r.userId] ?? 0) === minReceived);
+  const minFails = Math.min(...fewest.map((r) => r.fails));
+  const best = fewest.filter((r) => r.fails === minFails);
+  return best[Math.floor(rnd() * best.length)] ?? null;
+}
+
 /* ───────── 그만두기 규칙 ───────── */
 
 /**
