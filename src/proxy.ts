@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const PUBLIC = ["/login", "/auth/", "/_next", "/favicon.ico", "/icon.svg", "/manifest.webmanifest"];
+const PUBLIC = ["/login", "/auth/", "/_next", "/favicon.ico", "/icon.svg", "/manifest.webmanifest", "/sw.js", "/icons/"];
 
 /**
  * 잠금. 우선순위: 매직링크(허용 이메일 1개) > 비밀번호 > 열림.

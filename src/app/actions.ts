@@ -82,3 +82,20 @@ export async function confirmLivingFundAction(input: { confirm: boolean }) {
   if (res.ok) { revalidatePath("/"); revalidatePath("/log"); }
   return res;
 }
+
+/**
+ * 메일 속 숫자 코드로 로그인. 아이폰 홈 화면 앱은 사파리와 쿠키를 따로 써서
+ * 메일 링크(사파리에서 열림)로는 앱 안이 로그인되지 않는다 → 앱 안에서 코드를 직접 넣는다.
+ * Supabase 이메일 템플릿(Magic Link)에 {{ .Token }} 이 들어 있어야 메일에 숫자가 보인다.
+ */
+export async function verifyOtpAction(formData: FormData) {
+  const token = String(formData.get("token") ?? "").replace(/\D/g, "");
+  const next = String(formData.get("next") ?? "/");
+  const email = (process.env.AUTH_ALLOWED_EMAIL ?? "").trim().toLowerCase();
+  if (authMode() !== "magic" || !email) redirect("/login");
+  if (token.length < 6) redirect(`/login?sent=1&err=code&next=${encodeURIComponent(next)}`);
+  const supabase = await authClient();
+  const { data, error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
+  if (error || !isAllowed(data.user?.email)) redirect(`/login?sent=1&err=code&next=${encodeURIComponent(next)}`);
+  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/");
+}
