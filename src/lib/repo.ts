@@ -9,7 +9,8 @@ import {
 import { daysBetween, todayKST } from "./format";
 import { nextTradingDay } from "./krx-calendar";
 import { universeGuard } from "./guards";
-import { verifyOrders } from "./verify";
+import { verifyOrders, INVERSE_SHORT_RE } from "./verify";
+import { ma20Info } from "./setup-calc";
 
 export interface Repo {
   readonly mode: "supabase" | "seed";
@@ -29,6 +30,8 @@ export interface Repo {
   /** 리스크 다이얼·30거래·페이스·기회 횟수 */
   riskPanel(): Promise<RiskPanelData>;
   moveStage(code: string, to: Stage, reason: string, actor: Author): Promise<{ ok: true } | { ok: false; error: string }>;
+  /** FN-1 생활비 분리 확인/취소 (비움 버튼). 확인하면 오늘 날짜가 들어간다. */
+  confirmLivingFund(confirm: boolean): Promise<{ ok: true; value: string | null } | { ok: false; error: string }>;
 }
 
 
@@ -127,11 +130,12 @@ class SeedRepo implements Repo {
   }
   private closes(code: string) {
     const c = SEED_CANDLES.filter((x) => x.code === code);
-    return { last: c[c.length - 1]?.close ?? null, prev: c[c.length - 2]?.close ?? null };
+    const m = ma20Info(c.slice(-25).map((x) => x.close));
+    return { last: c[c.length - 1]?.close ?? null, prev: c[c.length - 2]?.close ?? null, ma20: m.ma20, below: m.below_days };
   }
   private summary(stock: Stock): StockSummary {
-    const { last, prev } = this.closes(stock.code);
-    return { stock, thesis: this.latestThesis(stock.code), setup: this.latestSetup(stock.code), position: this.openPosition(stock.code), last_close: last, prev_close: prev };
+    const { last, prev, ma20, below } = this.closes(stock.code);
+    return { stock, thesis: this.latestThesis(stock.code), setup: this.latestSetup(stock.code), position: this.openPosition(stock.code), last_close: last, prev_close: prev, ma20, below_ma20_days: below };
   }
 
   async latestRegime() {
@@ -160,7 +164,7 @@ class SeedRepo implements Repo {
     return SEED_EVENTS.filter((e) => e.event_date >= t && daysBetween(t, e.event_date) <= days).sort((a, b) => a.event_date.localeCompare(b.event_date));
   }
   async settings() {
-    return { ...SEED_SETTINGS };
+    return { ...this.settingsMem };
   }
   private proposalsMem = SEED_PROPOSALS.map((p) => ({ ...p }));
   async proposals(status: "pending" | "all" = "pending") {
@@ -200,11 +204,17 @@ class SeedRepo implements Repo {
     });
     return buildAudit(SEED_ORDERS, computed, SEED_SETTINGS);
   }
+  private settingsMem: Settings = { ...SEED_SETTINGS };
+  async confirmLivingFund(confirm: boolean) {
+    this.settingsMem.living_fund_confirmed_at = confirm ? todayKST() : null;
+    return { ok: true as const, value: this.settingsMem.living_fund_confirmed_at };
+  }
   async moveStage(code: string, to: Stage, reason: string, actor: Author) {
     const stock = this.stocks.find((s) => s.code === code);
     if (!stock) return { ok: false as const, error: "종목 없음" };
+    if (to !== "radar" && to !== "exited" && INVERSE_SHORT_RE.test(stock.name)) return { ok: false as const, error: "UV-5: 인버스·숏 상품은 공부·백테스트 전엔 올리지 않는다" };
     if (to === "universe") {
-      const err = universeGuard(this.latestThesis(code), this.latestSetup(code), SEED_SETTINGS);
+      const err = universeGuard(this.latestThesis(code), this.latestSetup(code), this.settingsMem);
       if (err) return { ok: false as const, error: err };
     }
     const from = stock.stage;
@@ -291,12 +301,14 @@ class SupabaseRepo implements Repo {
     return m;
   }
 
-  private async lastCloses(codes: string[]): Promise<Map<string, { last: number | null; prev: number | null }>> {
-    const m = new Map<string, { last: number | null; prev: number | null }>();
+  /** 최근 25개 종가: 현재가·전일가 + 20일선·20일선 아래 연속 마감 (AL-1 경고용) */
+  private async lastCloses(codes: string[]): Promise<Map<string, { last: number | null; prev: number | null; ma20: number | null; below: number | null }>> {
+    const m = new Map<string, { last: number | null; prev: number | null; ma20: number | null; below: number | null }>();
     await Promise.all(codes.map(async (code) => {
-      const { data } = await this.db.from("sb_candles").select("close").eq("code", code).order("date", { ascending: false }).limit(2);
+      const { data } = await this.db.from("sb_candles").select("close").eq("code", code).order("date", { ascending: false }).limit(25);
       const rows = (data ?? []) as Row[];
-      m.set(code, { last: rows[0] ? Number(rows[0].close) : null, prev: rows[1] ? Number(rows[1].close) : null });
+      const info = ma20Info(rows.map((r) => Number(r.close)).reverse());
+      m.set(code, { last: rows[0] ? Number(rows[0].close) : null, prev: rows[1] ? Number(rows[1].close) : null, ma20: info.ma20, below: info.below_days });
     }));
     return m;
   }
@@ -332,6 +344,8 @@ class SupabaseRepo implements Repo {
       position: positions.get(stock.code) ?? null,
       last_close: closes.get(stock.code)?.last ?? null,
       prev_close: closes.get(stock.code)?.prev ?? null,
+      ma20: closes.get(stock.code)?.ma20 ?? null,
+      below_ma20_days: closes.get(stock.code)?.below ?? null,
     }));
   }
 
@@ -343,13 +357,15 @@ class SupabaseRepo implements Repo {
       this.db.from("sb_theses").select("*").eq("code", code).order("created_at", { ascending: false }).limit(1),
       this.db.from("sb_setups").select("*").eq("code", code).order("as_of", { ascending: false }).limit(1),
       this.db.from("sb_positions").select("*").eq("code", code).is("closed_at", null).limit(1),
-      this.db.from("sb_candles").select("*").eq("code", code).order("date", { ascending: true }).limit(400),
+      // 최근 2년치(약 500거래일). 오름차순 limit 은 '가장 오래된' 행을 가져오므로 내림차순으로 받고 뒤집는다.
+      this.db.from("sb_candles").select("*").eq("code", code).order("date", { ascending: false }).limit(520),
       this.db.from("sb_events").select("*").or(`code.eq.${code},code.is.null`).order("event_date", { ascending: true }),
       this.db.from("sb_stage_log").select("*").eq("code", code).order("created_at", { ascending: false }).limit(30),
       this.db.from("sb_orders_log").select("*").eq("code", code).order("ts", { ascending: false }).limit(50),
       this.db.from("sb_balance_snapshots").select("*").eq("code", code).order("as_of", { ascending: false }).limit(30),
     ]);
-    const c = ((candles.data ?? []) as Row[]).map(rowToCandle);
+    const c = ((candles.data ?? []) as Row[]).map(rowToCandle).reverse();
+    const m20 = ma20Info(c.slice(-25).map((x) => x.close));
     return {
       stock,
       thesis: thesis.data?.[0] ? rowToThesis(thesis.data[0] as Row) : null,
@@ -357,6 +373,8 @@ class SupabaseRepo implements Repo {
       position: position.data?.[0] ? rowToPosition(position.data[0] as Row) : null,
       last_close: c[c.length - 1]?.close ?? null,
       prev_close: c[c.length - 2]?.close ?? null,
+      ma20: m20.ma20,
+      below_ma20_days: m20.below_days,
       snapshots: ((snaps.data ?? []) as Row[]).map(rowToSnapshot),
       candles: c,
       events: ((events.data ?? []) as Row[]).map(rowToEvent),
@@ -431,7 +449,7 @@ class SupabaseRepo implements Repo {
     const [o, sl, st, su, po, settings, rl] = await Promise.all([
       this.db.from("sb_orders_log").select("*").order("ts", { ascending: true }).limit(2000),
       this.db.from("sb_stage_log").select("*"),
-      this.db.from("sb_stocks").select("code, stage, sector"),
+      this.db.from("sb_stocks").select("code, name, stage, sector"),
       this.db.from("sb_setups").select("*"),
       this.db.from("sb_positions").select("*"),
       this.settings(),
@@ -444,11 +462,17 @@ class SupabaseRepo implements Repo {
     const ca = codes.length ? await this.db.from("sb_candles").select("*").in("code", codes).gte("date", minDate ?? "1970-01-01") : { data: [] };
     const computed = verifyOrders({
       orders, stageLog: ((sl.data ?? []) as Row[]).map(rowToStageLog),
-      stocks: ((st.data ?? []) as Row[]).map((r) => ({ code: r.code as string, stage: r.stage as Stage, sector: (r.sector as string) ?? null })),
+      stocks: ((st.data ?? []) as Row[]).map((r) => ({ code: r.code as string, name: r.name as string, stage: r.stage as Stage, sector: (r.sector as string) ?? null })),
       setups: ((su.data ?? []) as Row[]).map(rowToSetup), positions,
       candles: ((ca.data ?? []) as Row[]).map(rowToCandle), settings, riskLog: ((rl.data ?? []) as Row[]).map(rowToRisk),
     });
     return buildAudit(orders, computed, settings);
+  }
+
+  async confirmLivingFund(confirm: boolean) {
+    const { data, error } = await this.db.rpc("sb_confirm_living_fund", { p_confirm: confirm });
+    if (error) return { ok: false as const, error: error.message };
+    return { ok: true as const, value: (data as string | null) ?? null };
   }
 
   async moveStage(code: string, to: Stage, reason: string, actor: Author) {

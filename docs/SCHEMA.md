@@ -129,3 +129,13 @@ Supabase 기본 메일러는 시간당 3통 제한이라 혼자 쓰기엔 충분
 - **RS-3 페이스**: `sb_balance_snapshots.total_value`(kis_bot, code null)로 연환산 페이스 "목표 연 20~30% · 지금 페이스 연 N%" 표시만.
 - **기회 횟수** `sb_signals`(규칙 신호·진입 여부·미진입 사유). 월간 신호/진입/업종 수, 유니버스 커버리지(목표 30종목·8업종), 업종 40% 초과 쏠림 경고.
 - 규칙 RS-1·RS-2·RS-3 추가(총 29개). 시드: 가짜 제안 1건, 리스크 일지 1일, 신호 3건.
+
+## 12. 7차 (2026-10-22) — `supabase/migrations/20261022_07_lessons_1021.sql` (bium-brain `swingbot_lessons_2026-10-21` 반영)
+10/21 삼성전자 KB 수동 포지션 정리(약 -100만원)에서 나온 규칙 4개.
+- FN-1 투자금은 1년 안에 안 쓸 돈만: 설정 `living_fund_confirmed_at`(null = 미확인). 사이트 '생활비 분리 확인'(세 문장 체크) → `sb_confirm_living_fund(true)`. 확인 전엔 봇 매수 관문이 막는다. 변경은 `sb_settings_history`에 actor=bium.
+- CD-1 손실 확정일 쿨다운: 설정 `loss_cooldown_trading_days`=1. 손실 확정 = 봇 계좌 포지션이 realized_pnl<0 으로 종료됐거나 EX-1 매도. `sb_last_loss_day()`, `sb_in_loss_cooldown(day)`. 사후 검증은 verify.ts(평단 아래 매도 뒤 같은 거래일 매수).
+- UV-5 인버스·숏 금지: `sb_is_inverse_short(name)` + 트리거 `sb_stocks_guard_inverse`(검토·유니버스·보유로 못 올림). 레이더 투입은 허용(기록용).
+- AL-1 세 신호 동시 경고: 가설 무효화 + 종가 ≤ 손절선(없으면 평단 -6%) + 20일선 아래 마감. 사이트가 최근 25개 종가로 계산(`ma20Info`) → 오늘 할 일 맨 위 빨간 카드 + 종목 상세 신호등.
+- 봇 매수 관문 교체: `sb_buy_blockers(code, price)` 가 막히는 이유 배열을 돌려준다(UV-1, UV-5, FN-1, CD-1, MF-1, 보유 종목 평단 아래면 EN-7). `sb_can_buy(code, price)` = 배열이 비었나. 1차의 `sb_can_buy(text)`는 보유 종목 피라미딩(EN-5·6)까지 막고 MF-1 은 안 막아서 교체했다. 비중·손익비(SZ-1·RS-1·RR-1)는 수량이 있어야 해서 봇 계산 + 사후 검증 그대로.
+- `sb_today()`에 `gates`(생활비 확인일, 쿨다운 여부, 마지막 손실일) 추가.
+- 시드: 삼성전자 KB 포지션 종료(10/21, 실현 약 -100만원, 미확인 배지), 스냅샷 10/8·10/21 추가, 가설 무효화 ① 성립 → 폐기, 단계 레이더(재설정 감시만).

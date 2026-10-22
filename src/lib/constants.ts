@@ -70,6 +70,8 @@ export const ACCOUNT_LABEL: Record<"kis_bot" | "kb_manual", string> = {
 export const SETTING_KEYS: { key: string; label: string; unit?: string; easy: string; decided_by: string; review_at: string }[] = [
   { key: "bot_started_at", label: "봇 가동일", easy: "봇이 처음 일을 시작한 날. 이날부터 '규칙 지킨 날'을 센다.", decided_by: "비움", review_at: "모의투자 시작 때" },
   { key: "bot_account_balance", label: "봇 계좌 잔고", unit: "원", easy: "봇이 쓸 수 있는 돈 전부(주식 평가액 + 예수금). 비중 계산의 분모.", decided_by: "봇이 매일 갱신", review_at: "자동" },
+  { key: "living_fund_confirmed_at", label: "FN-1 생활비 분리 확인일", easy: "이 계좌 돈이 1년 안에 쓸 돈이 아니라고 비움이 확인한 날. 비어 있으면 봇이 사지 않는다.", decided_by: "비움", review_at: "1년마다 다시 확인" },
+  { key: "loss_cooldown_trading_days", label: "CD-1 손실 후 쉬는 날", unit: "거래일", easy: "손해 보고 판 날을 포함해 이만큼은 새로 사지 않는다. 화난 채로 사는 걸 막는다.", decided_by: "비움 결정 (10/21 교훈)", review_at: "7단계 백테스트" },
   { key: "max_weight_per_stock_pct", label: "SZ-1 종목당 비중 상한", unit: "%", easy: "한 종목에 넣을 수 있는 최대 비율. 20%면 최소 5종목으로 나눠 담는다는 뜻.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
   { key: "max_weight_per_sector_pct", label: "SZ-1 업종당 비중 상한", unit: "%", easy: "같은 업종(예: 반도체)에 몰아 넣을 수 있는 최대 비율.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
   { key: "uv4_drawdown_pct", label: "UV-4 고점 대비 조정 상한", unit: "%", easy: "꼭대기에서 이만큼 넘게 떨어진 종목은 살 수 있는 목록에 못 올린다. 위에 물린 사람이 너무 많다.", decided_by: "Claude 초기값", review_at: "7단계 백테스트" },
@@ -152,11 +154,13 @@ export const CHECKLIST_ITEMS: { key: string; label: string }[] = [
 ];
 
 export const RULES: Rule[] = [
+  { rule_id: "FN-1", category: "자금", title: "투자금은 1년 안에 안 쓸 돈만", description: "봇 계좌에는 1년 안에 쓸 계획이 없는 돈만 넣는다. 카드값·수술비·생활비는 계좌 밖에 따로. 비움이 사이트에서 '생활비 분리 확인'을 누르기 전엔 봇이 사지 않는다. (10/21 교훈: 카드값 때문에 코어 VOO를 팔았다)" },
   { rule_id: "MF-1", category: "시장 필터", title: "관망이면 신규 진입 없음", description: "코스피·코스닥 200일선 방향, VKOSPI, 단일종목 레버리지 ETF 거래대금 비중으로 거래/축소/관망 판정. 관망 시 신규 진입 금지." },
   { rule_id: "MF-2", category: "시장 필터", title: "축소면 포지션 크기 절반", description: "시장 신호가 축소일 때 모든 신규 포지션 크기를 정상의 절반으로." },
   { rule_id: "UV-1", category: "유니버스", title: "유니버스 밖 종목 매수 금지", description: "봇은 '유니버스' 단계 종목만 매수할 수 있다. 사람이 승인한다." },
   { rule_id: "UV-2", category: "유니버스", title: "가설 + 무효화 조건 필수", description: "무효화 조건이 비어 있으면 유니버스 승인 불가." },
   { rule_id: "UV-3", category: "유니버스", title: "무효화 위반 시 검토 강등", description: "무효화 조건 위반 확인 → 검토 단계로 강등 → 비움 승인 후 퇴출(봇 매도)." },
+  { rule_id: "UV-5", category: "유니버스", title: "인버스·숏 금지", description: "인버스·숏 상품은 규칙이 없다. 공부·백테스트 전엔 검토 이상으로 올리지 않고 사지 않는다. (10/21 교훈: 손실 직후 인버스 복수 매매 충동)" },
   { rule_id: "UV-4", category: "유니버스", title: "제외 조건", description: "고점 대비 60% 이상 조정, 또는 같은 기간 비교 지수 대비 2배 이상 조정한 종목은 유니버스 승인 불가. 대형 지수 비중주는 코스피 대신 반도체지수·코스닥 등으로 비교." },
   { rule_id: "EN-1", category: "진입", title: "피봇 장중 돌파 + 거래량", description: "피봇(C 박스/베이스 고점) 장중 돌파 + 개장 2시간 내 누적 거래량 ≥ 50일 평균 일거래량의 50%." },
   { rule_id: "EN-2", category: "진입", title: "추격 금지", description: "피봇 대비 +2~3%를 넘으면 주문 취소. 추격 매수 금지." },
@@ -166,6 +170,7 @@ export const RULES: Rule[] = [
   { rule_id: "EN-6", category: "진입", title: "3차는 트렌드 템플레이트 대부분 충족", description: "3차 추가는 트렌드 템플레이트 8요건 대부분 충족 시." },
   { rule_id: "EN-7", category: "진입", title: "물타기 금지", description: "손실 중 추가매수 금지. 피라미딩은 위로만." },
   { rule_id: "EN-8", category: "진입", title: "주 수로 계산해 로그", description: "주문은 금액이 아니라 주 수로 계산해 주문 전 로그에 기록 (8/18 10주 오주문 재발 방지)." },
+  { rule_id: "CD-1", category: "진입", title: "손실 확정일 신규 매수 금지", description: "손절·손실 정리가 체결된 거래일에는 신규·추가 매수를 하지 않는다 (쿨다운 1거래일). 복수 매매 차단. (10/21 교훈)" },
   { rule_id: "RR-1", category: "진입", title: "손익비 2:1 이상 사전 고정", description: "매수 전 손절가·목표가를 숫자로 기록하고 손익비 (목표-진입)/(진입-손절) 가 2:1~3:1 이상이어야 한다. 미기록 시 주문 거부." },
   { rule_id: "SZ-1", category: "진입", title: "종목당·업종당 비중 상한", description: "봇 계좌 잔고 기준 종목당·업종당 최대 비중(sb_settings)을 넘는 주문은 거부." },
   { rule_id: "EX-1", category: "손절·매도", title: "손절 -6% 장중 발동", description: "진입가 -6%. 장중에 손절가 닿으면 발동." },
@@ -176,6 +181,7 @@ export const RULES: Rule[] = [
   { rule_id: "EX-6", category: "손절·매도", title: "최대 하락폭 매도 검토", description: "2단계 시작 이후 최대 일간·주간 하락폭이 나오면 실적과 무관하게 매도 검토." },
   { rule_id: "EX-7", category: "손절·매도", title: "실패 재설정", description: "손절 후에도 관심종목 유지. 원래 피봇 재돌파 + 거래량이면 재매수. 아니면 새 베이스 대기." },
   { rule_id: "EX-8", category: "손절·매도", title: "연속 손실 시 축소", description: "연속 손실이 나면 포지션 크기를 줄인다." },
+  { rule_id: "AL-1", category: "손절·매도", title: "세 신호 동시 경고", description: "가설 무효화 조건 성립 + 손절선 이탈 + 20일선 아래 종가가 동시에 켜지면 오늘 할 일 맨 위에 빨간 경고. 수동 보유도 포함(손절선이 없으면 평단 -6%). (10/20 삼성전자: 셋 다 켜졌는데 하루 더 들고 있었다)" },
   { rule_id: "RS-1", category: "리스크", title: "리스크 다이얼", description: "조심(종목 10%·거래 리스크 0.6%) / 보통(20%·1.2%) / 과감(30%·1.8%), 업종 40% 고정. 매일 장 전 판정. 하향은 즉시(시장 흐림, 연속 손절 2회, 최근 30거래 기댓값 마이너스 중 하나), 상향은 한 단계씩(시장 맑음, 누적 30거래 이상, 최근 30거래 기댓값 플러스 전부). 단계 상한 초과 주문은 위반. MF-2는 조심 단계로 통합." },
   { rule_id: "RS-2", category: "리스크", title: "평가 단위 30거래", description: "성적 리뷰·규칙 변경 근거는 종료 거래 30건 단위만. 30건마다 리포트. 월 수익률은 표시만, 변경 근거 불가." },
   { rule_id: "RS-3", category: "리스크", title: "목표 수익률로 규칙 변경 금지", description: "목표 수익률로 비중·손절·진입 조건을 바꾸지 않는다. \"목표 연 20~30% · 지금 페이스 연 N%\" 표시만." },

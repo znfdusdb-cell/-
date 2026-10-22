@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AlertLights } from "./AlertLights";
 import type { StockDetail, Settings } from "@/lib/types";
 import { nextStep, mountainStage, MOUNTAIN_LABEL, MOUNTAIN_HINT } from "@/lib/easy";
 import { universeGuard, uv4Status } from "@/lib/guards";
@@ -32,6 +33,8 @@ export function EasyDetail({ d, settings }: { d: StockDetail; settings: Settings
           {position?.is_unverified && <Badge tone="warn">숫자 미확인</Badge>}
         </h1>
       </div>
+
+      <AlertLights s={d} easy />
 
       {/* 다음에 일어나야 할 일 + 버튼 */}
       <section className="rounded-2xl border border-line bg-bg-2 p-4">

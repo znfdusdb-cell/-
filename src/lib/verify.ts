@@ -12,16 +12,21 @@
  *  SZ-1 업종당 비중 상한 초과         — 주문 시각 잔고(account_balance_at) 기준. 상한 미설정이면 판정 보류
  *  RS-1 리스크 단계 상한 초과         — 종목당 비중·거래당 리스크가 그날 단계(sb_risk_log, 없으면 settings.risk_level) 상한 초과
  *  EV-2 휴장일 주문                   — KRX 달력 기준 비거래일
+ *  CD-1 손실 확정일 쿨다운 중 매수     — 손실 매도(평단 아래 매도) 체결 뒤 같은 거래일(설정 N거래일) 안의 매수
+ *  UV-5 인버스·숏 매수                — 종목명 기준
  *  RULE rule_id 없는 주문
  * 한계: 손절선은 트레일링으로 움직이므로 EX-1 은 포지션의 최종 손절선 기준 근사치다.
  */
 import type { OrderLog, StageLog, Setup, Position, Candle, Violation, Stage, Settings, Stock, RiskLog, RiskLevel } from "./types";
 import { isTradingDay, holidayName, nextTradingDay } from "./krx-calendar";
 
+/** UV-5: 인버스·숏 상품 이름 (DB sb_is_inverse_short 와 같은 정의) */
+export const INVERSE_SHORT_RE = /(인버스|곱버스|inverse|숏|short|bear)/i;
+
 export interface VerifyContext {
   orders: OrderLog[];
   stageLog: StageLog[];
-  stocks: Pick<Stock, "code" | "stage" | "sector">[];
+  stocks: (Pick<Stock, "code" | "stage" | "sector"> & { name?: string })[];
   setups: Setup[];      // 종목별 여러 as_of 가능
   positions: Position[];
   candles: Candle[];    // 보유 종목 일봉
@@ -57,6 +62,10 @@ export function verifyOrders(ctx: VerifyContext): Violation[] {
 
   // 종목별 누적 보유 (매수 누적, 매도 차감) — 물타기·비중 판정용
   const hold = new Map<string, { qty: number; cost: number }>();
+  // CD-1: 마지막 손실 확정일과 쿨다운 끝나는 날
+  const cooldownN = numSetting(ctx.settings, "loss_cooldown_trading_days") ?? 1;
+  let lossDay: string | null = null;
+  let cooldownEnd: string | null = null;
 
   for (const o of orders) {
     if (o.source !== "bot" || o.ts.slice(0, 10) < start) continue;
@@ -70,6 +79,12 @@ export function verifyOrders(ctx: VerifyContext): Violation[] {
     else if (o.planned_qty !== o.qty) out.push({ order_id: o.id, rule_id: "EN-8", reason: `계산 수량 ${o.planned_qty}주 ≠ 주문 수량 ${o.qty}주` });
 
     if (o.side === "buy") {
+      if (cooldownEnd && day <= cooldownEnd) {
+        out.push({ order_id: o.id, rule_id: "CD-1", reason: `손실 확정일(${lossDay}) 쿨다운 중 매수` });
+      }
+      const nm = ctx.stocks.find((s) => s.code === o.code)?.name;
+      if (nm && INVERSE_SHORT_RE.test(nm)) out.push({ order_id: o.id, rule_id: "UV-5", reason: `인버스·숏 상품 매수 (${nm})` });
+
       const st = stageAt(ctx, o.code, o.ts);
       if (st !== "universe" && st !== "holding") out.push({ order_id: o.id, rule_id: "UV-1", reason: `주문 시각 단계가 '${st ?? "?"}' (유니버스 아님)` });
 
@@ -121,6 +136,12 @@ export function verifyOrders(ctx: VerifyContext): Violation[] {
       hold.set(o.code, { qty: cur.qty + o.qty, cost: cur.cost + o.qty * o.price });
     } else {
       const h = hold.get(o.code);
+      if (h && h.qty > 0 && o.price < h.cost / h.qty && cooldownN > 0) {
+        lossDay = day;
+        let end = day;
+        for (let i = 1; i < cooldownN; i++) end = nextTradingDay(end);
+        cooldownEnd = end;
+      }
       if (h) {
         const left = h.qty - o.qty;
         hold.set(o.code, left <= 0 ? { qty: 0, cost: 0 } : { qty: left, cost: (h.cost / h.qty) * left });

@@ -75,3 +75,10 @@ export async function decideProposalAction(input: { id: number; decision: "appro
   if (res.ok) { revalidatePath("/"); revalidatePath("/log"); }
   return res;
 }
+
+/** FN-1 생활비 분리 확인/취소. 확인은 두 문장을 모두 체크해야 보낸다(화면). */
+export async function confirmLivingFundAction(input: { confirm: boolean }) {
+  const res = await getRepo().confirmLivingFund(input.confirm);
+  if (res.ok) { revalidatePath("/"); revalidatePath("/log"); }
+  return res;
+}

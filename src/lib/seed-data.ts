@@ -2,8 +2,9 @@
  * 시드 데이터. Supabase 연결이 없을 때 사이트가 그대로 쓰고,
  * scripts/seed.ts 가 같은 데이터를 Supabase에 넣는다. (단일 출처)
  *
- * 삼성전자는 KB 수동 보유(봇 대상 아님). 체결 이력은 재구성 불가라 화면으로 확인된 잔고 스냅샷만 넣는다
- * (swingbot_erratum_2_2026-10-06). 9/22 이후 미확인 → 비움이 실제 숫자를 주면 교체. 일봉은 가짜다.
+ * 삼성전자는 KB 수동 보유였다(봇 대상 아님). 체결 이력은 재구성 불가라 화면으로 확인된 잔고 스냅샷만 넣는다
+ * (swingbot_erratum_2_2026-10-06). 2026-10-21 전량 정리(swingbot_lessons_2026-10-21) → 포지션 종료, 가설 폐기, 레이더로.
+ * 일봉은 가짜다.
  * 나머지 4종목은 완전히 가짜(이름 앞에 [가짜]).
  */
 import type {
@@ -90,7 +91,7 @@ const score = (items: CheckItem[]) => items.filter((i) => i.pass).length;
 
 // ---------- 종목 ----------
 export const SEED_STOCKS: Stock[] = [
-  { code: "005930", name: "삼성전자", market: "KOSPI", sector: "반도체", stage: "review", stage_changed_at: "2026-10-06T09:00:00+09:00", stage_reason: "KB 계좌 수동 보유 중. 봇 계좌 파이프라인은 검토부터 시작 (가설 작성 완료, 유니버스 승인 대기)", is_seed: false },
+  { code: "005930", name: "삼성전자", market: "KOSPI", sector: "반도체", stage: "radar", stage_changed_at: "2026-10-22T13:00:00+09:00", stage_reason: "10/21 KB 수동 포지션 전량 정리(약 -100만원), 가설 무효화 ① 성립 → 가설 폐기. 관심만 유지(EX-7): 문턱 288,000 재돌파 + 거래량이면 새 가설부터. 유니버스는 중소형 실적 성장주 중심으로 전환(비움 결정)", is_seed: false },
   { code: "999901", name: "[가짜] 알파로보틱스", market: "KOSDAQ", sector: "로봇", stage: "radar", stage_changed_at: "2026-10-05T07:10:00+09:00", stage_reason: "브레인 후보 수집: 상대강도 상위", is_seed: true },
   { code: "999902", name: "[가짜] 베타바이오", market: "KOSDAQ", sector: "바이오", stage: "review", stage_changed_at: "2026-10-02T09:30:00+09:00", stage_reason: "가설 작성 중", is_seed: true },
   { code: "999903", name: "[가짜] 감마조선", market: "KOSPI", sector: "조선", stage: "universe", stage_changed_at: "2026-09-29T20:00:00+09:00", stage_reason: "비움 승인", is_seed: true },
@@ -99,6 +100,7 @@ export const SEED_STOCKS: Stock[] = [
 
 export const SEED_STAGE_LOG: StageLog[] = [
   { id: 1, code: "005930", from_stage: null, to_stage: "review", reason: "시드: KB 수동 보유 중, 가설 초안(claude_code) 비움 미승인. 봇 계좌 기준으론 아직 유니버스 아님", actor: "claude_code", created_at: "2026-10-06T09:00:00+09:00" },
+  { id: 2, code: "005930", from_stage: "review", to_stage: "radar", reason: "기록: 10/21 비움이 KB 24주 전량 정리(손절선·무효화 ①·20일선 이탈 동시 성립). 가설 폐기, 재설정 감시만", actor: "claude_code", created_at: "2026-10-22T13:00:00+09:00" },
   { id: 5, code: "999901", from_stage: null, to_stage: "radar", reason: "상대강도 상위 + 거래량 축소 감지", actor: "brain", created_at: "2026-10-05T07:10:00+09:00" },
   { id: 6, code: "999902", from_stage: null, to_stage: "radar", reason: "실적 서프라이즈 2분기 연속", actor: "brain", created_at: "2026-09-28T07:10:00+09:00" },
   { id: 7, code: "999902", from_stage: "radar", to_stage: "review", reason: "가설 작성 시작", actor: "bium", created_at: "2026-10-02T09:30:00+09:00" },
@@ -114,16 +116,16 @@ export const SEED_STAGE_LOG: StageLog[] = [
 // ---------- 가설 ----------
 export const SEED_THESES: Thesis[] = [
   {
-    id: 1, code: "005930", author: "claude_code", status: "draft",
+    id: 1, code: "005930", author: "claude_code", status: "discarded",
     hypothesis: "3분기 컨센서스 사상 최대(FnGuide 매출 200조7657억, 영업이익 106조9435억, 2026-10-06 보도). 최근 원화 강세로 전망치 소폭 하향 분석 있음. 가격은 3C 베이스 진행 중(A 380,000→189,200, B 288,000 회복, C 후보 아직 넓음). C 박스 고점 288,000 돌파 시 2단계 재개가 가설. 10/8 잠정실적 결과 확인 후 승인.",
     hypothesis_plain: "회사 실적은 역대 최고로 예상돼요. 가격은 큰 폭락 뒤 절반쯤 되찾고 지금 숨 고르는 중이에요. 288,000원 문턱을 거래량과 함께 넘으면 다시 오르막이 시작된다고 보는 거예요. 10월 8일 실적 발표를 보고 나서 승인하세요.",
     invalidation_conditions: [
-      { text: "288,000 돌파 실패 후 C 박스 하단(250,000) 종가 이탈", violated: false, note: null, plain: "문턱을 못 넘고 250,000원 아래에서 하루를 마치면 틀린 거예요." },
+      { text: "288,000 돌파 실패 후 C 박스 하단(250,000) 종가 이탈", violated: true, note: "10/20 종가 약 211,500 (10/21 비움 화면 확인). 250,000 아래 마감", plain: "문턱을 못 넘고 250,000원 아래에서 하루를 마치면 틀린 거예요." },
       { text: "HBM4 주요 고객 인증 지연 공식 발표", violated: false, note: null, plain: "핵심 제품(HBM4)이 큰 고객 검사를 통과 못 했다고 회사가 공식 발표하면 틀린 거예요." },
-      { text: "3분기 영업이익이 컨센서스 10% 이상 하회 (FnGuide 106조9435억 기준 약 96.2조 이하). 10/8 잠정실적으로 검증", violated: false, note: null, plain: "10월 8일 발표한 영업이익이 96조 2천억 원보다 적으면 틀린 거예요." },
+      { text: "3분기 영업이익이 컨센서스 10% 이상 하회 (FnGuide 106조9435억 기준 약 96.2조 이하). 10/8 잠정실적으로 검증", violated: false, note: "10/8 잠정 영업이익 107.4조 → 미위반 (매출 195조는 컨센서스 미달)", plain: "10월 8일 발표한 영업이익이 96조 2천억 원보다 적으면 틀린 거예요." },
       { text: "필라델피아 반도체지수 대비 상대강도 3개월 연속 하위", violated: false, note: null, plain: "미국 반도체 지수보다 석 달 내리 못 오르면 틀린 거예요." },
     ],
-    created_at: "2026-10-06T09:00:00+09:00", updated_at: "2026-10-06T09:00:00+09:00",
+    created_at: "2026-10-06T09:00:00+09:00", updated_at: "2026-10-22T13:00:00+09:00",
   },
   {
     id: 2, code: "999902", author: "claude_code", status: "draft",
@@ -220,7 +222,7 @@ export const SEED_SETUPS: Setup[] = [
 
 // ---------- 포지션 ----------
 export const SEED_POSITIONS: Position[] = [
-  { id: 1, code: "005930", account: "kb_manual", qty: 13, avg_price: 257575, stop_price: null, state: "manual", entry_rule_id: null, is_unverified: true, note: "KB 계좌 수동 보유. 봇 상태 머신·손절 자동화 대상 아님. 9/22 10:41 확인값(13주, 평단 257,575). 이후 변동 미확인 — 비움이 현재 수량·평단을 주면 교체", initial_stop_price: null, exit_price: null, realized_pnl: null, r_multiple: null, opened_at: "2026-08-13T09:00:00+09:00", closed_at: null, updated_at: "2026-09-22T10:41:00+09:00" },
+  { id: 1, code: "005930", account: "kb_manual", qty: 0, avg_price: 255300, stop_price: null, state: "closed", entry_rule_id: null, is_unverified: true, note: "KB 계좌 수동 보유였음(봇 대상 아님). 정리 직전 24주, 평단 약 255,300. 10/21 오전(10:48 이전, 정확한 시각·체결가 미확인) 전량 정리, 실현 손실 약 -100만원(비움 보고). 실패 원인: 손실 중 추가매수(물타기), 생활비 미분리 → FN-1·CD-1 신설", initial_stop_price: null, exit_price: null, realized_pnl: -1000000, r_multiple: null, opened_at: "2026-08-13T09:00:00+09:00", closed_at: "2026-10-21T10:48:00+09:00", updated_at: "2026-10-22T13:00:00+09:00" },
   { id: 2, code: "999904", account: "kis_bot", qty: 0, avg_price: 41200, stop_price: 36000, state: "closed", entry_rule_id: "EN-3", is_unverified: false, note: "[가짜]", initial_stop_price: 38700, exit_price: 38600, realized_pnl: -26000, r_multiple: -1.04, opened_at: "2026-09-15T09:40:00+09:00", closed_at: "2026-09-29T09:02:00+09:00", updated_at: "2026-09-29T09:02:00+09:00" },
 ];
 
@@ -230,7 +232,10 @@ export const SEED_SNAPSHOTS: BalanceSnapshot[] = [
   { id: 2, account: "kb_manual", code: "005930", as_of: "2026-08-18T15:14:00+09:00", qty: 10, avg_price: 268400, market_price: 267500, cash: null, total_value: null, note: "10주 오주문 (계획 1주). 매입금액 약 2,684,190원 → EN-8 신설 계기" },
   { id: 3, account: "kb_manual", code: "005930", as_of: "2026-08-26T09:43:00+09:00", qty: 10, avg_price: 259609, market_price: null, cash: null, total_value: null, note: "8/18 이후 일부 매도·재매수 추정, 미확인" },
   { id: 4, account: "kb_manual", code: "005930", as_of: "2026-09-04T10:11:00+09:00", qty: 13, avg_price: 257575, market_price: null, cash: 2900000, total_value: null, note: "3주 추가: 국장 총액 증가(예수금 168만→290만)에 따른 수동 비중 조정. 정찰병 규칙 매수 아님" },
-  { id: 5, account: "kb_manual", code: "005930", as_of: "2026-09-22T10:41:00+09:00", qty: 13, avg_price: 257575, market_price: 279250, cash: null, total_value: null, note: "마지막 확인. 이후 미확인" },
+  { id: 5, account: "kb_manual", code: "005930", as_of: "2026-09-22T10:41:00+09:00", qty: 13, avg_price: 257575, market_price: 279250, cash: null, total_value: null, note: "9/22 확인" },
+  { id: 8, account: "kb_manual", code: "005930", as_of: "2026-10-08T15:30:00+09:00", qty: 13, avg_price: 263100, market_price: null, cash: null, total_value: null, note: "10/8 확인: 13주, 평단 약 263,100. 3분기 잠정실적 발표일 하락" },
+  { id: 9, account: "kb_manual", code: "005930", as_of: "2026-10-21T09:29:00+09:00", qty: 24, avg_price: 255300, market_price: 224000, cash: null, total_value: null, note: "10/8~10/20 하락 중 11주 추가(평균 약 246,000) = 물타기(EN-7 위반에 해당). 평가손익 -764,155원(-12.46%). 10/20 종가 약 211,500에서 손절선·무효화 ①·20일선 이탈 동시 성립" },
+  { id: 10, account: "kb_manual", code: "005930", as_of: "2026-10-21T10:48:00+09:00", qty: 0, avg_price: null, market_price: null, cash: null, total_value: null, note: "전량 정리(10:48 이전). 실현 손실 약 -100만원(비움 보고). 체결가 미확인" },
   { id: 6, account: "kis_bot", code: null, as_of: "2026-09-15T08:30:00+09:00", qty: null, avg_price: null, market_price: null, cash: 6200000, total_value: 6200000, note: "[가짜] 봇 계좌 시작 잔고" },
   { id: 7, account: "kis_bot", code: null, as_of: "2026-10-06T15:40:00+09:00", qty: null, avg_price: null, market_price: null, cash: 6174000, total_value: 6174000, note: "[가짜] 종가 기준" },
 ];
@@ -273,6 +278,8 @@ export const SEED_SETTINGS: Settings = {
   risk_min_trades_for_bold: "30", risk_consecutive_loss_down: "2",
   target_return_pct_min: "20", target_return_pct_max: "30",
   universe_target_stocks: "30", universe_target_sectors: "8", universe_sector_warn_pct: "40",
+  living_fund_confirmed_at: null,     // FN-1: 비움이 사이트에서 확인하기 전엔 봇 매수 불가
+  loss_cooldown_trading_days: "1",    // CD-1: 손실 확정일 당일 신규 매수 금지
   regime_vkospi_reduce: null,
   regime_vkospi_wait: null,
   regime_lev_etf_share_reduce: null,
@@ -281,7 +288,7 @@ export const SEED_SETTINGS: Settings = {
 
 // ---------- 이벤트 ----------
 export const SEED_EVENTS: MarketEvent[] = [
-  { id: 1, code: "005930", event_type: "earnings", title: "3분기 잠정실적 발표 (10/8 목)", event_date: "2026-10-08", note: "FnGuide 컨센서스 매출 200조7657억·영업이익 106조9435억. EV-1: 발표 전 축소 여부 비움 승인", source: "news:파이낸셜포스트·국제뉴스 2026-10-06" },
+  { id: 1, code: "005930", event_type: "earnings", title: "3분기 잠정실적 발표 (10/8 목)", event_date: "2026-10-08", note: "FnGuide 컨센서스 매출 200조7657억·영업이익 106조9435억. 결과: 영업이익 107.4조(컨센서스 상회), 매출 195조(미달), 발표일 하락", source: "news:파이낸셜포스트·국제뉴스 2026-10-06" },
   { id: 2, code: null, event_type: "macro", title: "미국 CPI 발표", event_date: "2026-10-14", note: null, source: "seed" },
   { id: 3, code: null, event_type: "holiday", title: "한글날 휴장", event_date: "2026-10-09", note: "하루 휴장. 손절선 하루 미작동", source: "krx_calendar" },
   { id: 4, code: "999903", event_type: "earnings", title: "[가짜] 3분기 실적", event_date: "2026-10-28", note: null, source: "seed" },

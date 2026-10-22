@@ -34,6 +34,9 @@ VPS `.env`에 `SWINGBOT_SUPABASE_URL`, `SWINGBOT_SUPABASE_SERVICE_KEY`(bium4581 
 
 제안은 `sb_proposals`에 `pending`으로 들어가고 사이트 '오늘 할 일' 맨 위에 뜬다. 비움이 승인하면 `sb_approve_proposal`이 `apply_at`=다음 거래일 08:30 KST를 찍고, 봇(또는 크론)이 08:30 이후 `sb_apply_due_proposals()`를 호출해 설정 제안을 적용한다. 변경은 `sb_settings_history`에 남는다. 규칙·단계 제안은 승인 후 사람이 처리하고 `applied`로 표시.
 
+## 봇 매수 관문 (7차, 봇용. MCP 도구 아님)
+봇은 주문 직전 `sb_buy_blockers(p_code, p_price)`를 호출해 빈 배열일 때만 주문한다. 막히는 이유: UV-1 단계, UV-5 인버스·숏, FN-1 생활비 분리 미확인, CD-1 손실 확정일 쿨다운, MF-1 시장 폭풍, EN-7 보유 종목 평단 아래 추가 매수. `sb_today`의 `gates`로 대화에서도 확인 가능.
+
 ## 금지
 주문 관련 도구는 만들지 않는다. `sb_orders_log`·`sb_positions`에 쓰는 함수는 없다. 대화로는 어떤 경로로도 주문이 나가지 않는다. 설정 적용은 장중 즉시 금지(08:30 함수만).
 

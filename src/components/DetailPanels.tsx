@@ -3,6 +3,7 @@ import { SETUP_TYPE_LABEL, THESIS_STATUS_LABEL, POSITION_STATE_LABEL, STAGE_LABE
 import { upcomingClosures, KRX_CALENDAR_UPDATED, KRX_CALENDAR_COVERS_UNTIL } from "@/lib/krx-calendar";
 import { fmtNum, fmtPct, footprint, fmtDate, fmtDateTime, pctChange, udClass, daysBetween, todayKST } from "@/lib/format";
 import { Badge } from "./StockCard";
+import { LivingFundConfirm } from "./LivingFundConfirm";
 
 export function Section({ title, right, children }: { title: string; right?: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -316,6 +317,7 @@ export function ClosuresPanel({ from, days = 45, longTradingDays = 2 }: { from: 
 export function SettingsPanel({ settings }: { settings: Settings }) {
   return (
     <Section title="설정값 (sb_settings)" right={<span className="text-[11px] text-fg-3">백테스트 근거 없이 변경 금지</span>}>
+      <div className="mb-3"><LivingFundConfirm confirmedAt={settings.living_fund_confirmed_at ?? null} /></div>
       <ul className="space-y-2 text-xs">
         {SETTING_KEYS.map((k) => {
           const v = settings[k.key];

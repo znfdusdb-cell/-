@@ -196,6 +196,10 @@ export interface StockSummary {
   position: Position | null;
   last_close: number | null;
   prev_close: number | null;
+  /** 최근 종가 기준 20일선. 일봉 20개 미만이면 null */
+  ma20?: number | null;
+  /** 최근 연속으로 그날의 20일선 아래에서 마감한 날 수 (최대 3, 계산 불가면 null) */
+  below_ma20_days?: number | null;
 }
 
 export interface StockDetail extends StockSummary {
@@ -231,7 +235,7 @@ export interface Violation {
 export type ViewMode = "easy" | "detail";
 
 export interface Todo {
-  kind: "approve_universe" | "approve_exit" | "approve_thesis" | "event_reduce" | "proposal";
+  kind: "red_alert" | "living_fund" | "approve_universe" | "approve_exit" | "approve_thesis" | "event_reduce" | "proposal";
   code: string;
   name: string;
   title: string;

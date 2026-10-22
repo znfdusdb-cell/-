@@ -52,3 +52,20 @@ export function candleStats(candles: Candle[], window = 252): CandleStats | null
 }
 
 export const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * 20일선과 '20일선 아래 마감' 연속 일수. closesAsc = 날짜 오름차순 종가.
+ * 진입 근거 붕괴 기준은 3일 연속(EN 맥락), AL-1 경고는 1일부터 켠다.
+ */
+export function ma20Info(closesAsc: number[], maxDays = 3): { ma20: number | null; below_days: number | null } {
+  const n = closesAsc.length;
+  if (n < 20) return { ma20: null, below_days: null };
+  const maAt = (end: number) => closesAsc.slice(end - 19, end + 1).reduce((a, b) => a + b, 0) / 20;
+  const ma20 = Math.round(maAt(n - 1));
+  let below = 0;
+  for (let i = n - 1; i >= 19 && below < maxDays; i--) {
+    if (closesAsc[i] < maAt(i)) below++;
+    else break;
+  }
+  return { ma20, below_days: below };
+}

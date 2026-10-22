@@ -68,7 +68,7 @@ export default async function LogPage() {
             : `${audit.violations.length > 0 && audit.since !== audit.settings.bot_started_at ? `마지막 위반 ${fmtDate(audit.since)}` : `봇 가동일 ${fmtDate(audit.settings.bot_started_at)}`} 기준 · 봇 주문 ${audit.botOrders}건 · 위반 ${audit.violations.length}건`}
         </p>
         <p className="mt-1 text-[11px] text-fg-3">
-          위반 = 주문 기록을 규칙과 대조한 검증 함수 판정(UV-1·EN-2·EN-7·EN-8·RR-1·SZ-1·EX-1·EV-2 휴장일·근거 없음) + 봇 자진 신고. 수동 매매와 봇 가동일 이전 주문은 기록만 하고 제외. 소액 실전 통과 기준: 3개월 0건.
+          위반 = 주문 기록을 규칙과 대조한 검증 함수 판정(UV-1·UV-5·EN-2·EN-7·EN-8·CD-1·RR-1·SZ-1·RS-1·EX-1·EV-2 휴장일·근거 없음) + 봇 자진 신고. 수동 매매와 봇 가동일 이전 주문은 기록만 하고 제외. 소액 실전 통과 기준: 3개월 0건.
         </p>
       </section>
 

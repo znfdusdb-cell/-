@@ -31,7 +31,7 @@ npm run dev        # 환경변수 없으면 내장 시드 데이터로 뜬다 (�
 ## Supabase 연결 (비움 승인 후)
 
 1. `docs/SCHEMA.md` 읽고 승인.
-2. Supabase SQL Editor에서 `supabase/migrations/` 파일을 번호 순서대로 실행 (01 init → 02 → 03 → 04 → 05 → 06). 전부 추가만이라 다시 실행해도 안전.
+2. Supabase SQL Editor에서 `supabase/migrations/` 파일을 번호 순서대로 실행 (01 init → 02 → 03 → 04 → 05 → 06 → 07). 전부 추가만이라 다시 실행해도 안전.
 3. 같은 곳에서 `supabase/seed.sql` 실행 (또는 `.env.local` 채우고 `npx tsx scripts/seed.ts`).
 4. `.env.example`을 `.env.local`로 복사해 값 채움. 배지가 'DB'로 바뀐다.
 

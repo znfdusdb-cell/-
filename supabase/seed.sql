@@ -9,11 +9,13 @@ delete from sb_proposals where reason like '[가짜]%';
 delete from sb_balance_snapshots where note like '[가짜]%';
 
 insert into sb_rules (rule_id,category,title,description) values
+('FN-1','자금','투자금은 1년 안에 안 쓸 돈만','봇 계좌에는 1년 안에 쓸 계획이 없는 돈만 넣는다. 카드값·수술비·생활비는 계좌 밖에 따로. 비움이 사이트에서 ''생활비 분리 확인''을 누르기 전엔 봇이 사지 않는다. (10/21 교훈: 카드값 때문에 코어 VOO를 팔았다)'),
 ('MF-1','시장 필터','관망이면 신규 진입 없음','코스피·코스닥 200일선 방향, VKOSPI, 단일종목 레버리지 ETF 거래대금 비중으로 거래/축소/관망 판정. 관망 시 신규 진입 금지.'),
 ('MF-2','시장 필터','축소면 포지션 크기 절반','시장 신호가 축소일 때 모든 신규 포지션 크기를 정상의 절반으로.'),
 ('UV-1','유니버스','유니버스 밖 종목 매수 금지','봇은 ''유니버스'' 단계 종목만 매수할 수 있다. 사람이 승인한다.'),
 ('UV-2','유니버스','가설 + 무효화 조건 필수','무효화 조건이 비어 있으면 유니버스 승인 불가.'),
 ('UV-3','유니버스','무효화 위반 시 검토 강등','무효화 조건 위반 확인 → 검토 단계로 강등 → 비움 승인 후 퇴출(봇 매도).'),
+('UV-5','유니버스','인버스·숏 금지','인버스·숏 상품은 규칙이 없다. 공부·백테스트 전엔 검토 이상으로 올리지 않고 사지 않는다. (10/21 교훈: 손실 직후 인버스 복수 매매 충동)'),
 ('UV-4','유니버스','제외 조건','고점 대비 60% 이상 조정, 또는 같은 기간 비교 지수 대비 2배 이상 조정한 종목은 유니버스 승인 불가. 대형 지수 비중주는 코스피 대신 반도체지수·코스닥 등으로 비교.'),
 ('EN-1','진입','피봇 장중 돌파 + 거래량','피봇(C 박스/베이스 고점) 장중 돌파 + 개장 2시간 내 누적 거래량 ≥ 50일 평균 일거래량의 50%.'),
 ('EN-2','진입','추격 금지','피봇 대비 +2~3%를 넘으면 주문 취소. 추격 매수 금지.'),
@@ -23,6 +25,7 @@ insert into sb_rules (rule_id,category,title,description) values
 ('EN-6','진입','3차는 트렌드 템플레이트 대부분 충족','3차 추가는 트렌드 템플레이트 8요건 대부분 충족 시.'),
 ('EN-7','진입','물타기 금지','손실 중 추가매수 금지. 피라미딩은 위로만.'),
 ('EN-8','진입','주 수로 계산해 로그','주문은 금액이 아니라 주 수로 계산해 주문 전 로그에 기록 (8/18 10주 오주문 재발 방지).'),
+('CD-1','진입','손실 확정일 신규 매수 금지','손절·손실 정리가 체결된 거래일에는 신규·추가 매수를 하지 않는다 (쿨다운 1거래일). 복수 매매 차단. (10/21 교훈)'),
 ('RR-1','진입','손익비 2:1 이상 사전 고정','매수 전 손절가·목표가를 숫자로 기록하고 손익비 (목표-진입)/(진입-손절) 가 2:1~3:1 이상이어야 한다. 미기록 시 주문 거부.'),
 ('SZ-1','진입','종목당·업종당 비중 상한','봇 계좌 잔고 기준 종목당·업종당 최대 비중(sb_settings)을 넘는 주문은 거부.'),
 ('EX-1','손절·매도','손절 -6% 장중 발동','진입가 -6%. 장중에 손절가 닿으면 발동.'),
@@ -33,6 +36,7 @@ insert into sb_rules (rule_id,category,title,description) values
 ('EX-6','손절·매도','최대 하락폭 매도 검토','2단계 시작 이후 최대 일간·주간 하락폭이 나오면 실적과 무관하게 매도 검토.'),
 ('EX-7','손절·매도','실패 재설정','손절 후에도 관심종목 유지. 원래 피봇 재돌파 + 거래량이면 재매수. 아니면 새 베이스 대기.'),
 ('EX-8','손절·매도','연속 손실 시 축소','연속 손실이 나면 포지션 크기를 줄인다.'),
+('AL-1','손절·매도','세 신호 동시 경고','가설 무효화 조건 성립 + 손절선 이탈 + 20일선 아래 종가가 동시에 켜지면 오늘 할 일 맨 위에 빨간 경고. 수동 보유도 포함(손절선이 없으면 평단 -6%). (10/20 삼성전자: 셋 다 켜졌는데 하루 더 들고 있었다)'),
 ('RS-1','리스크','리스크 다이얼','조심(종목 10%·거래 리스크 0.6%) / 보통(20%·1.2%) / 과감(30%·1.8%), 업종 40% 고정. 매일 장 전 판정. 하향은 즉시(시장 흐림, 연속 손절 2회, 최근 30거래 기댓값 마이너스 중 하나), 상향은 한 단계씩(시장 맑음, 누적 30거래 이상, 최근 30거래 기댓값 플러스 전부). 단계 상한 초과 주문은 위반. MF-2는 조심 단계로 통합.'),
 ('RS-2','리스크','평가 단위 30거래','성적 리뷰·규칙 변경 근거는 종료 거래 30건 단위만. 30건마다 리포트. 월 수익률은 표시만, 변경 근거 불가.'),
 ('RS-3','리스크','목표 수익률로 규칙 변경 금지','목표 수익률로 비중·손절·진입 조건을 바꾸지 않는다. "목표 연 20~30% · 지금 페이스 연 N%" 표시만.'),
@@ -40,7 +44,7 @@ insert into sb_rules (rule_id,category,title,description) values
 ('EV-2','이벤트','장기 휴장 전 알림','손절선이 며칠간 작동 못 하는 장기 휴장 전 알림. 갭하락 시 시초가 체결을 전제로 크기 결정.') on conflict (rule_id) do update set category=excluded.category, title=excluded.title, description=excluded.description;
 
 insert into sb_stocks (code,name,market,sector,stage,stage_changed_at,stage_reason,is_seed) values
-('005930','삼성전자','KOSPI','반도체','review','2026-10-06T09:00:00+09:00','KB 계좌 수동 보유 중. 봇 계좌 파이프라인은 검토부터 시작 (가설 작성 완료, 유니버스 승인 대기)',false),
+('005930','삼성전자','KOSPI','반도체','radar','2026-10-22T13:00:00+09:00','10/21 KB 수동 포지션 전량 정리(약 -100만원), 가설 무효화 ① 성립 → 가설 폐기. 관심만 유지(EX-7): 문턱 288,000 재돌파 + 거래량이면 새 가설부터. 유니버스는 중소형 실적 성장주 중심으로 전환(비움 결정)',false),
 ('999901','[가짜] 알파로보틱스','KOSDAQ','로봇','radar','2026-10-05T07:10:00+09:00','브레인 후보 수집: 상대강도 상위',true),
 ('999902','[가짜] 베타바이오','KOSDAQ','바이오','review','2026-10-02T09:30:00+09:00','가설 작성 중',true),
 ('999903','[가짜] 감마조선','KOSPI','조선','universe','2026-09-29T20:00:00+09:00','비움 승인',true),
@@ -48,6 +52,7 @@ insert into sb_stocks (code,name,market,sector,stage,stage_changed_at,stage_reas
 
 insert into sb_stage_log (code,from_stage,to_stage,reason,actor,created_at) values
 ('005930',null,'review','시드: KB 수동 보유 중, 가설 초안(claude_code) 비움 미승인. 봇 계좌 기준으론 아직 유니버스 아님','claude_code','2026-10-06T09:00:00+09:00'),
+('005930','review','radar','기록: 10/21 비움이 KB 24주 전량 정리(손절선·무효화 ①·20일선 이탈 동시 성립). 가설 폐기, 재설정 감시만','claude_code','2026-10-22T13:00:00+09:00'),
 ('999901',null,'radar','상대강도 상위 + 거래량 축소 감지','brain','2026-10-05T07:10:00+09:00'),
 ('999902',null,'radar','실적 서프라이즈 2분기 연속','brain','2026-09-28T07:10:00+09:00'),
 ('999902','radar','review','가설 작성 시작','bium','2026-10-02T09:30:00+09:00'),
@@ -60,7 +65,7 @@ insert into sb_stage_log (code,from_stage,to_stage,reason,actor,created_at) valu
 ('999904','review','exited','무효화 조건 위반 확인 후 퇴출 승인','bium','2026-09-29T15:40:00+09:00');
 
 insert into sb_theses (code,author,status,hypothesis,hypothesis_plain,invalidation_conditions,created_at,updated_at) values
-('005930','claude_code','draft','3분기 컨센서스 사상 최대(FnGuide 매출 200조7657억, 영업이익 106조9435억, 2026-10-06 보도). 최근 원화 강세로 전망치 소폭 하향 분석 있음. 가격은 3C 베이스 진행 중(A 380,000→189,200, B 288,000 회복, C 후보 아직 넓음). C 박스 고점 288,000 돌파 시 2단계 재개가 가설. 10/8 잠정실적 결과 확인 후 승인.','회사 실적은 역대 최고로 예상돼요. 가격은 큰 폭락 뒤 절반쯤 되찾고 지금 숨 고르는 중이에요. 288,000원 문턱을 거래량과 함께 넘으면 다시 오르막이 시작된다고 보는 거예요. 10월 8일 실적 발표를 보고 나서 승인하세요.','[{"text":"288,000 돌파 실패 후 C 박스 하단(250,000) 종가 이탈","violated":false,"note":null,"plain":"문턱을 못 넘고 250,000원 아래에서 하루를 마치면 틀린 거예요."},{"text":"HBM4 주요 고객 인증 지연 공식 발표","violated":false,"note":null,"plain":"핵심 제품(HBM4)이 큰 고객 검사를 통과 못 했다고 회사가 공식 발표하면 틀린 거예요."},{"text":"3분기 영업이익이 컨센서스 10% 이상 하회 (FnGuide 106조9435억 기준 약 96.2조 이하). 10/8 잠정실적으로 검증","violated":false,"note":null,"plain":"10월 8일 발표한 영업이익이 96조 2천억 원보다 적으면 틀린 거예요."},{"text":"필라델피아 반도체지수 대비 상대강도 3개월 연속 하위","violated":false,"note":null,"plain":"미국 반도체 지수보다 석 달 내리 못 오르면 틀린 거예요."}]'::jsonb,'2026-10-06T09:00:00+09:00','2026-10-06T09:00:00+09:00'),
+('005930','claude_code','discarded','3분기 컨센서스 사상 최대(FnGuide 매출 200조7657억, 영업이익 106조9435억, 2026-10-06 보도). 최근 원화 강세로 전망치 소폭 하향 분석 있음. 가격은 3C 베이스 진행 중(A 380,000→189,200, B 288,000 회복, C 후보 아직 넓음). C 박스 고점 288,000 돌파 시 2단계 재개가 가설. 10/8 잠정실적 결과 확인 후 승인.','회사 실적은 역대 최고로 예상돼요. 가격은 큰 폭락 뒤 절반쯤 되찾고 지금 숨 고르는 중이에요. 288,000원 문턱을 거래량과 함께 넘으면 다시 오르막이 시작된다고 보는 거예요. 10월 8일 실적 발표를 보고 나서 승인하세요.','[{"text":"288,000 돌파 실패 후 C 박스 하단(250,000) 종가 이탈","violated":true,"note":"10/20 종가 약 211,500 (10/21 비움 화면 확인). 250,000 아래 마감","plain":"문턱을 못 넘고 250,000원 아래에서 하루를 마치면 틀린 거예요."},{"text":"HBM4 주요 고객 인증 지연 공식 발표","violated":false,"note":null,"plain":"핵심 제품(HBM4)이 큰 고객 검사를 통과 못 했다고 회사가 공식 발표하면 틀린 거예요."},{"text":"3분기 영업이익이 컨센서스 10% 이상 하회 (FnGuide 106조9435억 기준 약 96.2조 이하). 10/8 잠정실적으로 검증","violated":false,"note":"10/8 잠정 영업이익 107.4조 → 미위반 (매출 195조는 컨센서스 미달)","plain":"10월 8일 발표한 영업이익이 96조 2천억 원보다 적으면 틀린 거예요."},{"text":"필라델피아 반도체지수 대비 상대강도 3개월 연속 하위","violated":false,"note":null,"plain":"미국 반도체 지수보다 석 달 내리 못 오르면 틀린 거예요."}]'::jsonb,'2026-10-06T09:00:00+09:00','2026-10-22T13:00:00+09:00'),
 ('999902','claude_code','draft','[가짜] 신약 3상 결과 발표 전 기관 매집. 2분기 연속 컨센서스 상회.',null,'[]'::jsonb,'2026-10-02T09:30:00+09:00','2026-10-02T09:30:00+09:00'),
 ('999903','claude_code','valid','[가짜] LNG선 수주 잔고 3년치 + 신조선가 상승. 4~7주 플랫 베이스 고점 돌파 대기. (가짜 카드라 ''유효'' 상태로 둠)','[가짜] 배 주문이 3년치 밀려 있고 배값도 오르고 있어요. 평평하게 쉬는 곳의 윗가격을 넘으면 사요.','[{"text":"신조선가 지수 2개월 연속 하락","violated":false,"note":null},{"text":"베이스 하단(-12%) 종가 이탈","violated":false,"note":null}]'::jsonb,'2026-09-29T20:00:00+09:00','2026-09-29T20:00:00+09:00'),
 ('999904','claude_code','suspect','[가짜] 중동 리스크로 유가 90달러 이상 유지 시 정제 마진 확대.','[가짜] 기름값이 비싸게 유지되면 돈을 더 번다는 가설이었어요.','[{"text":"WTI 70달러 하회","violated":true,"note":"9/24 종가 68.4달러"},{"text":"정제 마진 5달러 이하","violated":false,"note":null}]'::jsonb,'2026-09-12T20:00:00+09:00','2026-09-24T07:10:00+09:00');
@@ -73,7 +78,7 @@ insert into sb_setups (code,as_of,setup_type,footprint_weeks,max_contraction_pct
 ('999904','2026-10-06','none',14,22,11,2,null,null,null,null,0,'[{"key":"tt1","label":"현재가 > 150일선·200일선","pass":false,"value":null},{"key":"tt2","label":"150일선 > 200일선","pass":true,"value":null},{"key":"tt3","label":"200일선 1개월 이상 상승 (권장 4~5개월)","pass":true,"value":null},{"key":"tt4","label":"50일선 > 150일선 > 200일선","pass":false,"value":null},{"key":"tt5","label":"현재가 > 50일선","pass":false,"value":null},{"key":"tt6","label":"52주 신저가 대비 +25~30% 이상","pass":false,"value":"데이터 부족 (실제 일봉 0거래일 / 252 필요)","pending":true},{"key":"tt7","label":"52주 신고가 25% 이내","pass":false,"value":"데이터 부족 (실제 일봉 0거래일 / 252 필요)","pending":true},{"key":"tt8","label":"상대강도 상위","pass":false,"value":null}]'::jsonb,2,'[{"key":"c1","label":"큰 흐름이 2단계(상승 추세)다","pass":false},{"key":"c2","label":"상승 중 베이스(조정·횡보 구간)가 있다","pass":true},{"key":"c3","label":"흔들림이 갈수록 작아졌고 마지막 조정이 10% 이내다","pass":false},{"key":"c4","label":"베이스 동안 거래량이 줄었다","pass":false},{"key":"c5","label":"고점 대비 조정이 60% 미만이다","pass":true},{"key":"c6","label":"피봇을 거래량 급증과 함께 돌파했다","pass":false},{"key":"c7","label":"피봇 대비 +2~3% 이내에서 진입했다","pass":false}]'::jsonb,2,-23.2,-6.5,3.6,'KOSPI','[가짜] 50일선 이탈. 퇴출.',null,null,null,null,'2026-06-30','seed') on conflict (code,as_of) do update set setup_type=excluded.setup_type, footprint_weeks=excluded.footprint_weeks, max_contraction_pct=excluded.max_contraction_pct, min_contraction_pct=excluded.min_contraction_pct, t_count=excluded.t_count, pivot=excluded.pivot, cbox_high=excluded.cbox_high, cbox_low=excluded.cbox_low, cbox_start=excluded.cbox_start, volume_dry_days=excluded.volume_dry_days, trend_template=excluded.trend_template, trend_template_score=excluded.trend_template_score, checklist=excluded.checklist, checklist_score=excluded.checklist_score, drawdown_pct=excluded.drawdown_pct, market_drawdown_pct=excluded.market_drawdown_pct, drawdown_vs_market=excluded.drawdown_vs_market, benchmark=excluded.benchmark, notes=excluded.notes, high_52w=excluded.high_52w, high_52w_date=excluded.high_52w_date, low_52w=excluded.low_52w, low_52w_date=excluded.low_52w_date, base_start=excluded.base_start, data_source=excluded.data_source;
 
 insert into sb_positions (code,account,qty,avg_price,stop_price,state,entry_rule_id,is_unverified,note,initial_stop_price,exit_price,realized_pnl,r_multiple,opened_at,closed_at,updated_at) values
-('005930','kb_manual',13,257575,null,'manual',null,true,'KB 계좌 수동 보유. 봇 상태 머신·손절 자동화 대상 아님. 9/22 10:41 확인값(13주, 평단 257,575). 이후 변동 미확인 — 비움이 현재 수량·평단을 주면 교체',null,null,null,null,'2026-08-13T09:00:00+09:00',null,'2026-09-22T10:41:00+09:00'),
+('005930','kb_manual',0,255300,null,'closed',null,true,'KB 계좌 수동 보유였음(봇 대상 아님). 정리 직전 24주, 평단 약 255,300. 10/21 오전(10:48 이전, 정확한 시각·체결가 미확인) 전량 정리, 실현 손실 약 -100만원(비움 보고). 실패 원인: 손실 중 추가매수(물타기), 생활비 미분리 → FN-1·CD-1 신설',null,null,-1000000,null,'2026-08-13T09:00:00+09:00','2026-10-21T10:48:00+09:00','2026-10-22T13:00:00+09:00'),
 ('999904','kis_bot',0,41200,36000,'closed','EN-3',false,'[가짜]',38700,38600,-26000,-1.04,'2026-09-15T09:40:00+09:00','2026-09-29T09:02:00+09:00','2026-09-29T09:02:00+09:00');
 
 insert into sb_balance_snapshots (account,code,as_of,qty,avg_price,market_price,cash,total_value,note) values
@@ -81,7 +86,10 @@ insert into sb_balance_snapshots (account,code,as_of,qty,avg_price,market_price,
 ('kb_manual','005930','2026-08-18T15:14:00+09:00',10,268400,267500,null,null,'10주 오주문 (계획 1주). 매입금액 약 2,684,190원 → EN-8 신설 계기'),
 ('kb_manual','005930','2026-08-26T09:43:00+09:00',10,259609,null,null,null,'8/18 이후 일부 매도·재매수 추정, 미확인'),
 ('kb_manual','005930','2026-09-04T10:11:00+09:00',13,257575,null,2900000,null,'3주 추가: 국장 총액 증가(예수금 168만→290만)에 따른 수동 비중 조정. 정찰병 규칙 매수 아님'),
-('kb_manual','005930','2026-09-22T10:41:00+09:00',13,257575,279250,null,null,'마지막 확인. 이후 미확인'),
+('kb_manual','005930','2026-09-22T10:41:00+09:00',13,257575,279250,null,null,'9/22 확인'),
+('kb_manual','005930','2026-10-08T15:30:00+09:00',13,263100,null,null,null,'10/8 확인: 13주, 평단 약 263,100. 3분기 잠정실적 발표일 하락'),
+('kb_manual','005930','2026-10-21T09:29:00+09:00',24,255300,224000,null,null,'10/8~10/20 하락 중 11주 추가(평균 약 246,000) = 물타기(EN-7 위반에 해당). 평가손익 -764,155원(-12.46%). 10/20 종가 약 211,500에서 손절선·무효화 ①·20일선 이탈 동시 성립'),
+('kb_manual','005930','2026-10-21T10:48:00+09:00',0,null,null,null,null,'전량 정리(10:48 이전). 실현 손실 약 -100만원(비움 보고). 체결가 미확인'),
 ('kis_bot',null,'2026-09-15T08:30:00+09:00',null,null,null,6200000,6200000,'[가짜] 봇 계좌 시작 잔고'),
 ('kis_bot',null,'2026-10-06T15:40:00+09:00',null,null,null,6174000,6174000,'[가짜] 종가 기준');
 
@@ -90,7 +98,7 @@ insert into sb_orders_log (ts,code,side,qty,planned_qty,price,source,stop_price,
 ('2026-09-29T09:02:00+09:00','999904','sell',10,10,38600,'bot',null,null,6180000,'UV-3','무효화 조건 위반 → 퇴출 승인 → 봇 매도',false,'[가짜] 추석 연휴 뒤 첫 거래일');
 
 insert into sb_events (code,event_type,title,event_date,note,source) values
-('005930','earnings','3분기 잠정실적 발표 (10/8 목)','2026-10-08','FnGuide 컨센서스 매출 200조7657억·영업이익 106조9435억. EV-1: 발표 전 축소 여부 비움 승인','news:파이낸셜포스트·국제뉴스 2026-10-06'),
+('005930','earnings','3분기 잠정실적 발표 (10/8 목)','2026-10-08','FnGuide 컨센서스 매출 200조7657억·영업이익 106조9435억. 결과: 영업이익 107.4조(컨센서스 상회), 매출 195조(미달), 발표일 하락','news:파이낸셜포스트·국제뉴스 2026-10-06'),
 (null,'macro','미국 CPI 발표','2026-10-14',null,'seed'),
 (null,'holiday','한글날 휴장','2026-10-09','하루 휴장. 손절선 하루 미작동','krx_calendar'),
 ('999903','earnings','[가짜] 3분기 실적','2026-10-28',null,'seed');
@@ -1427,6 +1435,8 @@ insert into sb_settings (key,value) values
 ('universe_target_stocks','30'),
 ('universe_target_sectors','8'),
 ('universe_sector_warn_pct','40'),
+('living_fund_confirmed_at',null),
+('loss_cooldown_trading_days','1'),
 ('regime_vkospi_reduce',null),
 ('regime_vkospi_wait',null),
 ('regime_lev_etf_share_reduce',null),

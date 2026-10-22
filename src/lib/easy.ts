@@ -44,6 +44,11 @@ export function nextStep(s: StockSummary, settings: Settings): string {
   const kb = position?.account === "kb_manual" ? " (KB에서 손으로 들고 있는 건 그대로예요.)" : "";
   switch (stock.stage) {
     case "radar":
+      if (thesis?.status === "discarded") {
+        return setup?.pivot
+          ? `가설을 버렸어요. 관심만 둬요. 문턱 ${fmtNum(setup.pivot)}원을 거래량과 함께 다시 넘으면 그때 새 가설부터 써요.`
+          : "가설을 버렸어요. 관심만 둬요. 새 쉬는 곳이 생기면 새 가설부터 써요.";
+      }
       return "브레인이 올린 후보예요. 가설(왜 사나)과 '틀렸다고 인정할 조건'을 적으면 검토로 올라가요.";
     case "review":
       if (!thesis) return "가설과 '틀렸다고 인정할 조건'이 아직 없어요. 그걸 적어야 다음으로 가요." + kb;
@@ -64,10 +69,45 @@ export function nextStep(s: StockSummary, settings: Settings): string {
   }
 }
 
-/** 홈 '오늘 할 일': 비움 결정이 필요한 것만 */
+export interface AlertSignals {
+  thesis: boolean;       // 가설 무효화 조건 성립 (또는 위반 의심)
+  stop: boolean;         // 종가가 손절선 이하
+  ma20: boolean;         // 20일선 아래 마감
+  stopPrice: number | null;
+  stopFromRule: boolean; // 손절선이 없어 평단 -6% 로 계산했나 (수동 보유)
+  all: boolean;
+}
+
+/** AL-1: 보유 중인 종목(봇·수동)의 세 신호. 가짜 일봉이면 계산하지 않는다. */
+export function alertSignals(s: StockSummary): AlertSignals | null {
+  const { thesis, position, setup } = s;
+  if (!position || position.qty <= 0 || position.closed_at) return null;
+  if (setup?.data_source === "seed" && s.stock.is_seed) return null;
+  const stopFromRule = position.stop_price === null;
+  const stopPrice = position.stop_price ?? (position.avg_price ? Math.round(position.avg_price * 0.94) : null);
+  const th = thesis?.status === "suspect" || Boolean(thesis?.invalidation_conditions.some((c) => c.violated));
+  const st = stopPrice !== null && s.last_close !== null && s.last_close <= stopPrice;
+  const m = (s.below_ma20_days ?? 0) >= 1;
+  return { thesis: th, stop: st, ma20: m, stopPrice, stopFromRule, all: th && st && m };
+}
+
+/** 홈 '오늘 할 일': 비움 결정이 필요한 것만. 맨 위는 AL-1 빨간 경고, 다음은 FN-1 생활비 분리 확인. */
 export function buildTodos(items: StockSummary[], events: MarketEvent[], settings: Settings, proposals: Proposal[] = []): Todo[] {
   const out: Todo[] = [];
   const t = todayKST();
+  for (const s of items) {
+    const a = alertSignals(s);
+    if (!a?.all) continue;
+    const kb = s.position?.account === "kb_manual";
+    out.push({
+      kind: "red_alert", code: s.stock.code, name: s.stock.name,
+      title: `${s.stock.name}: 세 신호가 모두 켜졌어요`,
+      detail: `가설이 깨졌고, 종가 ${fmtNum(s.last_close)}원이 안전벨트 ${fmtNum(a.stopPrice)}원${a.stopFromRule ? "(평단 -6%)" : ""} 아래, 20일선(${fmtNum(s.ma20 ?? null)}원) 아래예요. 규칙상 정리할 때예요.${kb ? " KB에서 손으로 들고 있는 거라 비움이 직접 팔아야 해요." : " 봇이 손절선대로 팔아요."}`,
+    });
+  }
+  if (!settings.living_fund_confirmed_at) {
+    out.push({ kind: "living_fund", code: "", name: "", title: "생활비 분리 확인", detail: "봇 계좌 돈이 1년 안에 쓸 돈이 아닌지 확인해요. 확인 전엔 봇이 아무것도 사지 않아요." });
+  }
   for (const p of proposals.filter((x) => x.status === "pending")) {
     const label = p.kind === "setting" ? (SETTING_KEYS.find((k) => k.key === p.target)?.label ?? p.target) : p.target;
     out.push({ kind: "proposal", code: "", name: label, title: `${PROPOSAL_KIND_LABEL[p.kind]} 변경 제안 결정`, detail: p.plain ?? `${label}: ${p.current_value ?? "없음"} → ${p.proposed_value}`, proposal: p });

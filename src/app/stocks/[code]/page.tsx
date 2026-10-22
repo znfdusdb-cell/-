@@ -10,6 +10,7 @@ import { Badge } from "@/components/StockCard";
 import { EasyDetail } from "@/components/EasyDetail";
 import { viewMode } from "@/lib/view";
 import { ThesisApproveButton } from "@/components/ThesisApproveButton";
+import { AlertLights } from "@/components/AlertLights";
 import { Section, FootprintPanel, CheckPanel, ThesisPanel, PositionPanel, EventsPanel, StageLogPanel, OrdersTable, SnapshotsPanel } from "@/components/DetailPanels";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +62,8 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           무효화 조건 위반. 규칙 UV-3: 검토 단계로 강등 → 비움 승인 후 퇴출(봇 매도). 손절선은 그대로 작동한다.
         </div>
       )}
+
+      <AlertLights s={d} />
 
       <Section title={`단계: ${STAGE_LABEL[stock.stage]}`} right={<span className="text-[11px] text-fg-3">{STAGE_HINT[stock.stage]}</span>}>
         {thesis?.status === "draft" && thesis.invalidation_conditions.length > 0 && <div className="mb-2"><ThesisApproveButton thesisId={thesis.id} code={stock.code} /></div>}

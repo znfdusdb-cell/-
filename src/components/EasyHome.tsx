@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { StockSummary, MarketRegime, Settings, MarketEvent, Stage, Proposal, RiskLog } from "@/lib/types";
 import { ProposalCard } from "./ProposalCard";
+import { LivingFundConfirm } from "./LivingFundConfirm";
 import { RISK_LEVEL_LABEL, RISK_LEVEL_EASY } from "@/lib/constants";
 import { buildTodos, regimeSentence, nextStep, mountainStage } from "@/lib/easy";
 import { Lights, MountainPos, WeatherIcon } from "./EasyBits";
@@ -29,7 +30,14 @@ export function EasyHome({ items, regime, events, settings, proposals, risk }: {
         ) : (
           <div className="mt-2 space-y-2">
             {todos.map((t) =>
-              t.kind === "proposal" && t.proposal ? (
+              t.kind === "red_alert" ? (
+                <Link key={"a" + t.code} href={`/stocks/${t.code}`} className="block rounded-xl border-2 border-stop bg-stop/15 px-4 py-3 active:scale-[0.99]">
+                  <div className="text-lg font-bold text-stop">{t.title}</div>
+                  <div className="text-sm text-fg">{t.detail}</div>
+                </Link>
+              ) : t.kind === "living_fund" ? (
+                <LivingFundConfirm key="fund" confirmedAt={null} easy />
+              ) : t.kind === "proposal" && t.proposal ? (
                 <ProposalCard key={"p" + t.proposal.id} p={t.proposal} easy />
               ) : (
                 <Link key={t.kind + t.code} href={`/stocks/${t.code}`} className="block rounded-xl bg-fg px-4 py-3 text-bg active:scale-[0.99]">
