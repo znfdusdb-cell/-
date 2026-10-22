@@ -69,5 +69,36 @@ class T(unittest.TestCase):
         self.assertEqual(rows, [])
 
 
+    def test_setup_vcp(self):
+        from datetime import date as D, timedelta as TD
+        from bot.setups import compute
+        anchors = [(0, 100), (200, 200), (220, 170), (240, 195), (255, 180), (268, 193), (278, 186), (290, 192), (299, 191)]
+        def val(i):
+            for (a, pa), (b, pb) in zip(anchors, anchors[1:]):
+                if a <= i <= b:
+                    return pa + (pb - pa) * (i - a) / (b - a)
+        d, c = D(2025, 8, 1), []
+        for i in range(300):
+            p = val(i)
+            c.append({"date": d.isoformat(), "open": p, "high": p * 1.005, "low": p * 0.995, "close": p, "volume": 1000000 if i < 200 else 600000})
+            d += TD(days=1)
+            while d.weekday() > 4:
+                d += TD(days=1)
+        r = compute("T", c)
+        self.assertEqual(r["setup_type"], "vcp")
+        self.assertEqual(r["t_count"], 3)
+        self.assertEqual(r["pivot"], 194)
+        self.assertEqual(r["trend_template_score"], 7)   # TT8 보류
+        self.assertTrue(r["checklist"][2]["pass"])        # 흔들림 축소 + 마지막 10% 이내
+        self.assertIsNone(r["drawdown_vs_market"])        # UV-4 보류
+
+    def test_setup_short_history_pending(self):
+        from bot.setups import compute
+        c = [{"date": f"2026-0{1 + i // 28}-{1 + i % 28:02d}", "open": 100, "high": 101, "low": 99, "close": 100, "volume": 1} for i in range(100)]
+        r = compute("S", c)
+        tt = {x["key"]: x for x in r["trend_template"]}
+        self.assertTrue(tt["tt6"]["pending"] and tt["tt7"]["pending"] and tt["tt1"]["pending"])
+
+
 if __name__ == "__main__":
     unittest.main()

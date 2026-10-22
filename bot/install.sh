@@ -50,10 +50,11 @@ echo "4/4 매일 자동 실행 등록 (평일 한국시간 16:20, 장 마감 뒤
 off="$(date +%z)"; sign="${off:0:1}"; oh=$((10#${off:1:2}))
 [ "$sign" = "-" ] && oh=$((-oh))
 h=$(( (16 - 9 + oh + 24) % 24 ))
-line="20 $h * * 1-5 cd $DIR && python3 -m bot.load_candles >> $CONF/load.log 2>&1"
+# 매일: 최신 코드 받기 → 일봉 → 셋업 계산. (코드 갱신이 자동이라 이 설치는 다시 안 돌려도 된다)
+line="20 $h * * 1-5 cd $DIR && git fetch -q --depth 1 origin $BRANCH && git reset -q --hard FETCH_HEAD; python3 -m bot.daily >> $CONF/load.log 2>&1"
 ( crontab -l 2>/dev/null | grep -v "bot.load_candles" || true; echo "$line" ) | crontab -
 echo "  등록: $line"
 
-echo "첫 적재 (종목당 2년치, 몇 분 걸릴 수 있음)"
-python3 -m bot.load_candles | tee -a "$CONF/load.log"
+echo "첫 실행: 일봉 적재 + 셋업 계산 (처음 넣는 종목은 2년치라 몇 분 걸릴 수 있음)"
+python3 -m bot.daily | tee -a "$CONF/load.log"
 echo "끝. 기록: $CONF/load.log"
