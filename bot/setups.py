@@ -68,7 +68,7 @@ def zigzag(c: list[dict], pct: float = ZIGZAG_PCT) -> list[tuple[str, int, float
     return pts
 
 
-def compute(code: str, candles: list[dict]) -> dict | None:
+def compute(code: str, candles: list[dict], rs: int | None = None) -> dict | None:
     c = sorted(candles, key=lambda x: x["date"])
     if len(c) < 60:
         return None
@@ -100,7 +100,7 @@ def compute(code: str, candles: list[dict]) -> dict | None:
         item(4, ma50 and price > ma50, f"{won(price)} vs 50일 {won(ma50)}"),
         item(5, from_low >= 25, f"52주 저가 {won(lo['low'])}({lo['date'][5:]}) 대비 {from_low:+.1f}%" if has52 else f"데이터 부족 (일봉 {len(c)} / 252)", pending=not has52),
         item(6, dd >= -25, f"52주 고가 {won(hi['high'])}({hi['date'][5:]}) 대비 {dd:.1f}%" if has52 else f"데이터 부족 (일봉 {len(c)} / 252)", pending=not has52),
-        item(7, False, "전 종목 등수 계산 전 (레이더 단계)", pending=True),
+        item(7, rs is not None and rs >= 70, f"RS {rs} (전 종목 백분위, 70 이상 통과)" if rs is not None else "전 종목 등수 계산 전", pending=rs is None),
     ]
 
     # 베이스: 52주 고가 이후
@@ -184,7 +184,7 @@ def compute(code: str, candles: list[dict]) -> dict | None:
         "high_52w": hi["high"] if has52 else None, "high_52w_date": hi["date"] if has52 else None,
         "low_52w": lo["low"] if has52 else None, "low_52w_date": lo["date"] if has52 else None,
         "base_start": hi["date"], "data_source": "bot",
-        "notes": (no_pivot_reason + ". " if no_pivot_reason else "") + f"자동 계산 {datetime.now(KST):%m/%d %H:%M}. 피봇·C 박스·흔들림은 지그재그({ZIGZAG_PCT:g}% 이상) 휴리스틱이라 비움 확인 전 참고값. 상대강도·시장 대비 조정은 보류.",
+        "notes": (no_pivot_reason + ". " if no_pivot_reason else "") + f"자동 계산 {datetime.now(KST):%m/%d %H:%M}. 피봇·C 박스·흔들림은 지그재그({ZIGZAG_PCT:g}% 이상) 휴리스틱이라 비움 확인 전 참고값. 상대강도는 최근 레이더 스캔 값, 시장 대비 조정은 보류.",
     }
 
 
@@ -192,10 +192,15 @@ def main(argv=None) -> int:
     env = load_env()
     db = Supa(env["SUPABASE_URL"], env["SUPABASE_SERVICE_KEY"])
     stocks = [s for s in db.select("sb_stocks", "select=code,name,is_seed") if not s.get("is_seed")]
+    try:
+        sc = db.select("sb_scans", "select=as_of,rs_mine&order=as_of.desc&limit=1")
+        rs_map = (sc[0].get("rs_mine") or {}) if sc else {}
+    except RuntimeError:
+        rs_map = {}
     out = []
     for s in stocks:
         rows = db.select("sb_candles", f"select=date,open,high,low,close,volume&code=eq.{s['code']}&source=neq.seed&order=date.desc&limit=400")
-        r = compute(s["code"], rows)
+        r = compute(s["code"], rows, rs_map.get(s["code"]))
         if not r:
             print(f"{s['code']} {s['name']}: 일봉 부족, 건너뜀")
             continue

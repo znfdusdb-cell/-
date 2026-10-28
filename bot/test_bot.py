@@ -100,5 +100,44 @@ class T(unittest.TestCase):
         self.assertTrue(tt["tt6"]["pending"] and tt["tt7"]["pending"] and tt["tt1"]["pending"])
 
 
+    def test_master_parse(self):
+        from bot import master
+        tail = 228
+        def row(code, name, group):
+            return f"{code:<9}{'KR7'+code+'000':<12}{name}" + group + "X" * (tail - 2)
+        text = "\n".join([row("005930", "삼성전자", "ST"), row("005935", "삼성전자우", "ST"), row("069500", "KODEX 200", "EF"), row("123450", "하나스팩1호", "ST")])
+        rows, groups = master.parse(text, tail, "KOSPI")
+        self.assertEqual(groups, {"ST": 3, "EF": 1})
+        keep = [r["code"] for r in rows if master.common_stock(r)]
+        self.assertEqual(keep, ["005930"])
+        self.assertEqual(rows[0]["name"], "삼성전자")
+
+    def test_dart_growth(self):
+        import json as J
+        from bot import dart
+        def http(url):
+            y = int(url.split("bsns_year=")[1][:4]); rp = url.split("reprt_code=")[1][:5]
+            base = {2026: 200, 2025: 100}.get(y, 80)
+            if rp == "11014" and y == 2026:
+                return J.dumps({"status": "013"}).encode()
+            lst = [{"corp_code": "C1", "account_nm": "영업이익", "fs_div": "CFS", "thstrm_amount": f"{base:,}"},
+                   {"corp_code": "C1", "account_nm": "영업이익", "fs_div": "OFS", "thstrm_amount": "1"},
+                   {"corp_code": "C1", "account_nm": "매출액", "fs_div": "CFS", "thstrm_amount": f"{base*10:,}"}]
+            return J.dumps({"status": "000", "list": lst}).encode()
+        dart.time.sleep = lambda s: None
+        data = {(y, rp): dart.multi("k", ["C1"], y, rp, http=http) for y in (2026, 2025, 2024) for rp in ("11013", "11012", "11014", "11011")}
+        periods = [(2026, r) for r in dart.ORDER] + [(2025, "11011")] + [(2025, r) for r in dart.ORDER]
+        g = dart.growth(periods, data, "C1")
+        self.assertEqual(g[0]["period"], "2026 반기")     # 3분기 미공시 → 반기부터
+        self.assertEqual(round(g[0]["op_yoy"]), 100)
+        from bot.scan import fund_check, percentile
+        ok, why = fund_check(g)
+        self.assertTrue(ok, why)
+        self.assertEqual(dart.yoy(10, -5), 999.0)
+        p = percentile({"a": 0.1, "b": 0.5, "c": -0.2})
+        self.assertEqual(p["b"], 99)
+        self.assertLess(p["c"], p["a"])
+
+
 if __name__ == "__main__":
     unittest.main()
