@@ -46,8 +46,8 @@ export function nextStep(s: StockSummary, settings: Settings): string {
     case "radar":
       if (thesis?.status === "discarded") {
         return setup?.pivot
-          ? `가설을 버렸어요. 관심만 둬요. 문턱 ${fmtNum(setup.pivot)}원을 거래량과 함께 다시 넘으면 그때 새 가설부터 써요.`
-          : "가설을 버렸어요. 관심만 둬요. 새 쉬는 곳이 생기면 새 가설부터 써요.";
+          ? `가설을 버렸어요. 관심만 둬요. 봇은 이 종목을 사지 않아요. 문턱 ${fmtNum(setup.pivot)}원을 거래량과 함께 넘으면 새 가설을 쓸지 검토해요.`
+          : "가설을 버렸어요. 관심만 둬요. 봇은 이 종목을 사지 않아요. 다시 오르막에 올라서 새로 쉬는 곳이 생기면 그때 새 가설을 검토해요.";
       }
       return "브레인이 올린 후보예요. 가설(왜 사나)과 '틀렸다고 인정할 조건'을 적으면 검토로 올라가요.";
     case "review":

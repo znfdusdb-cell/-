@@ -54,7 +54,7 @@ export function EasyDetail({ d, settings }: { d: StockDetail; settings: Settings
           <Term k="pivot" /> · 지금 · <Term k="stop" />
           {cboxWide && <span className="ml-2 text-warn">C 후보 (아직 넓음)</span>}
         </h2>
-        <Thermometer pivot={setup?.pivot ?? null} now={d.last_close} stop={position?.account === "kis_bot" ? position.stop_price : null} fake={fake} />
+        <Thermometer pivot={setup?.pivot ?? null} now={d.last_close} stop={position?.account === "kis_bot" ? position.stop_price : null} fake={fake} canBuy={stock.stage === "universe" || stock.stage === "holding"} />
         {position?.account === "kb_manual" && <p className="mt-2 text-[11px] text-fg-3">KB에서 손으로 들고 있는 건 봇 안전벨트가 없어요. 봇이 사면 그때 생겨요.</p>}
       </section>
 

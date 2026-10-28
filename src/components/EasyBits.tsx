@@ -67,7 +67,7 @@ export function Lights({ items, max = 7 }: { items: CheckItem[]; max?: number })
 }
 
 /** 세로 온도계: 위 문턱, 가운데 지금, 아래 안전벨트 */
-export function Thermometer({ pivot, now, stop, fake }: { pivot: number | null; now: number | null; stop: number | null; fake: boolean }) {
+export function Thermometer({ pivot, now, stop, fake, canBuy = true }: { pivot: number | null; now: number | null; stop: number | null; fake: boolean; canBuy?: boolean }) {
   const vals = [pivot, now, stop].filter((v): v is number => v !== null);
   const hi = vals.length ? Math.max(...vals) : 1;
   const lo = vals.length ? Math.min(...vals) : 0;
@@ -75,7 +75,7 @@ export function Thermometer({ pivot, now, stop, fake }: { pivot: number | null; 
   const pos = (v: number | null) => (v === null ? null : 12 + ((hi - v) / span) * 76); // % from top
   const fmt = (v: number | null) => (v === null ? "—" : v.toLocaleString("ko-KR"));
   const rows: { key: string; label: string; v: number | null; color: string; note: string }[] = [
-    { key: "pivot", label: "문턱", v: pivot, color: "#f59e0b", note: pivot === null ? "봇이 아직 못 정함" : "이걸 거래량과 함께 넘는 날 산다" },
+    { key: "pivot", label: "문턱", v: pivot, color: "#f59e0b", note: pivot === null ? "없음: 오르막(2단계) 위에서 쉴 때만 생긴다" : canBuy ? "이걸 거래량과 함께 넘는 날 산다" : "참고만. 살 수 있는 목록에 없어서 넘어도 안 산다" },
     { key: "now", label: "지금", v: fake ? null : now, color: "#e8eaf0", note: fake ? "실제 일봉 적재 전" : "" },
     { key: "stop", label: "안전벨트", v: stop, color: "#3182f6", note: stop === null ? "살 때 생긴다 (산 가격 -6%)" : "여기 아래면 판다" },
   ];
