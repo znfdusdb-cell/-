@@ -9,7 +9,6 @@ export function GET() {
       start_url: "/",
       scope: "/",
       display: "standalone",
-      orientation: "portrait",
       background_color: "#0b0d12",
       theme_color: "#0b0d12",
       icons: [
