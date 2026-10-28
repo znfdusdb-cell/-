@@ -166,6 +166,11 @@ def compute(code: str, candles: list[dict]) -> dict | None:
         cl(6, False, "장중 감시 단계에서 판정", pending=True),
     ]
     setup_type = "vcp" if stage2 and shrinking else "none"
+    # 문턱(피봇)은 2단계 오르막 위의 베이스에서만 의미가 있다. 내리막 속 반등 고점은 문턱이 아니다.
+    no_pivot_reason = None
+    if not stage2:
+        no_pivot_reason = "2단계(트렌드 템플레이트 1~5) 아님 → 문턱 없음. 내리막·평지 속 반등 고점은 피봇이 아니다"
+        pivot = cbox_low = cbox_start = None
     score = lambda xs: sum(1 for x in xs if x["pass"])  # noqa: E731
     return {
         "code": code, "as_of": last["date"], "setup_type": setup_type,
@@ -179,7 +184,7 @@ def compute(code: str, candles: list[dict]) -> dict | None:
         "high_52w": hi["high"] if has52 else None, "high_52w_date": hi["date"] if has52 else None,
         "low_52w": lo["low"] if has52 else None, "low_52w_date": lo["date"] if has52 else None,
         "base_start": hi["date"], "data_source": "bot",
-        "notes": f"자동 계산 {datetime.now(KST):%m/%d %H:%M}. 피봇·C 박스·흔들림은 지그재그({ZIGZAG_PCT:g}% 이상) 휴리스틱이라 비움 확인 전 참고값. 상대강도·시장 대비 조정은 보류.",
+        "notes": (no_pivot_reason + ". " if no_pivot_reason else "") + f"자동 계산 {datetime.now(KST):%m/%d %H:%M}. 피봇·C 박스·흔들림은 지그재그({ZIGZAG_PCT:g}% 이상) 휴리스틱이라 비움 확인 전 참고값. 상대강도·시장 대비 조정은 보류.",
     }
 
 
