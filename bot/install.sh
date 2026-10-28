@@ -33,15 +33,17 @@ ask KIS_APP_KEY "한투 APP Key"
 ask KIS_APP_SECRET "한투 APP Secret"
 ask SUPABASE_URL "Supabase 주소 https://xxxx.supabase.co"
 ask SUPABASE_SERVICE_KEY "Supabase service_role(secret) 키"
+ask DART_API_KEY "DART 인증키 (opendart.fss.or.kr)"
 umask 077
 cat > "$ENVF" <<CONF
 KIS_APP_KEY=$KIS_APP_KEY
 KIS_APP_SECRET=$KIS_APP_SECRET
 SUPABASE_URL=$SUPABASE_URL
 SUPABASE_SERVICE_KEY=$SUPABASE_SERVICE_KEY
+DART_API_KEY=$DART_API_KEY
 CONF
 chmod 600 "$ENVF"
-unset KIS_APP_KEY KIS_APP_SECRET SUPABASE_SERVICE_KEY
+unset KIS_APP_KEY KIS_APP_SECRET SUPABASE_SERVICE_KEY DART_API_KEY
 
 echo "3/4 연결 확인"
 cd "$DIR" && python3 -m bot.load_candles --check

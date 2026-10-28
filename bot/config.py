@@ -16,7 +16,7 @@ def load_env() -> dict:
                 continue
             k, v = line.split("=", 1)
             env[k.strip()] = v.strip().strip('"').strip("'")
-    for k in REQUIRED:  # 환경변수가 있으면 우선
+    for k in REQUIRED + ("DART_API_KEY",):  # 환경변수가 있으면 우선
         if os.environ.get(k):
             env[k] = os.environ[k]
     missing = [k for k in REQUIRED if not env.get(k)]

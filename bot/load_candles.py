@@ -43,6 +43,14 @@ def main(argv=None) -> int:
         db = Supa(env["SUPABASE_URL"], env["SUPABASE_SERVICE_KEY"])
         n = db.select("sb_stocks", "select=code")
         print(f"Supabase 연결 OK: 종목 {len(n)}개")
+        if env.get("DART_API_KEY"):
+            import json, urllib.parse, urllib.request
+            u = "https://opendart.fss.or.kr/api/company.json?" + urllib.parse.urlencode({"crtfc_key": env["DART_API_KEY"], "corp_code": "00126380"})
+            with urllib.request.urlopen(u, timeout=20) as r:
+                j = json.loads(r.read().decode("utf-8"))
+            print(f"DART 연결 OK: {j.get('corp_name')}" if j.get("status") == "000" else f"DART 확인 실패: {j.get('status')} {j.get('message')}")
+        else:
+            print("DART 키 없음 (실적 거름망은 키 입력 후)")
         return 0
 
     db = Supa(env["SUPABASE_URL"], env["SUPABASE_SERVICE_KEY"])
