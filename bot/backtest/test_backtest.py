@@ -126,3 +126,46 @@ def test_v2_take_profit_half_at_2R():
     whys = [t["why"] for t in r.trades]
     assert whys[0] == "익절(절반)" and abs(r.trades[0]["exit_px"] - 112) < 1e-9 and abs(r.trades[0]["frac"] - 0.5) < 0.01
     assert whys[1] == "손절" and abs(r.trades[1]["exit_px"] - 100) < 1e-9    # 나머지는 본전에서
+
+
+# ---- 일감 C: 시장 변수 ----
+from dataclasses import fields  # noqa: E402
+from functools import partial  # noqa: E402
+
+from bot.backtest import gate, markets, run_market  # noqa: E402
+
+RULES = ("K", "chase", "stop", "slot", "max_pos", "rs_min", "shrink", "last_t_max", "zz", "slope_min", "entry_mode", "stop_mode", "ma20_days", "take_profit", "cooldown")
+
+
+def test_kr_params_equal_v2_defaults():
+    p = E.Params()
+    assert p.market == "KR"
+    assert (p.fee, p.tax, p.slip_buy, p.slip_sell, p.slip_stop, p.capital, p.min_price, p.min_turnover, p.limit_up) == (
+        0.00015, 0.0025, 0.001, 0.001, 0.002, 1e8, 1000, 1e9, 0.295)
+
+
+def test_rule_numbers_do_not_branch_by_market():
+    kr, us = E.Params(market="KR"), E.Params(market="US")
+    assert all(getattr(kr, k) == getattr(us, k) for k in RULES)
+    assert {f.name for f in fields(E.Params)} >= set(RULES)
+    assert us.limit_up is None and us.capital != kr.capital
+
+
+def test_gate_pass_wait_and_bias():
+    days = pd.bdate_range("2015-01-01", "2026-10-30")
+    eq = pd.Series(np.linspace(1e8, 1.1e8, len(days)), index=days)
+    mk = lambda net, n, at: [{"entry": pd.Timestamp(at), "net": net, "R": net / 0.06, "gross": net, "exit": pd.Timestamp(at), "days": 5, "why": "20일선"}] * n  # noqa: E731
+    r = E.Result(trades=mk(0.004, 80, "2018-01-02") + mk(0.004, 30, "2025-01-02"), equity=eq, exposure=eq * 0)
+    assert gate.verdict(r, False)[0] == "PASS"
+    assert gate.verdict(r, True)[0] == "WAIT"                 # 0.4% < 0 + 0.5%p
+    r.trades = mk(0.01, 120, "2018-01-02")                    # 최근 2년 거래 없음 → WAIT
+    assert gate.verdict(r, False)[0] == "WAIT"
+
+
+def test_run_market_us_dummy(tmp_path, monkeypatch):
+    monkeypatch.setattr(run_market.data, "CACHE", tmp_path)
+    monkeypatch.setattr(markets, "dummy_data", partial(markets.dummy_data, n=8))
+    assert run_market.main(["--market", "US", "--dummy"]) == 0
+    txt = (tmp_path / "out" / "report_US_dummy.txt").read_text(encoding="utf-8")
+    assert "[시장] US 통화 USD" in txt and "생존편향 있음" in txt and txt.count("→ WAIT") + txt.count("→ PASS") == 7
+
