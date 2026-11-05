@@ -72,6 +72,14 @@ class Kis:
             raise KisError(f"{tr_id} {params.get('FID_INPUT_ISCD', '')}: {res.get('msg_cd')} {res.get('msg1')}")
         raise KisError("재시도 초과")
 
+    # ---------- 현재가 (연습 모드 장중 폴링) ----------
+    def price(self, code: str) -> dict:
+        """현재가·당일 누적 거래량 (inquire-price FHKST01010100)."""
+        res = self._get("/uapi/domestic-stock/v1/quotations/inquire-price", "FHKST01010100",
+                        {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code})
+        o = res.get("output") or {}
+        return {"price": int(float(o.get("stck_prpr") or 0)), "volume": int(float(o.get("acml_vol") or 0))}
+
     # ---------- 일봉 ----------
     def daily_page(self, code: str, start: date, end: date) -> tuple[str | None, list[dict]]:
         res = self._get("/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice", "FHKST03010100", {
