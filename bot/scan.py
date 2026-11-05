@@ -80,6 +80,7 @@ def main(argv=None) -> int:
     print(f"마스터: 보통주 {len(stocks)}개 ({summary})")
     if len(stocks) < 1000:
         print("경고: 보통주가 너무 적다. 그룹코드:", {m: v.get("groups") for m, v in info.items()})
+        cache.kv_set(con, "master", [])     # 다음 실행 때 다시 받게
 
     fails = 0
     for i, s in enumerate(stocks):
@@ -164,7 +165,7 @@ def main(argv=None) -> int:
     top = [{k: s.get(k) for k in ("code", "name", "market", "rs", "close", "turnover_eok", "dd", "fund", "fund_ok")} for s in price_pass[:60]]
     db.upsert("sb_scans", [{"as_of": today.isoformat(), "universe_n": len(stocks), "rs_n": len(rs), "price_pass_n": len(price_pass), "fund_pass_n": len(fund_pass),
                             "added": added, "top": top, "rs_mine": mine, "seconds": round(time.time() - t0), "kis_fail_n": fails,
-                            "notes": f"유동성 {MIN_PRICE}원·거래대금 {MIN_TURNOVER // 100_000_000}억, RS {RS_MIN}+, 영업이익 +{OP_YOY_MIN:.0f}% 2기간 + 매출 증가 (Claude 초기값)"}], "as_of")
+                            "notes": f"마스터 {summary} / 유동성 {MIN_PRICE}원·거래대금 {MIN_TURNOVER // 100_000_000}억, RS {RS_MIN}+, 영업이익 +{OP_YOY_MIN:.0f}% 2기간 + 매출 증가 (Claude 초기값)"}], "as_of")
     print(f"스캔 끝 {time.time() - t0:.0f}초")
     return 0
 

@@ -11,7 +11,7 @@ URLS = {
 }
 
 
-def parse(text: str, tail: int, market: str) -> tuple[list[dict], dict]:
+def _split(text: str, tail: int, market: str) -> tuple[list[dict], dict]:
     out, groups = [], {}
     for line in text.splitlines():
         row = line.rstrip("\r\n")
@@ -22,6 +22,19 @@ def parse(text: str, tail: int, market: str) -> tuple[list[dict], dict]:
         groups[group] = groups.get(group, 0) + 1
         out.append({"code": code, "name": name, "group": group, "market": market})
     return out, groups
+
+
+def parse(text: str, tail: int, market: str) -> tuple[list[dict], dict]:
+    """뒤쪽 고정폭 길이는 문서상 코스피 228·코스닥 222지만, 공식 예제는 줄바꿈을 포함해 센 값이라
+    줄바꿈을 뗀 실제 길이는 1 작을 수 있다(2026-11-05: 228로 잘라 그룹코드를 못 찾아 전 종목 0개).
+    그래서 N-1, N, N+1 중 그룹코드 'ST'(주권)가 가장 많이 나오는 길이를 고른다."""
+    best = None
+    for t in (tail - 1, tail, tail + 1):
+        rows, groups = _split(text, t, market)
+        st = groups.get("ST", 0)
+        if best is None or st > best[0]:
+            best = (st, rows, {**groups, "_tail": t})
+    return best[1], best[2]
 
 
 def common_stock(s: dict) -> bool:

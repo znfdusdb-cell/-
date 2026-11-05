@@ -107,10 +107,21 @@ class T(unittest.TestCase):
             return f"{code:<9}{'KR7'+code+'000':<12}{name}" + group + "X" * (tail - 2)
         text = "\n".join([row("005930", "삼성전자", "ST"), row("005935", "삼성전자우", "ST"), row("069500", "KODEX 200", "EF"), row("123450", "하나스팩1호", "ST")])
         rows, groups = master.parse(text, tail, "KOSPI")
-        self.assertEqual(groups, {"ST": 3, "EF": 1})
+        self.assertEqual(groups, {"ST": 3, "EF": 1, "_tail": 228})
         keep = [r["code"] for r in rows if master.common_stock(r)]
         self.assertEqual(keep, ["005930"])
         self.assertEqual(rows[0]["name"], "삼성전자")
+
+    def test_master_tail_off_by_one(self):
+        from bot import master
+        # 실제 파일처럼 뒤쪽 데이터가 문서 길이보다 1 짧은 경우(줄바꿈 포함해 센 길이)
+        def row(code, name, group):
+            return f"{code:<9}{'KR7'+code+'000':<12}{name}" + group + "X" * (227 - 2)
+        text = "\n".join([row("005930", "삼성전자", "ST"), row("000660", "SK하이닉스", "ST"), row("069500", "KODEX 200", "EF")])
+        rows, groups = master.parse(text, 228, "KOSPI")
+        self.assertEqual(groups["_tail"], 227)
+        self.assertEqual([r["code"] for r in rows if master.common_stock(r)], ["005930", "000660"])
+        self.assertEqual(rows[1]["name"], "SK하이닉스")
 
     def test_dart_growth(self):
         import json as J
