@@ -76,7 +76,7 @@ def main(argv=None) -> int:
         stocks, info = master.load()
         cache.kv_set(con, "master", stocks)
         cache.kv_set(con, "master_info", info)
-    summary = ", ".join("%s %s/%s" % (m, v.get("common"), v.get("rows")) for m, v in info.items())
+    summary = ", ".join("%s %s/%s 그룹%s" % (m, v.get("common"), v.get("rows"), dict(sorted(((k, c) for k, c in (v.get("groups") or {}).items()), key=lambda x: -x[1] if isinstance(x[1], int) else 0)[:4])) for m, v in info.items())
     print(f"마스터: 보통주 {len(stocks)}개 ({summary})")
     if len(stocks) < 1000:
         print("경고: 보통주가 너무 적다. 그룹코드:", {m: v.get("groups") for m, v in info.items()})
