@@ -20,5 +20,8 @@ bash <(curl -fsSL https://raw.githubusercontent.com/znfdusdb-cell/-/claude/swing
 ## 레이더 (bot.scan)
 전 종목(보통주) 매일 스캔. 일봉은 VPS `~/.swingbot/cache.db`(sqlite)에만. 유동성(1,000원·거래대금 10억) → RS 백분위 70+ → 트렌드 템플레이트 1~7 → DART 실적(최근 2기간 영업이익 +25%, 매출 증가) → 하루 최대 10개 레이더 투입(actor=bot). 요약 sb_scans. 첫 실행은 전 종목 1년 반치라 15분 안팎.
 
-## 다음
-3. 연습 모드: 신호 → 주문서 기록만 (실제 주문 없음)
+## 연습 모드 (bot.live, 주문 없음 — 주문서 기록만)
+- `bot.daily` 끝에 `bot.live.watch`: 유니버스·보유 중 2단계+피봇 최대 40개 → sb_watchlist.
+- `python3 -m bot.live.loop` : 평일 08:50 크론 시작, 09:00~15:30 현재가 폴링. EN-1(피봇 돌파 + 11:00 기준 누적 거래량 ≥ 50일 평균 x 0.5)·EN-2(피봇 x 1.03 이하)·sb_can_buy → SZ-1 수량(리스크 1.25%, 손절 6%)·RR-1 2:1 → sb_orders_log(source='practice'). 연습 보유는 `~/.swingbot/practice_positions.json`, EX-1 손절 매도 주문서, EX-3 본전 이동은 `practice_events.jsonl`. 기록 `~/.swingbot/live.log`, 실패 알림 줄은 `live.alert`.
+- `python3 -m bot.live.loop --replay 2026-05-01..2026-10-31` : 캐시 일봉 근사 재생(고가>피봇이면 max(시가,피봇) 체결) → `replay_orders.jsonl` → 위반 검사.
+- `python3 -m bot.live.audit [--file ...]` : 주문서 30장을 규칙표와 대조, 위반 0 이면 종료 코드 0.

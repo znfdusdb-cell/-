@@ -33,5 +33,11 @@ class Supa:
             self._req("POST", f"/{table}?on_conflict={on_conflict}", rows[i:i + chunk],
                       {"prefer": "resolution=merge-duplicates,return=minimal"})
 
+    def insert(self, table: str, rows: list[dict]):
+        self._req("POST", f"/{table}", rows, {"prefer": "return=minimal"})
+
+    def rpc(self, fn: str, args: dict):
+        return self._req("POST", f"/rpc/{fn}", args)
+
     def delete(self, table: str, query: str):
         self._req("DELETE", f"/{table}?{query}", extra={"prefer": "return=minimal"})

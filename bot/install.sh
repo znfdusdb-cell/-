@@ -54,8 +54,16 @@ off="$(date +%z)"; sign="${off:0:1}"; oh=$((10#${off:1:2}))
 h=$(( (16 - 9 + oh + 24) % 24 ))
 # 매일: 최신 코드 받기 → 일봉 → 셋업 계산. (코드 갱신이 자동이라 이 설치는 다시 안 돌려도 된다)
 line="20 $h * * 1-5 cd $DIR && git fetch -q --depth 1 origin $BRANCH && git reset -q --hard FETCH_HEAD; python3 -m bot.daily >> $CONF/load.log 2>&1"
-( crontab -l 2>/dev/null | grep -v "bot.load_candles" || true; echo "$line" ) | crontab -
+# 연습 모드 장중 루프: 평일 08:50 시작(09:00~15:30 감시, 주문서 기록만), 15:35 남아 있으면 종료
+s=$(( (8 - 9 + oh + 24) % 24 )); e=$(( (15 - 9 + oh + 24) % 24 ))
+# 서버 시각이 KST보다 9시간 이상 느리면(UTC 등) 08:50 KST가 전날이 된다 → 요일도 하루 당긴다(월~금 → 일~목)
+dow="1-5"; [ $((8 - 9 + oh)) -lt 0 ] && dow="0-4"
+live="50 $s * * $dow cd $DIR && python3 -m bot.live.loop >> $CONF/live.log 2>&1"
+stop="35 $e * * 1-5 pkill -f 'bot[.]live[.]loop' || true"
+( crontab -l 2>/dev/null | grep -v -e "bot.load_candles" -e "bot.daily" -e "bot.live.loop" -e "bot\[.\]live" || true; echo "$line"; echo "$live"; echo "$stop" ) | crontab -
 echo "  등록: $line"
+echo "  등록: $live"
+echo "  등록: $stop"
 
 echo "첫 실행: 일봉 적재 + 셋업 계산 (처음 넣는 종목은 2년치라 몇 분 걸릴 수 있음)"
 python3 -m bot.daily | tee -a "$CONF/load.log"
