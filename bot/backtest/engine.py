@@ -1,4 +1,4 @@
-"""백테스트 엔진 v1 — 명세 swingbot_backtest_spec_v1 [1]~[6] 기본값. 시뮬레이션만, 주문 코드 없음.
+"""백테스트 엔진 — v1(명세 swingbot_backtest_spec_v1) + v2 변형(Params 의 entry_mode·stop_mode·ma20_days·take_profit). 시뮬레이션만, 주문 코드 없음.
 
 신호(t일 종가): 종가_t > 피봇(t-1까지 데이터로 고정) AND 거래량_t >= K x 평균(거래량 t-50..t-1)
               AND t-1 자격(TT1~7, RS>=70, 유동성, 시장 대비 조정) AND 시장필터(t-1) != 관망 AND 쿨다운 아님
@@ -41,6 +41,12 @@ class Params:
     slip_sell: float = 0.001
     slip_stop: float = 0.002
     capital: float = 1e8
+    # ---- v2 (2026-11-05, 팀장): 규칙을 책·확정본에 맞춘 변형. 기본값은 v1과 같다 ----
+    entry_mode: str = "next_open"   # next_open: 종가 돌파 확인 → 다음날 시가(v1) / intraday: 장중 고가가 피봇을 넘는 날 max(시가, 피봇) 체결(EN-1)
+    stop_mode: str = "trail94"      # trail94: 매일 종가x0.94 위로만(EX-2 v1) / breakeven: -6% 고정, +1R(종가) 뒤 본전으로만 올림(EX-3)
+    ma20_days: int = 1              # 20일선 아래 종가 연속 N일이면 다음날 시가 청산 (확정본·대화: 3일 연속 = 진입 근거 붕괴)
+    take_profit: bool = False       # RR-1 2:1 — 고가가 진입가x(1+2x손절폭)에 닿으면 절반 익절, 나머지 손절선 본전
+    cooldown: bool = True           # CD-1 손실 확정일 신규 매수 금지
 
 
 def vcp_pivot(high: np.ndarray, low: np.ndarray, dates, p: Params) -> float | None:
@@ -109,18 +115,18 @@ def signals(pn, f, mkt_of: dict[str, str], ms: pd.DataFrame, p: Params, k_min: f
     out = []
     t0 = days.searchsorted(pd.Timestamp(start))
     for t in range(max(t0, 252), len(days)):
-        for j in np.flatnonzero(elig[t - 1] & (vr[t] >= k_min) & (c[t] > c[t - 1])):
+        for j in np.flatnonzero(elig[t - 1] & (vr[t] >= k_min) & (h[t] > np.maximum(c[t - 1], 0))):
             w = slice(t - 252, t)
             pv = vcp_pivot(h[w, j], lo[w, j], days[w], p)
-            if pv is None or not c[t, j] > pv:
+            if pv is None or not h[t, j] > pv:      # 장중 고가가 피봇을 넘은 날 전부. 종가 돌파 여부는 close_break 로
                 continue
             hi_i = t - 252 + int(np.nanargmax(h[w, j]))           # 2-4 시장 대비 조정 2배 이상 제외
             ic = ms[mkt_of[cols[j]] + "_close"].to_numpy()
             idd, sdd = ic[t - 1] / ic[hi_i] - 1, c[t - 1, j] / h[hi_i, j] - 1
             if idd < 0 and sdd / idd >= 2:
                 continue
-            out.append((t, j, pv, vr[t, j], rs[t - 1, j]))
-    return pd.DataFrame(out, columns=["t", "j", "pivot", "vr", "rs"])
+            out.append((t, j, pv, vr[t, j], rs[t - 1, j], bool(c[t, j] > pv)))
+    return pd.DataFrame(out, columns=["t", "j", "pivot", "vr", "rs", "close_break"]) if out else pd.DataFrame(columns=["t", "j", "pivot", "vr", "rs", "close_break"])
 
 
 @dataclass
@@ -137,74 +143,118 @@ def simulate(pn, f, sigs: pd.DataFrame, ms: pd.DataFrame, p: Params, start, end=
     days, cols = pn["close"].index, pn["close"].columns
     state = ms["state"].to_numpy() if p.use_filter else np.full(len(days), "trade")
     fee, tax, sb, ss, sst = (p.fee, p.tax, p.slip_buy, p.slip_sell, p.slip_stop) if p.costs else (0, 0, 0, 0, 0)
-    sigs = sigs[sigs["vr"] >= p.K]
-    by_t = {t: g.sort_values("rs", ascending=False) for t, g in sigs.groupby("t")}
+    sigs = sigs[sigs["vr"] >= p.K] if len(sigs) else sigs
+    if p.entry_mode == "next_open" and "close_break" in sigs.columns and len(sigs):
+        sigs = sigs[sigs["close_break"].astype(bool)]
+    by_t = {t: g.sort_values("rs", ascending=False) for t, g in sigs.groupby("t")} if len(sigs) else {}
     t0 = days.searchsorted(pd.Timestamp(start))
     t1 = len(days) if end is None else days.searchsorted(pd.Timestamp(end), "right")
     cash, pos, res, eq, ex = p.capital, {}, Result(), [], []
     last_close, lastv = {}, pn["close"].notna().to_numpy()[::-1].argmax(axis=0)
     lastv = len(days) - 1 - lastv
 
-    def sell(j, px, slip, d, why):
+    def sell(j, px, slip, d, why, frac=1.0):
         nonlocal cash
-        q = pos.pop(j)
-        cash += q["sh"] * px * (1 - slip) * (1 - fee - tax)
+        q = pos[j]
+        sh = q["sh"] if frac >= 1 else math.floor(q["sh"] * frac)
+        if sh <= 0:
+            return
+        cash += sh * px * (1 - slip) * (1 - fee - tax)
         net = px * (1 - slip) * (1 - fee - tax) / (q["px"] * (1 + sb) * (1 + fee)) - 1
         res.trades.append({"code": cols[j], "entry": days[q["t"]], "exit": days[d], "entry_px": q["px"], "exit_px": px,
-                           "gross": px / q["px"] - 1, "net": net, "R": net / p.stop, "days": d - q["t"], "why": why})
+                           "gross": px / q["px"] - 1, "net": net, "R": net / p.stop, "days": d - q["t"], "why": why, "frac": sh / q["sh0"]})
+        q["sh"] -= sh
+        if q["sh"] <= 0:
+            pos.pop(j)
 
-    pending = []
+    def fill(j, px, d, prev_eq):
+        nonlocal cash
+        size = p.slot * prev_eq * (0.5 if state[d - 2] == "reduce" else 1)
+        sh = math.floor(min(size, cash) / (px * (1 + sb) * (1 + fee)))
+        if sh <= 0:
+            res.unfilled["현금부족"] += 1
+            return
+        cash -= sh * px * (1 + sb) * (1 + fee)
+        pos[j] = {"t": d, "px": px, "sh": sh, "sh0": sh, "stop": px * (1 - p.stop), "below": 0, "tp": False}
+
+    def blocked(j, d, pv, intraday):
+        if j in pos:
+            return "보유중"
+        if halt[d, j] or np.isnan(o[d, j]):
+            return "거래정지"
+        if o[d, j] >= c[d - 1, j] * 1.295 and h[d, j] == lo[d, j]:
+            return "상한가"
+        if not intraday and o[d, j] < pv:
+            return "갭다운"
+        if o[d, j] > pv * (1 + p.chase):
+            return "추격금지"
+        if len(pos) >= p.max_pos:
+            return "동시보유초과"
+        return None
+
+    pending, stopped_prev = [], False
     for d in range(t0, t1):
         stopped = False
         for j in list(pos):                               # 상폐: 일봉이 끝나면 마지막 종가로 정리
             if d > lastv[j]:
                 sell(j, last_close[j], ss, d, "상폐")
-        for j in [j for j, q in pos.items() if q["exit"] and not halt[d, j]]:
+        for j in [j for j, q in pos.items() if q["below"] >= p.ma20_days and not halt[d, j]]:
             sell(j, o[d, j], ss, d, "20일선")
         prev_eq = eq[-1] if eq else p.capital
-        for s in pending:
-            j, pv = int(s.j), s.pivot
-            why = None
-            if j in pos:
-                why = "보유중"
-            elif halt[d, j] or np.isnan(o[d, j]):
-                why = "거래정지"
-            elif o[d, j] >= c[d - 1, j] * 1.295 and h[d, j] == lo[d, j]:
-                why = "상한가"
-            elif o[d, j] < pv:
-                why = "갭다운"
-            elif o[d, j] > pv * (1 + p.chase):
-                why = "추격금지"
-            elif len(pos) >= p.max_pos:
-                why = "동시보유초과"
-            if why:
-                res.unfilled[why] += 1
-                continue
-            size = p.slot * prev_eq * (0.5 if state[d - 2] == "reduce" else 1)
-            sh = math.floor(min(size, cash) / (o[d, j] * (1 + sb) * (1 + fee)))
-            if sh <= 0:
-                res.unfilled["현금부족"] += 1
-                continue
-            cash -= sh * o[d, j] * (1 + sb) * (1 + fee)
-            pos[j] = {"t": d, "px": o[d, j], "sh": sh, "stop": o[d, j] * (1 - p.stop), "exit": False}
-        for j in list(pos):                               # 장중 손절(진입일 포함), 갭은 시가 체결
-            q = pos[j]
-            if not halt[d, j] and lo[d, j] <= q["stop"]:
-                sell(j, min(q["stop"], o[d, j]), sst, d, "손절")
-                stopped = True
-        for j, q in pos.items():                          # 종가 마감 후: 손절 갱신(T-A), 20일선 이탈 표시
-            last_close[j] = c[d, j]
-            q["stop"] = max(q["stop"], c[d, j] * (1 - p.stop))
-            q["exit"] = q["exit"] or bool(c[d, j] < ma20[d, j])
-        pending = []
-        if d in by_t:
+        # ---- 진입 ----
+        if p.entry_mode == "next_open":
+            for s_ in pending:
+                j, pv = int(s_.j), s_.pivot
+                why = blocked(j, d, pv, False)
+                if why:
+                    res.unfilled[why] += 1
+                    continue
+                fill(j, o[d, j], d, prev_eq)
+        elif d in by_t:
             g = by_t[d]
-            if stopped:
+            if p.cooldown and stopped_prev:
+                res.unfilled["쿨다운"] += len(g)
+            elif state[d - 1] == "wait":
+                res.unfilled["관망"] += len(g)
+            else:
+                for s_ in g.itertuples():
+                    j, pv = int(s_.j), s_.pivot
+                    why = blocked(j, d, pv, True)
+                    if why:
+                        res.unfilled[why] += 1
+                        continue
+                    fill(j, max(o[d, j], pv), d, prev_eq)   # 장중 피봇 돌파 순간 체결(시가가 이미 위면 시가)
+        # ---- 장중: 익절(2:1) → 손절(진입일 포함, 갭은 시가) ----
+        for j in list(pos):
+            q = pos[j]
+            if halt[d, j]:
+                continue
+            if p.take_profit and not q["tp"] and h[d, j] >= q["px"] * (1 + 2 * p.stop) and d > q["t"]:
+                q["tp"] = True
+                sell(j, q["px"] * (1 + 2 * p.stop), ss, d, "익절(절반)", 0.5)
+                if j in pos:
+                    pos[j]["stop"] = max(pos[j]["stop"], pos[j]["px"])
+            if j in pos and lo[d, j] <= pos[j]["stop"]:
+                sell(j, min(pos[j]["stop"], o[d, j]), sst, d, "손절")
+                stopped = True
+        # ---- 종가 뒤: 손절선 갱신, 20일선 연속 이탈 ----
+        for j, q in pos.items():
+            last_close[j] = c[d, j]
+            if p.stop_mode == "trail94":
+                q["stop"] = max(q["stop"], c[d, j] * (1 - p.stop))
+            elif c[d, j] >= q["px"] * (1 + p.stop):          # +1R 이면 본전으로 (EX-3 수익 구간 최소 본전)
+                q["stop"] = max(q["stop"], q["px"])
+            q["below"] = q["below"] + 1 if c[d, j] < ma20[d, j] else 0
+        pending = []
+        if p.entry_mode == "next_open" and d in by_t:
+            g = by_t[d]
+            if p.cooldown and stopped:
                 res.unfilled["쿨다운"] += len(g)
             elif state[d - 1] == "wait":
                 res.unfilled["관망"] += len(g)
             else:
                 pending = list(g.itertuples())
+        stopped_prev = stopped
         val = sum(q["sh"] * last_close[j] for j, q in pos.items())
         eq.append(cash + val)
         ex.append(val / (cash + val))
