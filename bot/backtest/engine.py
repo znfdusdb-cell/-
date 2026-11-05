@@ -17,6 +17,8 @@ import numpy as np
 import pandas as pd
 
 from ..setups import zigzag
+from .costs import COSTS
+from .markets import SPEC
 
 
 @dataclass
@@ -29,24 +31,35 @@ class Params:
     slot: float = 0.20
     max_pos: int = 5
     rs_min: int = 70
-    min_price: float = 1000
-    min_turnover: float = 1e9
     shrink: float = 0.7
     last_t_max: float = 10.0
     zz: float = 6.0
     slope_min: float = 0.0
-    fee: float = 0.00015
-    tax: float = 0.0025
-    slip_buy: float = 0.001
-    slip_sell: float = 0.001
-    slip_stop: float = 0.002
-    capital: float = 1e8
+    # ---- 시장 변수(일감 C, 2026-11-05): None 이면 market 의 값(markets.SPEC·costs.COSTS). 규칙 숫자는 시장과 무관 ----
+    market: str = "KR"
+    min_price: float | None = None
+    min_turnover: float | None = None
+    fee: float | None = None
+    tax: float | None = None
+    slip_buy: float | None = None
+    slip_sell: float | None = None
+    slip_stop: float | None = None
+    capital: float | None = None
+    limit_up: float | None = None
     # ---- v2 (2026-11-05, 팀장): 규칙을 책·확정본에 맞춘 변형. 기본값은 v1과 같다 ----
     entry_mode: str = "next_open"   # next_open: 종가 돌파 확인 → 다음날 시가(v1) / intraday: 장중 고가가 피봇을 넘는 날 max(시가, 피봇) 체결(EN-1)
     stop_mode: str = "trail94"      # trail94: 매일 종가x0.94 위로만(EX-2 v1) / breakeven: -6% 고정, +1R(종가) 뒤 본전으로만 올림(EX-3)
     ma20_days: int = 1              # 20일선 아래 종가 연속 N일이면 다음날 시가 청산 (확정본·대화: 3일 연속 = 진입 근거 붕괴)
     take_profit: bool = False       # RR-1 2:1 — 고가가 진입가x(1+2x손절폭)에 닿으면 절반 익절, 나머지 손절선 본전
     cooldown: bool = True           # CD-1 손실 확정일 신규 매수 금지
+
+    def __post_init__(self):
+        if self.market not in SPEC:
+            raise ValueError(f"market {self.market!r} — {list(SPEC)} 중 하나")
+        src = {**{k: SPEC[self.market][k] for k in ("min_price", "min_turnover", "capital", "limit_up")}, **COSTS[self.market]}
+        for k in ("min_price", "min_turnover", "capital", "limit_up", "fee", "tax", "slip_buy", "slip_sell", "slip_stop"):
+            if getattr(self, k) is None:
+                setattr(self, k, src[k])
 
 
 def vcp_pivot(high: np.ndarray, low: np.ndarray, dates, p: Params) -> float | None:
@@ -182,7 +195,7 @@ def simulate(pn, f, sigs: pd.DataFrame, ms: pd.DataFrame, p: Params, start, end=
             return "보유중"
         if halt[d, j] or np.isnan(o[d, j]):
             return "거래정지"
-        if o[d, j] >= c[d - 1, j] * 1.295 and h[d, j] == lo[d, j]:
+        if p.limit_up is not None and o[d, j] >= c[d - 1, j] * (1 + p.limit_up) and h[d, j] == lo[d, j]:
             return "상한가"
         if not intraday and o[d, j] < pv:
             return "갭다운"
