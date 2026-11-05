@@ -1,8 +1,13 @@
 # 스윙봇 관제 사이트 — Claude Code 작업 규칙
 
+## 역할 (2026-11-05 회장 결정, 회장 원칙 39·40)
+- 스윙봇 팀장은 Claude 창(투자 스윙봇 대화). 회사(bium-brain 데스크톱 개발·연구)는 팀장이 research `swingbot_*` 지시서로 맡긴 실행·데이터 일만 한다. 규칙·코드·순서는 팀장이 정한다.
+- 기준점은 미너비니 방식 하나. 다른 투자 지식을 섞지 않는다. 결과에 맞춰 규칙을 고치지 않는다(RS-3), 번역 오류만 정정한다.
+- 회사 쪽 작업자는 코드 수정 대신 발견 사항을 research 에 적는다. 회장에게 규칙 질문을 올리지 않는다(팀장에게).
+
 ## 시작할 때
 1. bium-brain에서 `swingbot_final_spec_2026-10-06`(확정 규칙) → `swingbot_context_2026-10-06`(+erratum, erratum_2)(이유·실수 기록) 순으로 읽는다. 충돌하면 확정본 우선.
-2. bium-brain에서 research_id가 `swingbot_cc_request_`로 시작하는 문서를 전부 읽고, 아직 반영 안 된 요청이 있으면 목록으로 보고한다. `search_research`는 research_id를 못 찾으니 제목 키워드 `"클로드 코드 요청"`으로 검색한다(2026-10-07 확인: `swingbot_cc_request` 검색 0건, `클로드 코드 요청` 3건).
+2. bium-brain에서 최신 `swingbot_backtest_*`·`swingbot_pm_log_*`·`swingbot_minervini_review_*`를 읽고 회사가 한 일을 확인한다. research_id가 `swingbot_cc_request_`로 시작하는 문서를 전부 읽고, 아직 반영 안 된 요청이 있으면 목록으로 보고한다. `search_research`는 research_id를 못 찾으니 제목 키워드 `"클로드 코드 요청"`으로 검색한다(2026-10-07 확인: `swingbot_cc_request` 검색 0건, `클로드 코드 요청` 3건).
 3. 규칙이 애매하면 맥락본의 이유로 판단하고, 그래도 애매하면 구현하지 말고 비움에게 묻는다.
 
 ## 세션 저장 (클라우드 세션은 bium-claude-sync 훅이 안 돈다)
