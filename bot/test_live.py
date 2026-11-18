@@ -43,12 +43,21 @@ class Live(unittest.TestCase):
     def test_breakeven_ex3(self):
         b, out = book()
         _, _, n = L.entry_check(W, 10050, 600_000, "09:30", 100_000_000)
-        b.buy("t0", "T", n)                                                # 손절 9,447 → 1R 603
-        self.assertIsNone(b.on_price("t1", "T", 10652, "10:40"))
-        self.assertEqual(b.on_price("t2", "T", 10653, "11:00"), "EX-3")   # +1R
+        b.buy("t0", "T", n)                                                # 손절 9,447 → 1R 603, 3R 1,809
+        self.assertIsNone(b.on_price("t1", "T", 10653, "10:40"))           # +1R 로는 안 올림(v2까지의 오역)
+        self.assertIsNone(b.on_price("t1", "T", 11858, "10:50"))
+        self.assertEqual(b.on_price("t2", "T", 11859, "11:00"), "EX-3")   # +3R (손절폭 x3)
         self.assertEqual(b.pos["T"]["stop"], 10050)
         self.assertEqual(b.on_price("t3", "T", 10050, "14:00"), "EX-1")   # 본전 손절
         self.assertEqual(A.check(out[1]), [])
+
+    def test_be_r_same_as_backtest(self):
+        self.assertEqual(L.BE_R, 3.0)
+        try:
+            from bot.backtest.engine import Params
+        except ImportError:                                               # VPS 봇은 numpy·pandas 없이 돈다
+            self.skipTest("numpy/pandas 없음")
+        self.assertEqual(L.BE_R, Params().be_r)                           # 연습·백테스트 같은 숫자
 
     def test_no_chase(self):
         v, why, _ = L.entry_check(W, 10301, 2_000_000, "09:10", 100_000_000, gate=lambda c, p: [])
@@ -79,14 +88,14 @@ class Live(unittest.TestCase):
         self.assertEqual(A.report([out[0], o]), 1)
 
     def test_replay_breakout(self):
-        anchors = [(0, 100), (200, 200), (220, 170), (240, 195), (255, 180), (268, 193), (278, 186), (290, 192), (299, 191), (300, 196), (310, 215)]
+        anchors = [(0, 100), (200, 200), (220, 170), (240, 195), (255, 180), (268, 193), (278, 186), (290, 192), (299, 191), (300, 196), (310, 215), (325, 235)]
 
         def val(i):
             for (a, pa), (b_, pb) in zip(anchors, anchors[1:]):
                 if a <= i <= b_:
                     return pa + (pb - pa) * (i - a) / (b_ - a)
         d, c = date(2025, 8, 1), []
-        for i in range(311):
+        for i in range(326):
             p = val(i)
             c.append({"date": d.isoformat(), "open": p, "high": p * 1.005, "low": p * 0.995, "close": p,
                       "volume": 3_000_000 if i == 300 else (1_000_000 if i < 200 else 600_000)})
@@ -99,7 +108,8 @@ class Live(unittest.TestCase):
         self.assertEqual(json.loads(orders[0]["note"])["pivot"], 194)
         self.assertEqual(orders[0]["price"], 196)                        # max(시가 196, 피봇 194), 194 x 1.03 이내
         self.assertEqual(A.report(orders), 0)
-        self.assertEqual(len(events), 1)                                 # 215 > 194 x 1.06 → EX-3
+        self.assertEqual(len(events), 1)                                 # 고가 ≥ 196 + 3 x 11.76 = 231.28 → EX-3 한 번
+        self.assertGreaterEqual(events[0]["price"], 231.28)
 
 
 if __name__ == "__main__":

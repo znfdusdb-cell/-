@@ -8,7 +8,7 @@
   EN-2 체결가 ≤ 피봇 x 1.03 (추격 금지)
   sb_can_buy(code, price) = true (UV-1·UV-5·FN-1·CD-1·MF-1·EN-7, DB 관문)
   SZ-1 수량 = 잔고 x 1.25% ÷ (체결가 x 6%) 내림, RR-1 손익비 2:1 미만이면 기록 안 함
-  EX-1 보유 종목 체결가 ≤ 손절선 → 매도 주문서(장중 즉시), EX-3 +1R 도달 → 손절선을 매수가로 올린 기록
+  EX-1 보유 종목 체결가 ≤ 손절선 → 매도 주문서(장중 즉시), EX-3 +3R(손절폭 x3) 도달 → 손절선을 매수가로 올린 기록
 20일선 3일·2R 절반 익절은 종가 기준이라 bot.daily 몫이다(여기 없음).
 웹소켓(H0STCNT0)은 표준 라이브러리에 없어 쓰지 않는다. 폴링만, 호출 간격은 kis.MIN_INTERVAL(초당 약 12건).
 """
@@ -29,6 +29,7 @@ VOL_FRAC = 0.5        # EN-1
 VOL_CUTOFF = "11:00"  # EN-1 개장 2시간
 RISK_PCT = 0.0125     # SZ-1 (지시서 숫자)
 STOP_PCT = 0.06       # EX-1
+BE_R = 3.0            # EX-3 손절폭 x3 오르면 본전(미너비니 13장 정정). 백테스트 Params.be_r 와 같은 숫자
 TARGET_R = 2.0        # RR-1 목표가 = 진입가 + 2R
 RR_MIN = 2.0          # RR-1
 MAX_WATCH = 40        # KIS 실시간 등록 한도
@@ -75,11 +76,11 @@ def entry_check(w: dict, price: float, vol_ref: int, hhmm: str, balance: float, 
 
 
 def holding_check(p: dict, price: float, hhmm: str) -> tuple[str, dict] | None:
-    """보유 종목: EX-1 손절(우선) → EX-3 +1R 본전. 결과 없으면 None."""
+    """보유 종목: EX-1 손절(우선) → EX-3 +3R(BE_R) 본전. 결과 없으면 None."""
     n = {"price": price, "entry": p["entry"], "stop": p["stop"], "initial_stop": p["initial_stop"], "time": hhmm}
     if price <= p["stop"]:
         return "EX-1", n
-    if not p.get("be") and price >= p["entry"] + (p["entry"] - p["initial_stop"]):
+    if not p.get("be") and price >= p["entry"] + BE_R * (p["entry"] - p["initial_stop"]):
         return "EX-3", n
     return None
 
@@ -134,7 +135,7 @@ def replay(candles: dict[str, list[dict]], d0: str, d1: str, capital: float) -> 
                 continue
             bar, ts = cs[i], f"{d}T15:30:00+09:00"
             if code in book.pos:
-                for k in ("open", "low", "high"):     # 시가(갭이면 시가 체결) → 저가(손절 우선, 손절선 체결) → 고가(+1R)
+                for k in ("open", "low", "high"):     # 시가(갭이면 시가 체결) → 저가(손절 우선, 손절선 체결) → 고가(+3R)
                     if code in book.pos:
                         px = book.pos[code]["stop"] if k == "low" and bar["low"] <= book.pos[code]["stop"] else bar[k]
                         book.on_price(ts, code, px, "근사")
