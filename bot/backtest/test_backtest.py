@@ -67,11 +67,13 @@ def test_gap_down_stop_fills_at_open():
     assert len(r.trades) == 1
     t = r.trades[0]
     assert t["why"] == "손절" and t["entry_px"] == 101 and t["exit_px"] == 90
+    assert t["gap_stop"] and abs(t["gap_cost"] - (102 * 0.94 - 90) / 101) < 1e-9   # 손절가 95.88 대비 더 잃은 몫(AQ)
 
 
 def test_intraday_stop_fills_at_stop_price():
     r = sim([100, 100, 101, 100, 100], [101, 101, 103, 101, 101], [99, 99, 100, 94, 94], [100, 101, 102, 95, 95])
     assert r.trades[0]["exit_px"] == 102 * 0.94   # 진입일 종가로 갱신된 손절선(T-A)
+    assert not r.trades[0]["gap_stop"] and r.trades[0]["gap_cost"] == 0
 
 
 def test_chase_and_gap_down_cancelled():
@@ -106,10 +108,27 @@ def test_v2_intraday_chase_blocked_when_open_above():
 def test_v2_breakeven_stop_not_trailing():
     # 체결 100(t=2) → t=3 종가 107(+1R) → 손절 본전 100 → t=4 저가 99 → 100에 손절 (trail94 였으면 107x0.94=100.58)
     o, h, lo, c = [100, 100, 99, 106, 101, 101], [101, 101, 104, 108, 102, 102], [99, 99, 98, 105, 99, 99], [100, 100, 103, 107, 100, 100]
-    r = sim2(o, h, lo, c, 2, entry_mode="intraday", stop_mode="breakeven")
+    r = sim2(o, h, lo, c, 2, entry_mode="intraday", stop_mode="breakeven", be_r=1.0)
     assert r.trades and r.trades[0]["why"] == "손절" and abs(r.trades[0]["exit_px"] - 100) < 1e-9
     r = sim2(o, h, lo, c, 2, entry_mode="intraday", stop_mode="trail94")
     assert abs(r.trades[0]["exit_px"] - 107 * 0.94) < 1e-9
+
+
+def test_v3_breakeven_waits_for_3R():
+    # v3 기본 be_r=3: +7%(1R대)로는 본전 안 올림 → t=4 저가 99 에서 안 팔림. +18%(3R) 종가 뒤에야 본전
+    o, h, lo, c = [100, 100, 99, 106, 101, 101], [101, 101, 104, 108, 102, 102], [99, 99, 98, 105, 99, 99], [100, 100, 103, 107, 100, 100]
+    assert not sim2(o, h, lo, c, 2, entry_mode="intraday", stop_mode="breakeven").trades
+    o, h, lo, c = [100, 100, 99, 115, 101, 101], [101, 101, 104, 119, 102, 102], [99, 99, 98, 114, 99, 99], [100, 100, 103, 118, 100, 100]
+    r = sim2(o, h, lo, c, 2, entry_mode="intraday", stop_mode="breakeven")
+    assert r.trades and abs(r.trades[0]["exit_px"] - 100) < 1e-9
+
+
+def test_v3_tt6_needs_30pct_above_52w_low():
+    n = 300
+    c = np.r_[np.linspace(100, 100, 40), np.linspace(100, 128, n - 40)]       # 52주 저가 100 → 종가 128 (+28%)
+    pn, _ = panel(c, c, c, c)
+    assert not E.features(pn, E.Params(rs_min=0, min_price=0, min_turnover=0))["elig"].iloc[-1, 0]
+    assert E.features(pn, E.Params(rs_min=0, min_price=0, min_turnover=0, tt6_low=0.25))["elig"].iloc[-1, 0]
 
 
 def test_v2_ma20_three_days():
@@ -123,9 +142,9 @@ def test_v2_ma20_three_days():
 def test_v2_take_profit_half_at_2R():
     o, h, lo, c = [100, 100, 99, 105, 100, 100], [101, 101, 104, 113, 101, 101], [99, 99, 98, 104, 99.5, 99.5], [100, 100, 103, 112, 100, 100]
     r = sim2(o, h, lo, c, 2, entry_mode="intraday", stop_mode="breakeven", take_profit=True)
-    whys = [t["why"] for t in r.trades]
-    assert whys[0] == "익절(절반)" and abs(r.trades[0]["exit_px"] - 112) < 1e-9 and abs(r.trades[0]["frac"] - 0.5) < 0.01
-    assert whys[1] == "손절" and abs(r.trades[1]["exit_px"] - 100) < 1e-9    # 나머지는 본전에서
+    assert len(r.trades) == 1                     # v3: 절반 익절 + 나머지 본전 손절 = 포지션 1건 (v2는 2행으로 두 번 셌다)
+    t = r.trades[0]
+    assert t["tp"] and t["why"] == "손절" and abs(t["net"] - (0.5 * 0.12 + 0.5 * 0.0)) < 0.002 and abs(t["exit_px"] - 106) < 0.1
 
 
 # ---- 일감 C: 시장 변수 ----
@@ -134,7 +153,8 @@ from functools import partial  # noqa: E402
 
 from bot.backtest import gate, markets, run_market  # noqa: E402
 
-RULES = ("K", "chase", "stop", "slot", "max_pos", "rs_min", "shrink", "last_t_max", "zz", "slope_min", "entry_mode", "stop_mode", "ma20_days", "take_profit", "cooldown")
+RULES = ("K", "chase", "stop", "slot", "max_pos", "rs_min", "shrink", "last_t_max", "zz", "slope_min", "entry_mode", "stop_mode", "ma20_days", "take_profit", "cooldown",
+         "tt6_low", "be_r")
 
 
 def test_kr_params_equal_v2_defaults():

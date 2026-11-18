@@ -149,6 +149,23 @@ class T(unittest.TestCase):
         self.assertEqual(p["b"], 99)
         self.assertLess(p["c"], p["a"])
 
+    def test_fund_op_min_by_market_gate(self):
+        from bot.scan import fund_check, op_min
+        self.assertEqual((op_min("PASS"), op_min("WAIT"), op_min(None)), (40.0, 25.0, 25.0))
+        g = [{"period": "a", "op_yoy": 30.0, "rev_yoy": 5.0}, {"period": "b", "op_yoy": 45.0, "rev_yoy": 5.0}]
+        self.assertTrue(fund_check(g, "WAIT")[0])
+        self.assertFalse(fund_check(g, "PASS")[0])        # 강세장(PASS)에선 30%로는 부족
+
+    def test_tt6_30pct(self):
+        from bot.setups import compute
+        def run(last):
+            from datetime import date as D, timedelta as TD
+            c = [{"date": (D(2025, 1, 1) + TD(days=i)).isoformat(), "open": 100, "high": 100, "low": 100, "close": 100, "volume": 1} for i in range(260)]
+            c[-1].update(close=last, high=last)
+            return {x["key"]: x for x in compute("S", c)["trend_template"]}["tt6"]["pass"]
+        self.assertFalse(run(128))
+        self.assertTrue(run(131))
+
 
 if __name__ == "__main__":
     unittest.main()
