@@ -32,6 +32,7 @@ STOP_PCT = 0.06       # EX-1
 TARGET_R = 2.0        # RR-1 목표가 = 진입가 + 2R
 RR_MIN = 2.0          # RR-1
 MAX_WATCH = 40        # KIS 실시간 등록 한도
+PRACTICE_CAPITAL = 1e8  # 연습 가상 잔고(잔고 스냅샷 없을 때). 재생 --capital 기본값과 같다
 OPEN, CLOSE, POLL_S = "09:00", "15:30", 5.0
 POS_FILE = HOME / "practice_positions.json"
 EVENTS_FILE = HOME / "practice_events.jsonl"
@@ -193,6 +194,9 @@ def run_live() -> int:
         return 0
     wl = {w["code"]: w for w in load_watchlist(db, today)}
     balance = balance_of(db)
+    virtual = not balance
+    if virtual:
+        balance = PRACTICE_CAPITAL   # 봇 계좌 잔고 스냅샷이 없으면 연습용 가상 잔고(재생·백테스트와 같은 1억). 주문서 note.balance 에 그대로 남는다
     positions = json.loads(POS_FILE.read_text(encoding="utf-8")) if POS_FILE.exists() else {}
 
     def save():
@@ -204,8 +208,8 @@ def run_live() -> int:
     book = Book(positions, sink)
     codes = (list(positions) + [c for c in wl if c not in positions])[:MAX_WATCH]
     print(f"===== {now_kst():%Y-%m-%d %H:%M} 연습 루프: 감시 {len(wl)} + 연습 보유 {len(positions)}, 잔고 {balance:,.0f} =====")
-    if not balance:
-        print("SZ-1: 봇 계좌 잔고 스냅샷 없음 → 진입 주문서 기록 불가 (손절 감시는 계속)")
+    if virtual:
+        print(f"SZ-1: 봇 계좌 잔고 스냅샷 없음 → 연습 가상 잔고 {PRACTICE_CAPITAL:,.0f}원으로 수량 계산")
     vol_pre, done, last_why, fails = {}, set(), {}, 0
     while (hhmm := f"{now_kst():%H:%M}") < CLOSE:
         if hhmm < OPEN:
@@ -238,7 +242,8 @@ def run_live() -> int:
             ref = q["volume"] if hhmm < VOL_CUTOFF else vol_pre.get(code, 0)
 
             def gate(c, p):
-                return [] if db.rpc("sb_can_buy", {"p_code": c, "p_price": p}) else db.rpc("sb_buy_blockers", {"p_code": c, "p_price": p})
+                # 연습 범위는 레이더·검토 종목까지(회장 결정 11/18). 단계 관문(UV-1)만 연습에서 빼고 나머지 관문은 실전과 같다.
+                return [b for b in (db.rpc("sb_buy_blockers", {"p_code": c, "p_price": p}) or []) if not str(b).startswith("UV-1")]
             v, why, n = entry_check(wl[code], q["price"], ref, hhmm, balance, gate)
             if v == "order":
                 book.buy(ts, code, n)
