@@ -1,12 +1,16 @@
 """내일 감시 목록 → sb_watchlist. bot.daily 가 일봉·셋업 뒤에 부른다(16:20).
-유니버스·보유 종목 중 setups.py 가 2단계+피봇을 낸 종목(피봇이 있으면 2단계), 보유 먼저 → 종가가 피봇에 가까운 순, 최대 40개."""
+연습 범위(회장 결정 11/18): 레이더·검토·유니버스·보유 종목 중 setups.py 가 2단계+피봇을 낸 종목.
+연습은 넓게 돌려 규칙대로 움직이는지 보고, 실전(현금)은 그중 검증된 종목을 팀장이 이유와 함께 올려 회장이 유니버스 승인한 것만.
+정렬: 보유 → 유니버스 → 나머지, 같은 묶음 안에서는 종가가 피봇에 가까운 순, 최대 40개."""
 from __future__ import annotations
 
 from .loop import MAX_WATCH, STOP_PCT
 
+RANK = {"holding": 0, "universe": 1, "review": 2, "radar": 3}
+
 
 def build(db) -> list[dict]:
-    stocks = {s["code"]: s for s in db.select("sb_stocks", "select=code,name,stage&stage=in.(universe,holding)&is_seed=eq.false")}
+    stocks = {s["code"]: s for s in db.select("sb_stocks", "select=code,name,stage&stage=in.(radar,review,universe,holding)&is_seed=eq.false")}
     if not stocks:
         return []
     latest = {}
@@ -24,7 +28,7 @@ def build(db) -> list[dict]:
         rows.append({"as_of": s["as_of"], "code": code, "pivot": pv, "stop": round(pv * (1 - STOP_PCT), 2),
                      "vol50": round(sum(int(x["volume"]) for x in c) / 50),
                      "reason": f"{stocks[code]['stage']} · 2단계+피봇 · 종가 {close:,.0f} → 피봇까지 {gap:+.1f}%",
-                     "_k": (stocks[code]["stage"] != "holding", abs(gap))})
+                     "_k": (RANK.get(stocks[code]["stage"], 9), abs(gap))})
     rows = sorted(rows, key=lambda r: r["_k"])[:MAX_WATCH]
     for r in rows:
         r.pop("_k")
