@@ -32,6 +32,7 @@ STOP_PCT = 0.06       # EX-1
 TARGET_R = 2.0        # RR-1 목표가 = 진입가 + 2R
 RR_MIN = 2.0          # RR-1
 MAX_WATCH = 40        # KIS 실시간 등록 한도
+PRACTICE_SKIP = ("UV-1", "FN-1")  # 연습에서만 빼는 관문(실전 sb_can_buy 는 그대로)
 PRACTICE_CAPITAL = 1e8  # 연습 가상 잔고(잔고 스냅샷 없을 때). 재생 --capital 기본값과 같다
 OPEN, CLOSE, POLL_S = "09:00", "15:30", 5.0
 POS_FILE = HOME / "practice_positions.json"
@@ -242,8 +243,9 @@ def run_live() -> int:
             ref = q["volume"] if hhmm < VOL_CUTOFF else vol_pre.get(code, 0)
 
             def gate(c, p):
-                # 연습 범위는 레이더·검토 종목까지(회장 결정 11/18). 단계 관문(UV-1)만 연습에서 빼고 나머지 관문은 실전과 같다.
-                return [b for b in (db.rpc("sb_buy_blockers", {"p_code": c, "p_price": p}) or []) if not str(b).startswith("UV-1")]
+                # 연습 범위는 레이더·검토 종목까지(회장 결정 11/18). 돈의 성격·종목 승인 관문(UV-1 단계, FN-1 생활비 분리)은
+                # 실제 돈이 나갈 때만 의미가 있어 연습에서 뺀다. 행동 규칙 관문(UV-5, CD-1, MF-1, EN-7)은 실전과 같다.
+                return [b for b in (db.rpc("sb_buy_blockers", {"p_code": c, "p_price": p}) or []) if not str(b).startswith(PRACTICE_SKIP)]
             v, why, n = entry_check(wl[code], q["price"], ref, hhmm, balance, gate)
             if v == "order":
                 book.buy(ts, code, n)
