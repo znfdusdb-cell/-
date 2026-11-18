@@ -60,6 +60,8 @@ def fund_check(g: list[dict], gate: str | None = None) -> tuple[bool, str]:
 
 def update_cache(con, kis: Kis, code: str, today: date) -> None:
     last, n = cache.last_date(con, code)
+    if last and n >= 255 and last >= today.isoformat():
+        return          # 오늘 일봉까지 이미 받았다 → 다시 묻지 않는다(같은 날 다시 돌릴 때 한투 호출 0)
     if not last or n < 255:
         start = today - timedelta(days=FIRST_DAYS)
     else:
