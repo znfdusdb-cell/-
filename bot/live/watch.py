@@ -43,3 +43,7 @@ def main() -> int:
         db.upsert("sb_watchlist", rows, "as_of,code")
     print(f"감시 목록 {len(rows)}종목 저장")
     return 0
+
+
+if __name__ == "__main__":
+    main()
