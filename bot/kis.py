@@ -69,6 +69,9 @@ class Kis:
             if res.get("msg_cd") == "EGW00201" and attempt < 3:  # 초당 거래건수 초과 → 잠깐 쉬고 다시
                 time.sleep(1.0 + attempt)
                 continue
+            if res.get("msg_cd") == "OPSQ0008" and attempt < 3:  # 한투 쪽 중계(MCI) 일시 오류 → 조금 길게 쉬고 다시
+                time.sleep(3.0 * (attempt + 1))
+                continue
             raise KisError(f"{tr_id} {params.get('FID_INPUT_ISCD', '')}: {res.get('msg_cd')} {res.get('msg1')}")
         raise KisError("재시도 초과")
 
