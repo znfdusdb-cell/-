@@ -5,7 +5,7 @@
 3. 유동성 거름: 주가 1,000원 이상, 최근 20일 평균 거래대금 10억 원 이상 (Claude 초기값)
 4. 상대강도(RS): 0.4×3개월 + 0.2×6개월 + 0.2×9개월 + 0.2×12개월 수익률 → 전 종목 백분위 1~99
 5. 가격 거름: 트렌드 템플레이트 1~7 전부 + RS 70 이상
-6. 실적 거름(DART): 최근 2개 보고 기간 모두 영업이익 1년 전 대비 +25% 이상(흑자 전환 포함) + 매출 증가
+6. 실적 거름(DART): 최근 2개 보고 기간 모두 영업이익 1년 전 대비 +25% 이상(시장 관문 PASS=강세장이면 +40%, 책 7장)(흑자 전환 포함) + 매출 증가
 7. 둘 다 통과 → RS 높은 순으로 하루 최대 10개 레이더 투입(sb_stocks, actor=bot). 요약은 sb_scans
 """
 from __future__ import annotations
@@ -25,6 +25,7 @@ MIN_PRICE = 1000
 MIN_TURNOVER = 1_000_000_000      # 20일 평균 거래대금 10억
 RS_MIN = 70
 OP_YOY_MIN = 25.0
+OP_YOY_BULL = 40.0                # 시장 관문 PASS(강세장)일 때만 (책 7장 원본 대조 2026-11-18 정정)
 MAX_ADD = 10
 FIRST_DAYS = 400                  # 첫 적재 달력일 (약 270거래일)
 
@@ -42,11 +43,17 @@ def percentile(raw: dict[str, float]) -> dict[str, int]:
     return {c: max(1, min(99, round((i + 1) / n * 99))) for i, (c, _) in enumerate(items)} if n else {}
 
 
-def fund_check(g: list[dict]) -> tuple[bool, str]:
+def op_min(gate: str | None) -> float:
+    """영업이익 기준: 시장 관문(backtest run_market 판정 PASS/WAIT)이 PASS 일 때만 40%, 그 밖(WAIT·모름)은 25%."""
+    return OP_YOY_BULL if (gate or "").strip().upper() == "PASS" else OP_YOY_MIN
+
+
+def fund_check(g: list[dict], gate: str | None = None) -> tuple[bool, str]:
     if len(g) < 2:
         return False, "비교 가능한 보고 기간 2개 미만"
     a, b = g[0], g[1]
-    ok = all(x["op_yoy"] is not None and x["op_yoy"] >= OP_YOY_MIN and x["rev_yoy"] is not None and x["rev_yoy"] > 0 for x in (a, b))
+    m = op_min(gate)
+    ok = all(x["op_yoy"] is not None and x["op_yoy"] >= m and x["rev_yoy"] is not None and x["rev_yoy"] > 0 for x in (a, b))
     f = lambda v: "흑자전환" if v == 999.0 else ("—" if v is None else f"{v:+.0f}%")  # noqa: E731
     return ok, f"{a['period']} 영업이익 {f(a['op_yoy'])}·매출 {f(a['rev_yoy'])} / {b['period']} 영업이익 {f(b['op_yoy'])}·매출 {f(b['rev_yoy'])}"
 
@@ -67,6 +74,7 @@ def main(argv=None) -> int:
     t0 = time.time()
     today = datetime.now(KST).date()
     con = cache.db()
+    gate = env.get("MARKET_GATE", "WAIT")     # run_market 판정(PASS/WAIT)을 ~/.swingbot/env 에 적어 두면 쓴다. 없으면 WAIT → 25%
     kis = Kis(env["KIS_APP_KEY"], env["KIS_APP_SECRET"])
     db = Supa(env["SUPABASE_URL"], env["SUPABASE_SERVICE_KEY"])
 
@@ -133,7 +141,7 @@ def main(argv=None) -> int:
         for s in price_pass:
             corp = cc.get(s["code"])
             g = dart.growth(periods, data, corp) if corp else []
-            ok, why = fund_check(g)
+            ok, why = fund_check(g, gate)
             s["fund"] = why if corp else "DART 고유번호 없음"
             s["fund_ok"] = ok
             if ok:
@@ -165,7 +173,7 @@ def main(argv=None) -> int:
     top = [{k: s.get(k) for k in ("code", "name", "market", "rs", "close", "turnover_eok", "dd", "fund", "fund_ok")} for s in price_pass[:60]]
     db.upsert("sb_scans", [{"as_of": today.isoformat(), "universe_n": len(stocks), "rs_n": len(rs), "price_pass_n": len(price_pass), "fund_pass_n": len(fund_pass),
                             "added": added, "top": top, "rs_mine": mine, "seconds": round(time.time() - t0), "kis_fail_n": fails,
-                            "notes": f"마스터 {summary} / 유동성 {MIN_PRICE}원·거래대금 {MIN_TURNOVER // 100_000_000}억, RS {RS_MIN}+, 영업이익 +{OP_YOY_MIN:.0f}% 2기간 + 매출 증가 (Claude 초기값)"}], "as_of")
+                            "notes": f"마스터 {summary} / 유동성 {MIN_PRICE}원·거래대금 {MIN_TURNOVER // 100_000_000}억, RS {RS_MIN}+, 영업이익 +{op_min(gate):.0f}%(관문 {gate}) 2기간 + 매출 증가 (Claude 초기값)"}], "as_of")
     print(f"스캔 끝 {time.time() - t0:.0f}초")
     return 0
 

@@ -20,10 +20,11 @@ from .supa import Supa
 
 KST = timezone(timedelta(hours=9))
 ZIGZAG_PCT = 6.0      # 이보다 작은 흔들림은 무시
+TT6_MIN_PCT = 30.0    # 52주 저가 대비 최소 +30% (책 5장 원본 대조 2026-11-18 정정, 전엔 25)
 TT_LABELS = [
     ("tt1", "현재가 > 150일선·200일선"), ("tt2", "150일선 > 200일선"),
     ("tt3", "200일선 1개월 이상 상승 (권장 4~5개월)"), ("tt4", "50일선 > 150일선 > 200일선"),
-    ("tt5", "현재가 > 50일선"), ("tt6", "52주 신저가 대비 +25~30% 이상"),
+    ("tt5", "현재가 > 50일선"), ("tt6", "52주 신저가 대비 +30% 이상"),
     ("tt7", "52주 신고가 25% 이내"), ("tt8", "상대강도 상위"),
 ]
 CL_LABELS = [
@@ -98,7 +99,7 @@ def compute(code: str, candles: list[dict], rs: int | None = None) -> dict | Non
         item(2, ma200 and ma200_1m and ma200 > ma200_1m, f"200일선 1개월 전 {won(ma200_1m)} → {won(ma200)}" if ma200_1m else "1개월 전 200일선 없음", pending=ma200_1m is None),
         item(3, ma50 and ma150 and ma200 and ma50 > ma150 > ma200, f"50일 {won(ma50)} / 150일 {won(ma150)} / 200일 {won(ma200)}" if ma200 else None, pending=ma200 is None),
         item(4, ma50 and price > ma50, f"{won(price)} vs 50일 {won(ma50)}"),
-        item(5, from_low >= 25, f"52주 저가 {won(lo['low'])}({lo['date'][5:]}) 대비 {from_low:+.1f}%" if has52 else f"데이터 부족 (일봉 {len(c)} / 252)", pending=not has52),
+        item(5, from_low >= TT6_MIN_PCT, f"52주 저가 {won(lo['low'])}({lo['date'][5:]}) 대비 {from_low:+.1f}%" if has52 else f"데이터 부족 (일봉 {len(c)} / 252)", pending=not has52),
         item(6, dd >= -25, f"52주 고가 {won(hi['high'])}({hi['date'][5:]}) 대비 {dd:.1f}%" if has52 else f"데이터 부족 (일봉 {len(c)} / 252)", pending=not has52),
         item(7, rs is not None and rs >= 70, f"RS {rs} (전 종목 백분위, 70 이상 통과)" if rs is not None else "전 종목 등수 계산 전", pending=rs is None),
     ]

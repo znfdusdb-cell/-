@@ -1,4 +1,4 @@
-"""백테스트 엔진 — v1(명세 swingbot_backtest_spec_v1) + v2 변형(Params 의 entry_mode·stop_mode·ma20_days·take_profit). 시뮬레이션만, 주문 코드 없음.
+"""백테스트 엔진 — v1(명세 swingbot_backtest_spec_v1) + v2 변형(Params 의 entry_mode·stop_mode·ma20_days·take_profit) + v3 정정(tt6_low 30%·be_r 3R·포지션 1행). 시뮬레이션만, 주문 코드 없음.
 
 신호(t일 종가): 종가_t > 피봇(t-1까지 데이터로 고정) AND 거래량_t >= K x 평균(거래량 t-50..t-1)
               AND t-1 자격(TT1~7, RS>=70, 유동성, 시장 대비 조정) AND 시장필터(t-1) != 관망 AND 쿨다운 아님
@@ -48,10 +48,13 @@ class Params:
     limit_up: float | None = None
     # ---- v2 (2026-11-05, 팀장): 규칙을 책·확정본에 맞춘 변형. 기본값은 v1과 같다 ----
     entry_mode: str = "next_open"   # next_open: 종가 돌파 확인 → 다음날 시가(v1) / intraday: 장중 고가가 피봇을 넘는 날 max(시가, 피봇) 체결(EN-1)
-    stop_mode: str = "trail94"      # trail94: 매일 종가x0.94 위로만(EX-2 v1) / breakeven: -6% 고정, +1R(종가) 뒤 본전으로만 올림(EX-3)
+    stop_mode: str = "trail94"      # trail94: 매일 종가x0.94 위로만(EX-2 v1) / breakeven: -6% 고정, +be_r R(종가) 뒤 본전으로만 올림(EX-3)
     ma20_days: int = 1              # 20일선 아래 종가 연속 N일이면 다음날 시가 청산 (확정본·대화: 3일 연속 = 진입 근거 붕괴)
     take_profit: bool = False       # RR-1 2:1 — 고가가 진입가x(1+2x손절폭)에 닿으면 절반 익절, 나머지 손절선 본전
     cooldown: bool = True           # CD-1 손실 확정일 신규 매수 금지
+    # ---- v3 (2026-11-18, 팀장): 책 원본 대조로 번역 오류 정정(학습 노트 v2 정정 M·AL) ----
+    tt6_low: float = 0.30           # TT6 52주 저가 대비 최소 +30% (v2까지 25%)
+    be_r: float = 3.0               # breakeven 모드: 종가가 +be_r R(손절폭 x be_r) 이상이면 손절선 본전 (v2까지 1R)
 
     def __post_init__(self):
         if self.market not in SPEC:
@@ -114,7 +117,7 @@ def features(pn: dict[str, pd.DataFrame], p: Params) -> dict[str, pd.DataFrame]:
     f["vavg50"] = v.rolling(50).mean().shift(1)
     turnover = (c * v).rolling(20).mean()
     tt = ((c > f["ma150"]) & (c > f["ma200"]) & (f["ma150"] > f["ma200"]) & (f["ma200"] > f["ma200"].shift(21))
-          & (f["ma50"] > f["ma150"]) & (c > f["ma50"]) & (c >= f["lo252"] * 1.25) & (c >= f["hi252"] * 0.75))
+          & (f["ma50"] > f["ma150"]) & (c > f["ma50"]) & (c >= f["lo252"] * (1 + p.tt6_low)) & (c >= f["hi252"] * 0.75))
     f["elig"] = tt & (f["rs"] >= p.rs_min) & (c >= p.min_price) & (turnover >= p.min_turnover) & (c > f["hi252"] * 0.4)
     return f
 
@@ -166,18 +169,25 @@ def simulate(pn, f, sigs: pd.DataFrame, ms: pd.DataFrame, p: Params, start, end=
     last_close, lastv = {}, pn["close"].notna().to_numpy()[::-1].argmax(axis=0)
     lastv = len(days) - 1 - lastv
 
-    def sell(j, px, slip, d, why, frac=1.0):
+    def sell(j, px, slip, d, why, frac=1.0, gap=0.0):
+        """부분 매도는 포지션에 쌓고, 다 팔린 날 포지션 1행으로 기록(v3: 절반 익절도 한 거래). 수익률은 처음 수량 가중."""
         nonlocal cash
         q = pos[j]
         sh = q["sh"] if frac >= 1 else math.floor(q["sh"] * frac)
         if sh <= 0:
             return
         cash += sh * px * (1 - slip) * (1 - fee - tax)
-        net = px * (1 - slip) * (1 - fee - tax) / (q["px"] * (1 + sb) * (1 + fee)) - 1
-        res.trades.append({"code": cols[j], "entry": days[q["t"]], "exit": days[d], "entry_px": q["px"], "exit_px": px,
-                           "gross": px / q["px"] - 1, "net": net, "R": net / p.stop, "days": d - q["t"], "why": why, "frac": sh / q["sh0"]})
+        w = sh / q["sh0"]
+        q["net"] += w * (px * (1 - slip) * (1 - fee - tax) / (q["px"] * (1 + sb) * (1 + fee)) - 1)
+        q["gross"] += w * (px / q["px"] - 1)
+        q["xv"] += w * px
+        q["gap"] += w * gap
+        q["parts"].append(why)
         q["sh"] -= sh
         if q["sh"] <= 0:
+            res.trades.append({"code": cols[j], "entry": days[q["t"]], "exit": days[d], "entry_px": q["px"], "exit_px": q["xv"],
+                               "gross": q["gross"], "net": q["net"], "R": q["net"] / p.stop, "days": d - q["t"], "why": why,
+                               "tp": "익절(절반)" in q["parts"], "gap_stop": gap > 0, "gap_cost": q["gap"]})
             pos.pop(j)
 
     def fill(j, px, d, prev_eq):
@@ -188,7 +198,8 @@ def simulate(pn, f, sigs: pd.DataFrame, ms: pd.DataFrame, p: Params, start, end=
             res.unfilled["현금부족"] += 1
             return
         cash -= sh * px * (1 + sb) * (1 + fee)
-        pos[j] = {"t": d, "px": px, "sh": sh, "sh0": sh, "stop": px * (1 - p.stop), "below": 0, "tp": False}
+        pos[j] = {"t": d, "px": px, "sh": sh, "sh0": sh, "stop": px * (1 - p.stop), "below": 0, "tp": False,
+                  "net": 0.0, "gross": 0.0, "xv": 0.0, "gap": 0.0, "parts": []}
 
     def blocked(j, d, pv, intraday):
         if j in pos:
@@ -248,14 +259,15 @@ def simulate(pn, f, sigs: pd.DataFrame, ms: pd.DataFrame, p: Params, start, end=
                 if j in pos:
                     pos[j]["stop"] = max(pos[j]["stop"], pos[j]["px"])
             if j in pos and lo[d, j] <= pos[j]["stop"]:
-                sell(j, min(pos[j]["stop"], o[d, j]), sst, d, "손절")
+                sp = pos[j]["stop"]                       # 시가가 이미 손절가 아래(갭 하락)면 시가 체결(AQ). gap = 손절가 대비 더 잃은 몫(진입가 대비)
+                sell(j, min(sp, o[d, j]), sst, d, "손절", gap=max(0.0, sp - o[d, j]) / pos[j]["px"])
                 stopped = True
         # ---- 종가 뒤: 손절선 갱신, 20일선 연속 이탈 ----
         for j, q in pos.items():
             last_close[j] = c[d, j]
             if p.stop_mode == "trail94":
                 q["stop"] = max(q["stop"], c[d, j] * (1 - p.stop))
-            elif c[d, j] >= q["px"] * (1 + p.stop):          # +1R 이면 본전으로 (EX-3 수익 구간 최소 본전)
+            elif c[d, j] >= q["px"] * (1 + p.be_r * p.stop):  # +3R(손절폭 x3) 이면 본전으로 (EX-3, 책 13장 정정 AL)
                 q["stop"] = max(q["stop"], q["px"])
             q["below"] = q["below"] + 1 if c[d, j] < ma20[d, j] else 0
         pending = []
