@@ -23,5 +23,6 @@ bash <(curl -fsSL https://raw.githubusercontent.com/znfdusdb-cell/-/claude/swing
 ## 연습 모드 (bot.live, 주문 없음 — 주문서 기록만)
 - `bot.daily` 끝에 `bot.live.watch`: 유니버스·보유 중 2단계+피봇 최대 40개 → sb_watchlist.
 - `python3 -m bot.live.loop` : 평일 08:50 크론 시작, 09:00~15:30 현재가 폴링. EN-1(피봇 돌파 + 11:00 기준 누적 거래량 ≥ 50일 평균 x 0.5)·EN-2(피봇 x 1.03 이하)·sb_can_buy → SZ-1 수량(리스크 1.25%, 손절 6%)·RR-1 2:1 → sb_orders_log(source='practice'). 연습 보유는 `~/.swingbot/practice_positions.json`, EX-1 손절 매도 주문서, EX-3 본전 이동은 `practice_events.jsonl`. 기록 `~/.swingbot/live.log`, 실패 알림 줄은 `live.alert`.
+- 퇴출 연동(`bot.live.exits`, 11/27): 연습 보유는 sb_positions(account='practice')에 매수·EX-3 손절선·매도(closed_at·exit_price·realized_pnl·r_multiple)를 기록하고, json 은 캐시(루프 시작 때 DB 우선으로 맞춤). `bot.daily` 가 셋업 뒤·감시 목록 앞에 종가 퇴출 판정(20일선 아래 종가 3거래일 연속·종가 < 진입 때 C 박스 하단) → 다음 장 첫 조회가 EX-5 매도. 루프 시작 때 stage='exited' 종목의 연습 보유 → 첫 조회가 UV-3 매도(note 에 sb_stage_log 승인 시각). 우선순위 EX-1 > EX-5·UV-3 > EX-3. 2R 절반 익절은 연습에 없음. 마이그레이션 `20261127_10_practice_exit.sql` 적용 전엔 캐시로만 돈다.
 - `python3 -m bot.live.loop --replay 2026-05-01..2026-10-31` : 캐시 일봉 근사 재생(고가>피봇이면 max(시가,피봇) 체결) → `replay_orders.jsonl` → 위반 검사.
 - `python3 -m bot.live.audit [--file ...]` : 주문서 30장을 규칙표와 대조, 위반 0 이면 종료 코드 0.
