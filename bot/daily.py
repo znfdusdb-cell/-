@@ -3,7 +3,9 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 from . import load_candles, scan, setups
-from .live import watch
+from .config import load_env
+from .live import exits, watch
+from .supa import Supa
 
 
 def main() -> int:
@@ -14,6 +16,11 @@ def main() -> int:
         print("스캔 실패:", e)
     rc = load_candles.main([])
     setups.main([])
+    try:
+        env = load_env()
+        exits.mark_close_exits(Supa(env["SUPABASE_URL"], env["SUPABASE_SERVICE_KEY"]))   # 연습 보유 종가 퇴출 → 다음 장 시작 매도 표시
+    except Exception as e:
+        print("종가 퇴출 판정 실패:", e)
     try:
         watch.main()       # 연습 모드 장중 루프(bot.live.loop)가 내일 볼 종목
     except Exception as e:

@@ -7,6 +7,7 @@ from datetime import date, timedelta
 
 os.environ.setdefault("SWINGBOT_HOME", tempfile.mkdtemp())
 from bot.live import audit as A  # noqa: E402
+from bot.live import exits as X  # noqa: E402
 from bot.live import loop as L  # noqa: E402
 
 W = {"code": "T", "pivot": 10000, "vol50": 1_000_000}
@@ -110,6 +111,147 @@ class Live(unittest.TestCase):
         self.assertEqual(A.report(orders), 0)
         self.assertEqual(len(events), 1)                                 # 고가 ≥ 196 + 3 x 11.76 = 231.28 → EX-3 한 번
         self.assertGreaterEqual(events[0]["price"], 231.28)
+
+
+def bars(closes, start=date(2026, 10, 1)):
+    out, d = [], start
+    for c in closes:
+        out.append({"date": d.isoformat(), "open": c, "high": c, "low": c, "close": c, "volume": 1})
+        d += timedelta(days=1)
+        while d.weekday() > 4:
+            d += timedelta(days=1)
+    return out
+
+
+class FakeStore:
+    def __init__(self):
+        self.calls, self.rows = [], {}
+
+    def open(self, code, p):
+        p["id"] = len(self.rows) + 1
+        self.rows[p["id"]] = dict(p, code=code)
+        self.calls.append(("open", code))
+
+    def update(self, code, p):
+        self.rows[p["id"]].update(p)
+        self.calls.append(("update", code))
+
+    def close(self, code, p, rule, price, ts):
+        pnl, r = X.r_multiple(p["entry"], p["initial_stop"], price, p["qty"])
+        self.rows[p["id"]].update(closed_at=ts, exit_price=price, realized_pnl=pnl, r_multiple=r, exit_rule=rule)
+        self.calls.append(("close", code))
+
+
+class Exits(unittest.TestCase):
+    """지시서 2026-11-27 3절: 20일선 3일·박스 하단·손절 우선·UV-3·r_multiple."""
+    POS = {"entry": 10000, "stop": 9400, "initial_stop": 9400, "opened": "2026-10-01", "box_low": None}
+
+    def test_ma20_three_days(self):
+        up = [100.0] * 20
+        self.assertIsNone(X.close_exit(self.POS, bars(up + [99, 98])))           # 2일이면 유지
+        x = X.close_exit(self.POS, bars(up + [99, 98, 97]))                      # 3일 연속 → 다음 장 매도
+        self.assertEqual((x["rule"], x["ma20_days"]), ("EX-5", 3))
+        self.assertIn("20일선", x["why"])
+        self.assertIsNone(X.close_exit(self.POS, bars(up + [99, 98, 101, 97])))  # 중간에 위로 마감하면 다시 센다
+
+    def test_ma20_counts_from_entry(self):
+        b = bars([100.0] * 20 + [99, 98, 97])
+        self.assertIsNone(X.close_exit(dict(self.POS, opened=b[-2]["date"]), b))   # 진입 전 날은 안 센다
+
+    def test_box_low(self):
+        p = dict(self.POS, box_low=95)
+        self.assertIsNone(X.close_exit(p, bars([100.0] * 20 + [95])))           # 같으면 이탈 아님
+        x = X.close_exit(p, bars([100.0] * 20 + [94.9]))
+        self.assertEqual(x["rule"], "EX-5")
+        self.assertIn("박스 하단", x["why"])
+
+    def test_next_open_sell_and_r(self):
+        out, st = [], FakeStore()
+        b = L.Book({}, out.append, store=st)
+        _, _, n = L.entry_check(W, 10000.5, 600_000, "09:30", 100_000_000)
+        b.buy("2026-11-20T09:30:00+09:00", "T", n, box_low=9600)
+        self.assertEqual(st.rows[1]["box_low"], 9600)
+        self.assertEqual(out[0]["position_id"], 1)
+        b.mark_exit("T", {"rule": "EX-5", "why": "박스 하단 종가 이탈", "as_of": "2026-11-20", "close": 9550, "box_low": 9600, "ma20_days": 0})
+        self.assertEqual(b.on_price("2026-11-21T09:00:05+09:00", "T", 9700, "09:00"), "EX-5")   # 다음 장 첫 조회가
+        self.assertEqual((out[1]["side"], out[1]["rule_id"]), ("sell", "EX-5"))
+        self.assertEqual(A.check(out[1]), [])
+        row = st.rows[1]
+        q = out[0]["qty"]
+        self.assertEqual(row["exit_price"], 9700)
+        self.assertEqual(row["realized_pnl"], round(q * (9700 - 10000.5), 2))
+        self.assertAlmostEqual(row["r_multiple"], round((9700 - 10000.5) / (10000.5 - n["stop"]), 3), places=3)
+        self.assertEqual(row["exit_rule"], "EX-5")
+
+    def test_stop_beats_close_exit(self):
+        out = []
+        b = L.Book({}, out.append)
+        _, _, n = L.entry_check(W, 10000.5, 600_000, "09:30", 100_000_000)
+        b.buy("t0", "T", n)
+        b.mark_exit("T", {"rule": "EX-5", "why": "20일선 아래 종가 3거래일 연속", "as_of": "2026-11-20", "ma20_days": 3})
+        self.assertEqual(b.on_price("2026-11-21T09:00:05+09:00", "T", 9300, "09:00"), "EX-1")   # 같은 날 손절이면 손절만
+        self.assertEqual([o["rule_id"] for o in out], ["EN-1", "EX-1"])
+
+    def test_ex3_updates_store(self):
+        st = FakeStore()
+        b = L.Book({}, [].append, store=st)
+        _, _, n = L.entry_check(W, 10050, 600_000, "09:30", 100_000_000)
+        b.buy("t0", "T", n)
+        b.on_price("t1", "T", 11859, "11:00")
+        self.assertEqual(st.rows[1]["stop"], 10050)
+        self.assertIn(("update", "T"), st.calls)
+
+    def test_exited_stage_uv3(self):
+        out = []
+        b = L.Book({}, out.append)
+        _, _, n = L.entry_check(W, 10100, 600_000, "10:05", 100_000_000)
+        b.buy("t0", "T", n)
+
+        class DB:
+            def select(self, table, q):
+                return {"sb_stocks": [{"code": "T"}], "sb_stage_log": [{"created_at": "2026-11-26T20:00:00+09:00"}]}[table]
+        for code, at in X.exited_approvals(DB(), list(b.pos)).items():
+            b.mark_exit(code, X.uv3_mark(at))
+        self.assertEqual(b.on_price("2026-11-27T09:00:05+09:00", "T", 10500, "09:00"), "UV-3")
+        note = json.loads(out[1]["note"])
+        self.assertEqual((out[1]["rule_id"], note["why"], note["exit"]["approved_at"]), ("UV-3", "퇴출 승인 매도", "2026-11-26T20:00:00+09:00"))
+        self.assertEqual(A.check(out[1]), [])
+
+    def test_sync_db_first(self):
+        db = {"A": {"id": 1, "entry": 100, "qty": 1, "stop": 94, "initial_stop": 94, "be": False, "opened": "x"}}
+        cache = {"A": {"id": 1, "stop": 100, "be": True}, "Z": {"id": 9}}
+        got = X.sync(cache, db, log=lambda *_: None)
+        self.assertEqual(list(got), ["A"])                     # 캐시에만 있는 Z 는 버림
+        self.assertEqual((got["A"]["stop"], got["A"]["be"]), (100, True))
+
+    def test_audit_ex5_same_day(self):
+        o = {"ts": "2026-11-20T15:30:00+09:00", "code": "T", "side": "sell", "qty": 1, "price": 9500, "rule_id": "EX-5",
+             "note": json.dumps({"stop": 9400, "exit": {"rule": "EX-5", "as_of": "2026-11-20", "ma20_days": 3}})}
+        self.assertTrue(any("다음 장" in b for b in A.check(o)))
+
+    def test_replay_close_exit_next_open(self):
+        anchors = [(0, 100), (200, 200), (220, 170), (240, 195), (255, 180), (268, 193), (278, 186), (290, 192), (299, 191), (300, 196), (306, 199), (316, 188)]
+
+        def val(i):
+            for (a, pa), (b_, pb) in zip(anchors, anchors[1:]):
+                if a <= i <= b_:
+                    return pa + (pb - pa) * (i - a) / (b_ - a)
+        d, c = date(2025, 8, 1), []
+        for i in range(317):
+            p = val(i)
+            c.append({"date": d.isoformat(), "open": p, "high": p * 1.005, "low": p * 0.995, "close": p,
+                      "volume": 3_000_000 if i == 300 else (1_000_000 if i < 200 else 600_000)})
+            d += timedelta(days=1)
+            while d.weekday() > 4:
+                d += timedelta(days=1)
+        orders, _, _ = L.replay({"T": c}, c[299]["date"], c[-1]["date"], 1e8)
+        sells = [o for o in orders if o["side"] == "sell"]
+        self.assertEqual(sells[0]["rule_id"], "EX-5")                     # 손절(184.24)보다 먼저 20일선 3일 이탈
+        x = json.loads(sells[0]["note"])["exit"]
+        self.assertGreater(sells[0]["ts"][:10], x["as_of"])               # 판정 다음 거래일
+        k = next(i for i, b in enumerate(c) if b["date"] == sells[0]["ts"][:10])
+        self.assertEqual(sells[0]["price"], c[k]["open"])                 # 다음 날 시가
+        self.assertEqual(A.report(orders), 0)
 
 
 if __name__ == "__main__":

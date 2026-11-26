@@ -10,6 +10,7 @@ import argparse
 import json
 import sys
 
+from .exits import MA_DAYS
 from .loop import CHASE, RR_MIN, STOP_PCT, VOL_FRAC, size
 
 TOL = 0.011  # 가격 반올림 허용 (numeric(14,2))
@@ -37,11 +38,23 @@ def check(o: dict) -> list[str]:
         want = size(float(n.get("balance") or 0), px)
         if o["qty"] != want or o.get("planned_qty") != o["qty"]:
             bad.append(f"SZ-1/EN-8 수량 {o['qty']} (계획 {o.get('planned_qty')}) ≠ 계산 {want}")
-    else:
-        if o.get("rule_id") != "EX-1":
-            bad.append(f"매도 근거 {o.get('rule_id')} (연습 루프 매도는 EX-1만)")
+    elif o.get("rule_id") == "EX-1":
         if n.get("stop") is None or px > float(n["stop"]) + TOL:
             bad.append(f"EX-1 매도가 {px} > 손절선 {n.get('stop')}")
+    elif o.get("rule_id") == "EX-5":        # 종가 퇴출: 전 거래일 종가 판정 → 다음 장 매도
+        x = n.get("exit") or {}
+        ok = x.get("ma20_days", 0) >= MA_DAYS or (x.get("box_low") and float(x.get("close", 0)) < float(x["box_low"]))
+        if x.get("rule") != "EX-5" or not ok:
+            bad.append(f"EX-5 근거 없음: 20일선 {x.get('ma20_days')}일·종가 {x.get('close')}·박스 하단 {x.get('box_low')}")
+        if not x.get("as_of") or str(o["ts"])[:10] <= x["as_of"]:
+            bad.append(f"EX-5 판정일 {x.get('as_of')} 다음 장이 아닌 {str(o['ts'])[:10]} 매도")
+        if n.get("stop") is not None and px <= float(n["stop"]) - TOL:
+            bad.append(f"EX-4 우선순위: 손절선 {n['stop']} 아래 {px} 인데 EX-1 아닌 EX-5")
+    elif o.get("rule_id") == "UV-3":
+        if (n.get("exit") or {}).get("rule") != "UV-3":
+            bad.append("UV-3 매도인데 퇴출 승인 표시 없음")
+    else:
+        bad.append(f"매도 근거 {o.get('rule_id')} (연습 매도는 EX-1·EX-5·UV-3)")
     return bad
 
 

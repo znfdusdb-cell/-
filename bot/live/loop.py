@@ -9,7 +9,9 @@
   sb_can_buy(code, price) = true (UV-1·UV-5·FN-1·CD-1·MF-1·EN-7, DB 관문)
   SZ-1 수량 = 잔고 x 1.25% ÷ (체결가 x 6%) 내림, RR-1 손익비 2:1 미만이면 기록 안 함
   EX-1 보유 종목 체결가 ≤ 손절선 → 매도 주문서(장중 즉시), EX-3 +3R(손절폭 x3) 도달 → 손절선을 매수가로 올린 기록
-20일선 3일·2R 절반 익절은 종가 기준이라 bot.daily 몫이다(여기 없음).
+  EX-5 bot.daily 가 종가로 표시한 '다음 장 시작 매도'(20일선 아래 종가 3일 연속·박스 하단 종가 이탈) → 09:00 이후 첫 조회가 매도
+  UV-3 sb_stocks.stage='exited'(퇴출 승인) 종목의 연습 보유 → 첫 조회가 매도. 우선순위 EX-1 > EX-5·UV-3 > EX-3 (bot.live.exits)
+연습 보유는 sb_positions(account='practice')에 기록, practice_positions.json 은 캐시. 2R 절반 익절은 연습에 넣지 않는다(지시서 11/27 D).
 웹소켓(H0STCNT0)은 표준 라이브러리에 없어 쓰지 않는다. 폴링만, 호출 간격은 kis.MIN_INTERVAL(초당 약 12건).
 """
 from __future__ import annotations
@@ -40,7 +42,8 @@ POS_FILE = HOME / "practice_positions.json"
 EVENTS_FILE = HOME / "practice_events.jsonl"
 ALERT_FILE = HOME / "live.alert"
 REPLAY_FILE = HOME / "replay_orders.jsonl"
-RULE_TEXT = {"EN-1": "피봇 장중 돌파 + 거래량", "EX-1": "손절 -6% 장중 발동"}
+RULE_TEXT = {"EN-1": "피봇 장중 돌파 + 거래량", "EX-1": "손절 -6% 장중 발동",
+             "EX-5": "종가 퇴출 다음 장 시작 매도", "UV-3": "퇴출 승인 → 봇 매도"}
 
 
 def size(balance: float, price: float) -> int:
@@ -92,24 +95,56 @@ def order_row(ts: str, code: str, side: str, rule: str, n: dict, qty: int) -> di
 
 
 class Book:
-    """연습 보유 장부. 주문서는 sink 로, 손절선 이동(EX-3)·판정 기록은 events 로."""
-    def __init__(self, positions: dict, sink, events=None):
+    """연습 보유 장부. 주문서는 sink 로, 손절선 이동(EX-3)·판정 기록은 events 로, 포지션은 store(sb_positions)로."""
+    def __init__(self, positions: dict, sink, events=None, store=None, warn=print):
         self.pos, self.sink, self.events = positions, sink, events if events is not None else []
+        self.store, self.warn = store, warn
 
-    def buy(self, ts, code, n):
-        self.sink(order_row(ts, code, "buy", "EN-1", n, n["qty"]))
-        self.pos[code] = {"entry": n["price"], "qty": n["qty"], "stop": n["stop"], "initial_stop": n["stop"], "be": False, "opened": ts}
+    def _db(self, fn, *a):
+        if self.store:
+            try:
+                getattr(self.store, fn)(*a)
+            except Exception as e:   # DB 가 안 돼도 주문서·캐시는 계속(다음 시작 때 DB 와 맞춘다)
+                self.warn(f"sb_positions {fn} 실패 {a[0]}: {e}")
+
+    def buy(self, ts, code, n, box_low=None):
+        o = order_row(ts, code, "buy", "EN-1", n, n["qty"])
+        self.pos[code] = {"entry": n["price"], "qty": n["qty"], "stop": n["stop"], "initial_stop": n["stop"], "be": False, "opened": ts,
+                          "box_low": box_low, "exit": None}
+        self._db("open", code, self.pos[code])
+        o["position_id"] = self.pos[code].get("id")
+        self.sink(o)
+
+    def sell(self, ts, code, rule, n) -> str:
+        p = self.pos.pop(code)
+        o = order_row(ts, code, "sell", rule, n, p["qty"])
+        o["position_id"] = p.get("id")
+        self.sink(o)
+        self._db("close", code, p, rule, n["price"], ts)
+        return rule
+
+    def mark_exit(self, code, x: dict) -> None:
+        """다음 조회가에 팔 표시(EX-5 종가 퇴출·UV-3 퇴출 승인). 이미 표시가 있으면 먼저 것을 둔다."""
+        if code in self.pos and not self.pos[code].get("exit"):
+            self.pos[code]["exit"] = x
+            self._db("update", code, self.pos[code])
 
     def on_price(self, ts, code, price, hhmm) -> str | None:
-        r = holding_check(self.pos[code], price, hhmm)
+        p = self.pos[code]
+        r = holding_check(p, price, hhmm)
+        if r and r[0] == "EX-1":                                    # EX-4 우선순위: 손절이 먼저
+            return self.sell(ts, code, "EX-1", r[1])
+        if p.get("exit"):
+            x = p["exit"]
+            n = {"price": price, "entry": p["entry"], "stop": p["stop"], "initial_stop": p["initial_stop"], "time": hhmm,
+                 "exit": x, "why": x.get("why")}
+            return self.sell(ts, code, x["rule"], n)
         if not r:
             return None
         rule, n = r
-        if rule == "EX-1":
-            self.sink(order_row(ts, code, "sell", "EX-1", n, self.pos.pop(code)["qty"]))
-        else:
-            self.pos[code].update(stop=self.pos[code]["entry"], be=True)
-            self.events.append({"ts": ts, "code": code, "rule": "EX-3", "stop_from": n["stop"], "stop_to": n["entry"], **n})
+        p.update(stop=p["entry"], be=True)
+        self._db("update", code, p)
+        self.events.append({"ts": ts, "code": code, "rule": "EX-3", "stop_from": n["stop"], "stop_to": n["entry"], **n})
         return rule
 
 
@@ -118,6 +153,7 @@ def replay(candles: dict[str, list[dict]], d0: str, d1: str, capital: float) -> 
     """과거 일봉으로 근사 재생. 고가 > 피봇이면 max(시가, 피봇) 체결, 거래량은 그날 전체(11:00 누적 대신), sb_can_buy 미적용.
     감시 목록은 전날까지 일봉으로 setups.compute 가 2단계+피봇을 낸 종목."""
     from ..setups import compute
+    from .exits import close_exit
     orders, cash = [], [capital]
 
     def sink(o):
@@ -135,10 +171,12 @@ def replay(candles: dict[str, list[dict]], d0: str, d1: str, capital: float) -> 
                 continue
             bar, ts = cs[i], f"{d}T15:30:00+09:00"
             if code in book.pos:
-                for k in ("open", "low", "high"):     # 시가(갭이면 시가 체결) → 저가(손절 우선, 손절선 체결) → 고가(+3R)
+                for k in ("open", "low", "high"):     # 시가(갭이면 시가 체결, 전날 종가 퇴출 표시는 시가 매도) → 저가(손절 우선) → 고가(+3R)
                     if code in book.pos:
                         px = book.pos[code]["stop"] if k == "low" and bar["low"] <= book.pos[code]["stop"] else bar[k]
-                        book.on_price(ts, code, px, "근사")
+                        book.on_price(f"{d}T09:00:00+09:00" if k == "open" else ts, code, px, "근사")
+                if code in book.pos and (x := close_exit(book.pos[code], cs[max(0, i - 40):i + 1])):
+                    book.mark_exit(code, x)                       # 오늘 종가 → 다음 날 시가 매도(EX-5)
                 continue
             hist = [dict(c) for c in cs[max(0, i - 400):i]]
             s = compute(code, hist)
@@ -153,9 +191,11 @@ def replay(candles: dict[str, list[dict]], d0: str, d1: str, capital: float) -> 
                 v, why = "skip", "현금 부족"
             if v == "order":
                 n["approx"] = "재생 근사: 일봉 고가>피봇 → max(시가,피봇) 체결, 거래량=하루 전체, sb_can_buy 미적용"
-                book.buy(ts, code, n)
+                book.buy(ts, code, n, s.get("cbox_low"))
                 if bar["low"] <= book.pos[code]["stop"]:               # 진입일 손절(보수적)
                     book.on_price(ts, code, book.pos[code]["stop"], "근사")
+                if code in book.pos and (x := close_exit(book.pos[code], cs[max(0, i - 40):i + 1])):
+                    book.mark_exit(code, x)
             else:
                 stat["skips"][why.split(" (")[0]] = stat["skips"].get(why.split(" (")[0], 0) + 1
     stat["open_positions"] = len(book.pos)
@@ -175,7 +215,11 @@ def alert(msg: str) -> None:
 
 
 def load_watchlist(db, today: date) -> list[dict]:
-    rows = db.select("sb_watchlist", f"select=as_of,code,pivot,stop,vol50,reason&as_of=lt.{today}&order=as_of.desc&limit={MAX_WATCH}")
+    q = f"&as_of=lt.{today}&order=as_of.desc&limit={MAX_WATCH}"
+    try:
+        rows = db.select("sb_watchlist", "select=as_of,code,pivot,stop,vol50,reason,box_low" + q)
+    except RuntimeError:     # 11/27 마이그레이션(box_low) 적용 전
+        rows = db.select("sb_watchlist", "select=as_of,code,pivot,stop,vol50,reason" + q)
     return [r for r in rows if r["as_of"] == rows[0]["as_of"] and r["pivot"]] if rows else []
 
 
@@ -199,15 +243,31 @@ def run_live() -> int:
     virtual = not balance
     if virtual:
         balance = PRACTICE_CAPITAL   # 봇 계좌 잔고 스냅샷이 없으면 연습용 가상 잔고(재생·백테스트와 같은 1억). 주문서 note.balance 에 그대로 남는다
-    positions = json.loads(POS_FILE.read_text(encoding="utf-8")) if POS_FILE.exists() else {}
+    from . import exits as X
+    cache = json.loads(POS_FILE.read_text(encoding="utf-8")) if POS_FILE.exists() else {}
+    store = X.Store(db)
+    try:
+        positions = X.sync(cache, store.load_open())          # DB 우선
+    except Exception as e:                                     # 11/27 마이그레이션(account practice) 적용 전 등
+        alert(f"sb_positions 연습 포지션 읽기 실패 → 캐시로 진행: {e}")
+        positions, store = cache, None
 
     def save():
         POS_FILE.write_text(json.dumps(positions, ensure_ascii=False), encoding="utf-8")
 
     def sink(o):
+        if o.get("position_id") is None:
+            o.pop("position_id", None)
         db.insert("sb_orders_log", [o])
-        print("주문서", o["side"], o["code"], o["qty"], o["price"], o["rule_id"])
-    book = Book(positions, sink)
+        print("주문서", o["side"], o["code"], o["qty"], o["price"], o["rule_id"], json.loads(o["note"]).get("why") or "")
+    book = Book(positions, sink, store=store, warn=alert)
+    try:                                                       # C. 퇴출 승인(stage='exited') → 첫 조회가 UV-3 매도
+        for code, at in X.exited_approvals(db, list(positions)).items():
+            book.mark_exit(code, X.uv3_mark(at))
+            print(f"{code} 퇴출 승인({at}) → 첫 조회가 UV-3 매도")
+    except Exception as e:
+        alert(f"퇴출 승인 읽기 실패: {e}")
+    save()
     codes = (list(positions) + [c for c in wl if c not in positions])[:MAX_WATCH]
     print(f"===== {now_kst():%Y-%m-%d %H:%M} 연습 루프: 감시 {len(wl)} + 연습 보유 {len(positions)}, 잔고 {balance:,.0f} =====")
     if virtual:
@@ -249,7 +309,7 @@ def run_live() -> int:
                 return [b for b in (db.rpc("sb_buy_blockers", {"p_code": c, "p_price": p}) or []) if not str(b).startswith(PRACTICE_SKIP)]
             v, why, n = entry_check(wl[code], q["price"], ref, hhmm, balance, gate)
             if v == "order":
-                book.buy(ts, code, n)
+                book.buy(ts, code, n, wl[code].get("box_low"))
                 save()
                 done.add(code)
             elif v == "skip" or why != last_why.get(code):
@@ -297,7 +357,16 @@ def main(argv=None) -> int:
     print(f"재생 {d0}..{d1} (근사: 일봉 고가>피봇 → max(시가,피봇) 체결, 거래량=하루 전체, sb_can_buy 미적용)")
     print(f"거래일 {stat['days']}, 돌파 신호 {stat['signals']}, 주문서 {len(orders)} (매수 {sum(o['side'] == 'buy' for o in orders)}), "
           f"EX-3 {len(events)}, 미진입 {stat['skips']}, 남은 보유 {stat['open_positions']} → {REPLAY_FILE}")
-    from .audit import report
+    sells = {}
+    for o in orders:
+        if o["side"] == "sell":
+            why = (json.loads(o["note"]).get("why") or "") if o["rule_id"] == "EX-5" else ""
+            k = o["rule_id"] + (" 20일선" if "20일선" in why else "") + (" 박스" if "박스" in why else "")
+            sells[k] = sells.get(k, 0) + 1
+    print(f"매도 규칙별 {sells}")
+    from .audit import check, report
+    bad = sum(len(check(o)) for o in orders)
+    print(f"전체 주문서 {len(orders)}장 위반 {bad}건 (아래 표는 마지막 30장)")
     return report(orders[-30:])
 
 
